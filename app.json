@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Centifi",
+    "slug": "centifi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f0f0f"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.centifi",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Used for voice expense entry",
+        "NSCameraUsageDescription": "Used to capture receipts",
+        "NSPhotoLibraryUsageDescription": "Used to select receipts from your library"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6C63FF"
+      },
+      "package": "app.centifi",
+      "versionCode": 1,
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-av",
+      "expo-image-picker",
+      "expo-system-ui",
+      "expo-notifications"
+    ],
+    "scheme": "centifi",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
