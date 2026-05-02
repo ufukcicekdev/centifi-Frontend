@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import type { CustomCategory } from "../constants/mockData";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
 const PURPLE = "#6C63FF";
 
@@ -29,6 +30,7 @@ export function EmojiPickerSheet({
   onClose: () => void;
   isDark: boolean;
 }) {
+  const keyboardInset = useKeyboardInset();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: "#00000066" }} onPress={onClose} />
@@ -41,7 +43,7 @@ export function EmojiPickerSheet({
           backgroundColor: isDark ? "#1a1a1a" : "#fff",
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
-          paddingBottom: Platform.OS === "ios" ? 36 : 24,
+          paddingBottom: (Platform.OS === "ios" ? 36 : 24) + keyboardInset,
           paddingTop: 16,
         }}
       >
@@ -119,6 +121,7 @@ export default function CategoryEditorModal({
   const [name, setName] = useState(existing?.name ?? "");
   const [emoji, setEmoji] = useState(existing?.emoji ?? "📦");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const keyboardInset = useKeyboardInset();
 
   useEffect(() => {
     if (visible) {
@@ -164,7 +167,7 @@ export default function CategoryEditorModal({
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           padding: 24,
-          paddingBottom: Platform.OS === "ios" ? 40 : 28,
+          paddingBottom: (Platform.OS === "ios" ? 40 : 28) + keyboardInset,
         }}
       >
         <View

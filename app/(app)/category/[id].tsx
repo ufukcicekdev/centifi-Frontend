@@ -22,6 +22,7 @@ import MonthPickerModal from "../../../components/MonthPickerModal";
 import ExpenseTxRow from "../../../components/ExpenseTxRow";
 import { getCategoryMeta } from "../../../constants/mockData";
 import type { Language } from "../../../i18n";
+import { useThrottledRouter } from "../../../hooks/useThrottledRouter";
 
 const CORAL = "#FF6B6B";
 const INCOME_GREEN = "#55efc4";
@@ -38,6 +39,7 @@ const SCOPE_PILL: Record<Language, Record<ScopeFlow, string>> = {
 
 export default function CategoryDetailScreen() {
   const router = useRouter();
+  const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
   const rawId = useLocalSearchParams<{ id: string | string[] }>().id;
   const categoryId = Array.isArray(rawId) ? rawId[0] : rawId ?? "";
@@ -265,7 +267,7 @@ export default function CategoryDetailScreen() {
             </View>
 
             <Pressable
-              onPress={() => router.push("/(app)/settings")}
+              onPress={() => throttledPush("/(app)/settings")}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -366,7 +368,7 @@ export default function CategoryDetailScreen() {
           </Pressable>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
             <Pressable
-              onPress={() => router.push("/(app)/settings")}
+              onPress={() => throttledPush("/(app)/settings")}
               style={{
                 width: 48,
                 height: 48,
@@ -415,7 +417,7 @@ export default function CategoryDetailScreen() {
         activeListId={activeListId}
         onSelectList={setActiveList}
         onAddList={addList}
-        onEditLists={() => router.push("/(app)/settings")}
+        onEditLists={() => throttledPush("/(app)/settings")}
         isDark={isDark}
         language={language}
       />

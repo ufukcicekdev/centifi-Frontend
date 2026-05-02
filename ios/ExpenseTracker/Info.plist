@@ -33,6 +33,12 @@
           <string>app.centifi</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.161091505892-t5vd278qcfccr71k2si2p3gem4svu621</string>
+        </array>
+      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>

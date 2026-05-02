@@ -25,6 +25,7 @@ import ListsPickerModal from "../../components/ListsPickerModal";
 import CategoryEditorModal from "../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../components/ExpenseAmountSignRow";
 import type { Language } from "../../i18n";
+import { useThrottledRouter } from "../../hooks/useThrottledRouter";
 
 type RecurrenceId =
   | "once"
@@ -134,6 +135,7 @@ function formatDatePill(ymd: string, language: Language): string {
 
 export default function AddExpense() {
   const router = useRouter();
+  const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const { t } = useTranslation();
@@ -468,7 +470,7 @@ export default function AddExpense() {
         onAddList={addList}
         onEditLists={() => {
           setListsModalOpen(false);
-          router.push("/(app)/settings");
+          throttledPush("/(app)/settings");
         }}
         isDark={isDark}
         language={lang}

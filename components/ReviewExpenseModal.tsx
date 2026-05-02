@@ -1,283 +1,672 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
-  Modal, View, Text, TextInput, ScrollView, Pressable,
-  Platform, KeyboardAvoidingView, Animated, ActivityIndicator,
+  Modal,
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  Pressable,
+  Platform,
+  KeyboardAvoidingView,
+  Animated,
+  ActivityIndicator,
+  StyleSheet,
+  Alert,
+  useWindowDimensions,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import { getCategoryMeta, Category } from "../constants/mockData";
-import { createExpense, expenseListIdForApi } from "../lib/backend";
-import { useStore } from "../store/useStore";
+import { getCategoryMeta } from "../constants/mockData";
+import { createExpense, expenseListIdForApi, type ParsedExpenseItem } from "../lib/backend";
+import { formatApiErrorDetailBody, type ApiError } from "../lib/api";
+import { currencySymbolFor } from "../lib/formatMoney";
+import type { Language } from "../i18n";
+import { buildCategoriesForHome, useStore } from "../store/useStore";
+import AddExpenseDatePickerModal from "./AddExpenseDatePickerModal";
+import CategoryEditorModal from "./CategoryEditorModal";
 
-interface ParsedExpense {
-  amount: number;
+export type ReviewParsingKind = "receipt" | "voice" | "text";
+
+type EditRow = {
+  key: string;
+  amount: string;
   description: string;
-  category: Category;
-  date: string;
+  category: string;
+  occurredAt: Date;
   currency: string;
-}
+};
 
 interface Props {
   visible: boolean;
-  parsing: boolean; // true = still waiting for Gemini response
-  parsedExpense: ParsedExpense | null;
+  parsing: boolean;
+  /** Yükleme sırasında gösterilen açıklama (ses/fiş/metin) */
+  parsingKind?: ReviewParsingKind;
+  parsedExpenses: ParsedExpenseItem[] | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function ReviewExpenseModal({ visible, parsing, parsedExpense, onClose, onSaved }: Props) {
-  const { t } = useTranslation();
-  const { isDark, addExpense, activeListId, allCategories, customCategories, categoryDisplayOverrides } = useStore();
-  const categories = allCategories();
+function parseYmdToLocal(ymd: string): Date {
+  const parts = ymd.trim().split(/[-/]/).map((p) => parseInt(p, 10));
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d, 12, 0, 0, 0);
+}
 
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string>("other");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+function toApiDateOnly(d: Date): string {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
+}
+
+/** Add expense ekranı ile aynı “Bugün / 27 Eki” etiketi */
+function formatDatePill(ymd: string, language: Language): string {
+  const dt = parseYmdToLocal(ymd);
+  const now = new Date();
+  const sameDay =
+    dt.getFullYear() === now.getFullYear() &&
+    dt.getMonth() === now.getMonth() &&
+    dt.getDate() === now.getDate();
+  if (sameDay) return language === "tr" ? "Bugün" : "Today";
+  const locale =
+    language === "tr"
+      ? "tr-TR"
+      : language === "de"
+        ? "de-DE"
+        : language === "fr"
+          ? "fr-FR"
+          : language === "es"
+            ? "es-ES"
+            : "en-US";
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(dt);
+}
+
+/** Turkish "13,50" vs "1.234,56" vs US "13.50" → number */
+function parseAmountInput(raw: string): number {
+  const trimmed = raw.replace(/\s/g, "");
+  if (!trimmed) return NaN;
+  const lastComma = trimmed.lastIndexOf(",");
+  const lastDot = trimmed.lastIndexOf(".");
+  let normalized: string;
+  if (lastComma > lastDot) {
+    normalized = trimmed.replace(/\./g, "").replace(",", ".");
+  } else if (lastDot > lastComma) {
+    normalized = trimmed.replace(/,/g, "");
+  } else if (trimmed.includes(",")) {
+    normalized = trimmed.replace(",", ".");
+  } else {
+    normalized = trimmed;
+  }
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/** Add ekranı ile aynı: sabit alt bar + ScrollView son boşluğu */
+const SCROLL_BOTTOM_PAD_WITH_SAVE_BAR = 120;
+
+export default function ReviewExpenseModal({
+  visible,
+  parsing,
+  parsingKind = "receipt",
+  parsedExpenses,
+  onClose,
+  onSaved,
+}: Props) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  const {
+    isDark,
+    addExpense,
+    addCategory,
+    activeListId,
+    customCategories,
+    categoryDisplayOverrides,
+    enabledCategoryIds,
+    language,
+    displayCurrency,
+  } = useStore();
+  const lang = language as Language;
+  const homeCats = useMemo(() => {
+    let cats = buildCategoriesForHome(enabledCategoryIds, customCategories, categoryDisplayOverrides);
+    if (cats.length === 0) cats = buildCategoriesForHome(null, customCategories, categoryDisplayOverrides);
+    return cats;
+  }, [enabledCategoryIds, customCategories, categoryDisplayOverrides]);
+  const expenseCurrency = (displayCurrency || "USD").trim().toUpperCase();
+
+  const [rows, setRows] = useState<EditRow[]>([]);
+  const [dateModalRow, setDateModalRow] = useState<number | null>(null);
+  const [categoryModalRow, setCategoryModalRow] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
 
-  const bg = isDark ? "#0f0f0f" : "#f8f8f8";
+  const bg = isDark ? "#000000" : "#f5f5f5";
   const cardBg = isDark ? "#1a1a1a" : "#ffffff";
-  const textColor = isDark ? "#ffffff" : "#0f0f0f";
-  const mutedColor = isDark ? "#888888" : "#666666";
+  const textColor = isDark ? "#ffffff" : "#111111";
+  const mutedColor = isDark ? "#6b6b70" : "#888888";
   const borderColor = isDark ? "#2a2a2a" : "#e5e5e5";
+  const bottomBarBg = isDark ? "#0a0a0a" : "#ffffff";
+  const saveBtnBg = isDark ? "#2c2c2e" : "#e2e2e6";
+  const pillBg = isDark ? "#1c1c1e" : "#efefef";
+
+  const dateYmdForModal = useMemo(() => {
+    if (dateModalRow === null || rows[dateModalRow] == null) return toApiDateOnly(new Date());
+    return toApiDateOnly(rows[dateModalRow].occurredAt);
+  }, [dateModalRow, rows]);
+
+  const pillStyle = useMemo(
+    () => ({
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      backgroundColor: pillBg,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      gap: 6,
+    }),
+    [pillBg],
+  );
+
+  const patchRow = useCallback((index: number, patch: Partial<EditRow>) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }, []);
 
   useEffect(() => {
-    if (parsedExpense && !parsing) {
-      setAmount(parsedExpense.amount.toFixed(2));
-      setDescription(parsedExpense.description);
-      setCategory(parsedExpense.category);
-      setDate(parsedExpense.date);
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: true }),
-      ]).start();
-    } else {
-      fadeAnim.setValue(0);
-      slideAnim.setValue(40);
-    }
-  }, [parsedExpense, parsing]);
+    if (!visible || !parsing) return;
+    setRows([]);
+    fadeAnim.setValue(0);
+    slideAnim.setValue(40);
+  }, [visible, parsing, fadeAnim, slideAnim]);
 
-  // reset on close
+  useEffect(() => {
+    if (!visible || parsing || !parsedExpenses?.length || success) return;
+    setRows(
+      parsedExpenses.map((p, i) => {
+        const amt =
+          typeof p.amount === "number" && Number.isFinite(p.amount) ? Number(p.amount).toFixed(2) : "0.00";
+        const cur = (p.currency || expenseCurrency).trim().toUpperCase();
+        return {
+          key: `e-${i}-${p.description.slice(0, 12)}`,
+          amount: amt,
+          description: p.description ?? "",
+          category: String(p.category || "other"),
+          occurredAt: parseYmdToLocal(p.date || toApiDateOnly(new Date())),
+          currency: cur,
+        };
+      }),
+    );
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: true }),
+    ]).start();
+  }, [visible, parsing, parsedExpenses, success, expenseCurrency, fadeAnim, slideAnim]);
+
   useEffect(() => {
     if (!visible) {
       setSuccess(false);
       setSaving(false);
+      setDateModalRow(null);
+      setCategoryModalRow(null);
       fadeAnim.setValue(0);
       slideAnim.setValue(40);
+      setRows([]);
     }
-  }, [visible]);
+  }, [visible, fadeAnim, slideAnim]);
 
-  const handleSave = async () => {
-    const num = parseFloat(amount);
-    if (!num || num <= 0) return;
+  const handleSaveAll = async () => {
+    if (rows.length === 0) return;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const num = parseAmountInput(row.amount);
+      if (!Number.isFinite(num) || num <= 0) {
+        Alert.alert(
+          language === "tr" ? "Geçersiz tutar" : "Invalid amount",
+          language === "tr"
+            ? `Satır ${i + 1}: geçerli bir tutar girin (örn. 13,50 veya 13.50).`
+            : `Row ${i + 1}: enter a valid amount (e.g. 13.50 or 13,50).`,
+        );
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const { notificationAsync, NotificationFeedbackType } = await import("expo-haptics");
       await notificationAsync(NotificationFeedbackType.Success);
-    } catch {}
+    } catch {
+      /* no haptics */
+    }
+
     try {
       const list_id = expenseListIdForApi(activeListId);
-      const dto = await createExpense({
-        amount: parseFloat(amount),
-        description,
-        category,
-        date,
-        currency: "USD",
-        is_income: false,
-        ...(list_id != null ? { list_id } : {}),
-      });
-      addExpense({
-        id: String(dto.id),
-        amount: parseFloat(amount),
-        description,
-        category,
-        date,
-        currency: dto.currency ?? "USD",
-        listId: activeListId,
-        isIncome: false,
-      });
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const num = parseAmountInput(row.amount);
+        const date = toApiDateOnly(row.occurredAt);
+        const cur = (row.currency || expenseCurrency).trim().toUpperCase();
+        const dto = await createExpense({
+          amount: num,
+          description: row.description.trim(),
+          category: row.category,
+          date,
+          currency: cur,
+          is_income: false,
+          ...(list_id != null ? { list_id } : {}),
+        });
+        addExpense({
+          id: String(dto.id),
+          amount: num,
+          description: row.description.trim(),
+          category: row.category,
+          date,
+          currency: dto.currency ?? cur,
+          listId: activeListId,
+          isIncome: false,
+        });
+      }
+      setSaving(false);
       setSuccess(true);
       setTimeout(() => {
         onSaved();
       }, 900);
-    } catch {
+    } catch (e) {
       setSaving(false);
+      const detail = formatApiErrorDetailBody(
+        e && typeof e === "object" && "details" in e ? (e as ApiError).details : null,
+      );
+      Alert.alert(
+        language === "tr" ? "Kaydedilemedi" : "Could not save",
+        detail ??
+          (language === "tr"
+            ? "Bağlantı veya sunucu hatası. Tekrar dene."
+            : "Network or server error. Please try again."),
+      );
     }
   };
 
-  const meta = getCategoryMeta(category, customCategories, categoryDisplayOverrides);
+  const showForm = !parsing && !success && rows.length > 0;
+  const emptyParsed = !parsing && !success && parsedExpenses != null && parsedExpenses.length === 0;
+
+  const scrollContentBottomPad =
+    showForm ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR + Math.min(80, Math.max(0, (rows.length - 1) * 28)) : 40;
+
+  const parsingCopy = useMemo(() => {
+    const tr = language === "tr";
+    if (parsingKind === "voice") {
+      return tr ? "Centifi sesini analiz ediyor…" : "Centifi is analyzing what you said…";
+    }
+    if (parsingKind === "text") {
+      return tr ? "Centifi metnini analiz ediyor…" : "Centifi is analyzing your text…";
+    }
+    return tr ? "Centifi fişini analiz ediyor…" : "Centifi is analyzing your receipt…";
+  }, [parsingKind, language]);
+
+  const saveLabel = useMemo(() => {
+    if (rows.length <= 1) return t("common.save");
+    const tr = language === "tr";
+    return tr ? `Tümünü kaydet (${rows.length})` : `Save all (${rows.length})`;
+  }, [rows.length, t, language]);
+
+  const successTitle = useMemo(() => {
+    const tr = language === "tr";
+    if (rows.length > 1) {
+      return tr ? "Masraflar kaydedildi!" : "Expenses saved!";
+    }
+    return tr ? "Masraf kaydedildi!" : "Expense saved!";
+  }, [language, rows.length]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1, backgroundColor: bg }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
       >
-        {/* Header */}
-        <View style={{
-          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-          paddingHorizontal: 24, paddingTop: Platform.OS === "ios" ? 20 : 16, paddingBottom: 16,
-          borderBottomWidth: 1, borderBottomColor: borderColor,
-        }}>
-          <Pressable onPress={onClose} style={{
-            width: 36, height: 36, borderRadius: 12,
-            backgroundColor: cardBg, alignItems: "center", justifyContent: "center",
-            borderWidth: 1, borderColor,
-          }}>
-            <Ionicons name="close" size={18} color={mutedColor} />
-          </Pressable>
-          <Text style={{ color: textColor, fontSize: 16, fontWeight: "700" }}>
-            {parsing ? "Analyzing…" : success ? "Saved!" : "Review Expense"}
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 140 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {parsing ? (
-            <View style={{ alignItems: "center", paddingTop: 80 }}>
-              <ActivityIndicator size="large" color="#6C63FF" />
-              <Text style={{ color: mutedColor, marginTop: 20, fontSize: 15 }}>Gemini is reading your receipt…</Text>
-            </View>
-          ) : success ? (
-            <View style={{ alignItems: "center", paddingTop: 80 }}>
-              <View style={{
-                width: 72, height: 72, borderRadius: 36,
-                backgroundColor: "#43E97B20", alignItems: "center", justifyContent: "center", marginBottom: 16,
-              }}>
-                <Ionicons name="checkmark" size={38} color="#43E97B" />
-              </View>
-              <Text style={{ color: textColor, fontSize: 20, fontWeight: "700" }}>Expense Saved!</Text>
-            </View>
-          ) : (
-            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-              {/* Amount hero card */}
-              <View style={{
-                backgroundColor: cardBg, borderRadius: 24, padding: 24, marginBottom: 16,
-                borderWidth: 1, borderColor, alignItems: "center",
-              }}>
-                <View style={{
-                  width: 60, height: 60, borderRadius: 18,
-                  backgroundColor: meta.bgColor, alignItems: "center", justifyContent: "center", marginBottom: 12,
-                }}>
-                  <Text style={{ fontSize: 28 }}>{meta.emoji}</Text>
-                </View>
-                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                  <Text style={{ color: mutedColor, fontSize: 18, fontWeight: "600", marginTop: 6, marginRight: 2 }}>$</Text>
-                  <TextInput
-                    value={amount}
-                    onChangeText={setAmount}
-                    keyboardType="decimal-pad"
-                    style={{
-                      color: textColor, fontSize: 48, fontWeight: "800",
-                      letterSpacing: -2, minWidth: 80, padding: 0, textAlign: "center",
-                    }}
-                  />
-                </View>
-                <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600", marginTop: 4 }}>
-                  {meta.emoji} {meta.name}
-                </Text>
-              </View>
-
-              {/* Description */}
-              <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor }}>
-                <Text style={{ color: mutedColor, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 8 }}>Description</Text>
-                <TextInput
-                  value={description}
-                  onChangeText={setDescription}
-                  style={{ color: textColor, fontSize: 16, fontWeight: "500", padding: 0 }}
-                  placeholderTextColor={mutedColor}
-                />
-              </View>
-
-              {/* Date */}
-              <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor }}>
-                <Text style={{ color: mutedColor, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 8 }}>Date</Text>
-                <TextInput
-                  value={date}
-                  onChangeText={setDate}
-                  style={{ color: textColor, fontSize: 16, fontWeight: "500", padding: 0 }}
-                  placeholderTextColor={mutedColor}
-                />
-              </View>
-
-              {/* Category picker */}
-              <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor }}>
-                <Text style={{ color: mutedColor, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>Category</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {categories.map((cat) => {
-                    const m = getCategoryMeta(cat.id, customCategories, categoryDisplayOverrides);
-                    const isSelected = cat.id === category;
-                    return (
-                      <Pressable
-                        key={cat.id}
-                        onPress={() => setCategory(cat.id)}
-                        style={({ pressed }) => ({
-                          flexDirection: "row", alignItems: "center", gap: 6,
-                          paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
-                          backgroundColor: isSelected ? m.bgColor : isDark ? "#252525" : "#f5f5f5",
-                          borderWidth: isSelected ? 1.5 : 1,
-                          borderColor: isSelected ? m.color : "transparent",
-                          opacity: pressed ? 0.7 : 1,
-                        })}
-                      >
-                        <Text style={{ fontSize: 14 }}>{m.emoji}</Text>
-                        <Text style={{ fontSize: 12, fontWeight: isSelected ? "600" : "400", color: isSelected ? m.color : mutedColor }}>
-                          {m.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </Animated.View>
-          )}
-        </ScrollView>
-
-        {/* Bottom buttons */}
-        {!parsing && !success && (
-          <View style={{
-            position: "absolute", bottom: 0, left: 0, right: 0,
-            padding: 24, paddingBottom: Platform.OS === "ios" ? 36 : 24,
-            backgroundColor: bg, borderTopWidth: 1, borderTopColor: borderColor,
-            flexDirection: "row", gap: 12,
-          }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
+          <View style={{ flex: 1 }}>
             <Pressable
               onPress={onClose}
-              style={({ pressed }) => ({
-                flex: 1, borderRadius: 16, padding: 16, alignItems: "center",
-                backgroundColor: cardBg, borderWidth: 1, borderColor,
-                opacity: pressed ? 0.7 : 1,
-              })}
+              hitSlop={12}
+              style={{ alignSelf: "flex-start", paddingHorizontal: 20, paddingVertical: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={t("common.close", { defaultValue: "Close" })}
             >
-              <Text style={{ color: mutedColor, fontSize: 15, fontWeight: "600" }}>Discard</Text>
+              <Ionicons name="close" size={28} color={textColor} />
             </Pressable>
-            <Pressable
-              onPress={handleSave}
-              disabled={saving}
-              style={({ pressed }) => ({
-                flex: 2, borderRadius: 16, padding: 16, alignItems: "center",
-                backgroundColor: "#6C63FF", opacity: pressed || saving ? 0.8 : 1,
-                shadowColor: "#6C63FF", shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.4, shadowRadius: 16, elevation: 10,
-              })}
+
+            <ScrollView
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              keyboardDismissMode="interactive"
+              automaticallyAdjustKeyboardInsets
+              nestedScrollEnabled
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: 8,
+                paddingBottom: scrollContentBottomPad,
+                flexGrow: parsing || success || emptyParsed ? 1 : undefined,
+              }}
+              keyboardShouldPersistTaps="handled"
             >
-              {saving ? (
-                <ActivityIndicator size="small" color="#fff" />
+              {parsing ? (
+                <View style={{ alignItems: "center", paddingTop: 72, paddingHorizontal: 12 }}>
+                  <ActivityIndicator size="large" color="#6C63FF" />
+                  <Text style={{ color: mutedColor, marginTop: 20, fontSize: 15, textAlign: "center" }}>
+                    {parsingCopy}
+                  </Text>
+                </View>
+              ) : success ? (
+                <View style={{ alignItems: "center", paddingTop: 72 }}>
+                  <View
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 36,
+                      backgroundColor: "#43E97B20",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <Ionicons name="checkmark" size={38} color="#43E97B" />
+                  </View>
+                  <Text style={{ color: textColor, fontSize: 20, fontWeight: "700" }}>{successTitle}</Text>
+                </View>
+              ) : emptyParsed ? (
+                <View style={{ alignItems: "center", paddingTop: 72, paddingHorizontal: 16 }}>
+                  <Text style={{ color: mutedColor, fontSize: 15, textAlign: "center" }}>
+                    {language === "tr"
+                      ? "Bu girişten harcama çıkarılamadı. Farklı bir ifade veya fiş dene."
+                      : "Could not extract any expenses from this input. Try different wording or another receipt."}
+                  </Text>
+                </View>
               ) : (
-                <Text style={{ color: "#ffffff", fontSize: 15, fontWeight: "700" }}>Save Expense</Text>
+                <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+                  {rows.map((row, i) => {
+                    const meta = getCategoryMeta(row.category, customCategories, categoryDisplayOverrides);
+                    const rowSym = currencySymbolFor(row.currency || expenseCurrency, lang);
+                    return (
+                      <React.Fragment key={row.key}>
+                      <View style={{ marginBottom: i < rows.length - 1 ? 20 : 0 }}>
+                        {rows.length > 1 && (
+                          <Text
+                            style={{
+                              color: mutedColor,
+                              fontSize: 12,
+                              fontWeight: "700",
+                              marginBottom: 8,
+                              letterSpacing: 0.5,
+                            }}
+                          >
+                            {language === "tr" ? `Kalem ${i + 1} / ${rows.length}` : `Item ${i + 1} / ${rows.length}`}
+                          </Text>
+                        )}
+                        <View
+                          style={{
+                            backgroundColor: cardBg,
+                            borderRadius: 22,
+                            paddingVertical: 22,
+                            paddingHorizontal: 20,
+                            marginBottom: 14,
+                            borderWidth: 1,
+                            borderColor,
+                            alignItems: "center",
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 64,
+                              height: 64,
+                              borderRadius: 20,
+                              backgroundColor: meta.bgColor,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginBottom: 14,
+                            }}
+                          >
+                            <Text style={{ fontSize: 30 }}>{meta.emoji}</Text>
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "flex-start",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: mutedColor,
+                                fontSize: 20,
+                                fontWeight: "700",
+                                marginTop: 14,
+                                marginRight: 4,
+                              }}
+                            >
+                              {rowSym}
+                            </Text>
+                            <TextInput
+                              value={row.amount}
+                              onChangeText={(text) => patchRow(i, { amount: text })}
+                              keyboardType="decimal-pad"
+                              style={{
+                                color: textColor,
+                                fontSize: 44,
+                                fontWeight: "800",
+                                letterSpacing: -2,
+                                minWidth: 100,
+                                padding: 0,
+                                textAlign: "center",
+                              }}
+                              accessibilityLabel={t("review.amount", { defaultValue: "Amount" })}
+                            />
+                          </View>
+                          <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600", marginTop: 6 }}>
+                            {meta.emoji} {meta.name}
+                          </Text>
+                        </View>
+
+                        <View style={{ marginBottom: 12 }}>
+                          <Pressable onPress={() => setDateModalRow(i)} style={pillStyle}>
+                            <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
+                              {formatDatePill(toApiDateOnly(row.occurredAt), lang)}
+                            </Text>
+                            <Ionicons name="chevron-down" size={14} color={mutedColor} />
+                          </Pressable>
+                        </View>
+
+                        <View
+                          style={{
+                            backgroundColor: cardBg,
+                            borderRadius: 16,
+                            padding: 16,
+                            marginBottom: 12,
+                            borderWidth: 1,
+                            borderColor,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: mutedColor,
+                              fontSize: 11,
+                              letterSpacing: 1.2,
+                              textTransform: "uppercase",
+                              marginBottom: 8,
+                            }}
+                          >
+                            {language === "tr" ? "Açıklama" : "Description"}
+                          </Text>
+                          <TextInput
+                            value={row.description}
+                            onChangeText={(text) => patchRow(i, { description: text })}
+                            style={{
+                              color: textColor,
+                              fontSize: 16,
+                              fontWeight: "500",
+                              padding: 0,
+                              minHeight: 22,
+                              textAlignVertical: "top",
+                            }}
+                            placeholderTextColor={mutedColor}
+                            multiline
+                          />
+                        </View>
+
+                        <View style={{ marginBottom: 16 }}>
+                          <Text
+                            style={{
+                              color: mutedColor,
+                              fontSize: 11,
+                              letterSpacing: 1.2,
+                              textTransform: "uppercase",
+                              marginBottom: 10,
+                            }}
+                          >
+                            {language === "tr" ? "Kategori" : "Category"}
+                          </Text>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                            nestedScrollEnabled
+                            style={{ flexGrow: 0, flexShrink: 0, maxHeight: 56 }}
+                            contentContainerStyle={{ gap: 10, alignItems: "center", paddingRight: 8 }}
+                          >
+                            <Pressable
+                              onPress={() => setCategoryModalRow(i)}
+                              style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                borderWidth: 2,
+                                borderColor: isDark ? "#3a3a40" : "#ccc",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Ionicons name="add" size={24} color={textColor} />
+                            </Pressable>
+
+                            {homeCats.map((cat) => {
+                              const m = getCategoryMeta(cat.id, customCategories, categoryDisplayOverrides);
+                              const sel = cat.id === row.category;
+                              return (
+                                <Pressable
+                                  key={cat.id}
+                                  onPress={() => patchRow(i, { category: cat.id })}
+                                  style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 12,
+                                    borderRadius: 22,
+                                    backgroundColor: sel ? (isDark ? "#2a2a2e" : "#e4e4ea") : pillBg,
+                                    maxWidth: winW * 0.55,
+                                    borderWidth: sel ? 2 : 0,
+                                    borderColor: sel ? m.color : "transparent",
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 20 }}>{m.emoji}</Text>
+                                  <Text
+                                    style={{
+                                      color: textColor,
+                                      fontWeight: sel ? "700" : "600",
+                                      fontSize: 14,
+                                      flexShrink: 1,
+                                    }}
+                                    numberOfLines={1}
+                                  >
+                                    {m.name}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </ScrollView>
+                        </View>
+                      </View>
+                      </React.Fragment>
+                    );
+                  })}
+                </Animated.View>
               )}
-            </Pressable>
+            </ScrollView>
+
+            {showForm && (
+              <View
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  paddingHorizontal: 20,
+                  paddingTop: 12,
+                  paddingBottom: Math.max(insets.bottom, 16),
+                  backgroundColor: bottomBarBg,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: isDark ? "#222222" : "#e5e5e5",
+                }}
+              >
+                <Pressable
+                  onPress={handleSaveAll}
+                  disabled={saving}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    backgroundColor: saveBtnBg,
+                    borderRadius: 16,
+                    paddingVertical: 16,
+                    opacity: saving ? 0.65 : 1,
+                  }}
+                >
+                  {saving ? (
+                    <ActivityIndicator color={textColor} />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={22} color={textColor} />
+                      <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>{saveLabel}</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            )}
           </View>
-        )}
+        </SafeAreaView>
+
+        <AddExpenseDatePickerModal
+          visible={dateModalRow !== null}
+          valueYmd={dateYmdForModal}
+          onClose={() => setDateModalRow(null)}
+          onConfirm={(ymd) => {
+            if (dateModalRow !== null) {
+              patchRow(dateModalRow, { occurredAt: parseYmdToLocal(ymd) });
+            }
+            setDateModalRow(null);
+          }}
+          isDark={isDark}
+          language={lang}
+        />
+
+        <CategoryEditorModal
+          visible={categoryModalRow !== null}
+          onClose={() => setCategoryModalRow(null)}
+          isDark={isDark}
+          onSave={async (data) => {
+            const created = await addCategory(data);
+            if (categoryModalRow !== null) {
+              patchRow(categoryModalRow, { category: created.id });
+            }
+            setCategoryModalRow(null);
+          }}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );

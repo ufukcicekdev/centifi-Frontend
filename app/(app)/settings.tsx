@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -12,12 +13,14 @@ import {
   Linking,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store/useStore";
 import { LANGUAGES, Language } from "../../i18n";
 import {
@@ -39,6 +42,7 @@ import { updateMe, type BackendUser } from "../../lib/backend";
 import type { ApiError } from "../../lib/api";
 import { isValidEmail } from "../../lib/isValidEmail";
 import { ensureLocalNotificationPermissions } from "../../lib/localNotifications";
+import { clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
 
 const PURPLE = "#6C63FF";
 const DESTRUCTIVE = "#FF453A";
@@ -280,6 +284,15 @@ function AddBankModal({ visible, onSave, onClose, isDark }: {
 export default function Settings() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        clearRouterPushCooldown();
+      };
+    }, []),
+  );
+
   const {
     isDark, toggleTheme, language, setLanguage,
     displayCurrency, setDisplayCurrency,
@@ -303,7 +316,38 @@ export default function Settings() {
     isAuthenticated,
     user,
     setUser,
-  } = useStore();
+  } = useStore(
+    useShallow((s) => ({
+      isDark: s.isDark,
+      toggleTheme: s.toggleTheme,
+      language: s.language,
+      setLanguage: s.setLanguage,
+      displayCurrency: s.displayCurrency,
+      setDisplayCurrency: s.setDisplayCurrency,
+      monthlyBudget: s.monthlyBudget,
+      setMonthlyBudget: s.setMonthlyBudget,
+      notificationsEnabled: s.notificationsEnabled,
+      setNotificationsEnabled: s.setNotificationsEnabled,
+      customCategories: s.customCategories,
+      addCategory: s.addCategory,
+      updateCategory: s.updateCategory,
+      removeCategory: s.removeCategory,
+      lists: s.lists,
+      addList: s.addList,
+      updateList: s.updateList,
+      bankAutomations: s.bankAutomations,
+      addBankAutomation: s.addBankAutomation,
+      toggleBankAutomation: s.toggleBankAutomation,
+      removeBankAutomation: s.removeBankAutomation,
+      logout: s.logout,
+      expenses: s.expenses,
+      categoryDisplayOverrides: s.categoryDisplayOverrides,
+      setCategoryDisplayOverride: s.setCategoryDisplayOverride,
+      isAuthenticated: s.isAuthenticated,
+      user: s.user,
+      setUser: s.setUser,
+    })),
+  );
 
   const [showLangModal, setShowLangModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -521,6 +565,11 @@ export default function Settings() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
       <View
         style={{
           flexDirection: "row",
@@ -545,7 +594,13 @@ export default function Settings() {
         </Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: 48 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: 48 }}
+      >
 
         {/* ACCOUNT */}
         <SectionLabel label={t("settings.account")} isDark={isDark} first />
@@ -932,6 +987,7 @@ export default function Settings() {
           </Text>
         </Card>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal visible={showLangModal} transparent animationType="slide" onRequestClose={() => setShowLangModal(false)}>
         <View style={{ flex: 1 }}>

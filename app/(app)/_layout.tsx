@@ -1,8 +1,16 @@
-import { Stack } from "expo-router";
+import { useEffect } from "react";
+import { Stack, router } from "expo-router";
 import { useStore } from "../../store/useStore";
 
 export default function AppLayout() {
   const isDark = useStore((s) => s.isDark);
+
+  /** Ayarlar ~büyük chunk; ilk dokunuşta beklemeyi azaltmak için rota + modülü erken ısıt */
+  useEffect(() => {
+    router.prefetch("/(app)/settings");
+    void import("./settings");
+  }, []);
+
   return (
     <Stack
       screenOptions={{

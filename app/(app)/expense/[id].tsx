@@ -23,6 +23,7 @@ import ListsPickerModal from "../../../components/ListsPickerModal";
 import CategoryEditorModal from "../../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../../components/ExpenseAmountSignRow";
 import type { Language } from "../../../i18n";
+import { useThrottledRouter } from "../../../hooks/useThrottledRouter";
 
 type RecurrenceId =
   | "once"
@@ -126,6 +127,7 @@ function formatDatePill(ymd: string, language: Language): string {
 
 export default function ExpenseDetailScreen() {
   const router = useRouter();
+  const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const rawId = useLocalSearchParams<{ id: string | string[] }>().id;
@@ -297,7 +299,8 @@ export default function ExpenseDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
         style={{ flex: 1 }}
       >
         <View style={{ flex: 1 }}>
@@ -312,6 +315,8 @@ export default function ExpenseDetailScreen() {
           <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingTop: 8,
@@ -478,7 +483,7 @@ export default function ExpenseDetailScreen() {
         onAddList={addList}
         onEditLists={() => {
           setListsModalOpen(false);
-          router.push("/(app)/settings");
+          throttledPush("/(app)/settings");
         }}
         isDark={isDark}
         language={lang}

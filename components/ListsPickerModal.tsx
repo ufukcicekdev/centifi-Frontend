@@ -6,13 +6,13 @@ import {
   Modal,
   ScrollView,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ExpenseList } from "../constants/mockData";
 import type { Language } from "../i18n";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
 const COPY: Record<
   Language,
@@ -102,6 +102,7 @@ export default function ListsPickerModal({
   const t = COPY[language];
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const keyboardInset = useKeyboardInset();
 
   useEffect(() => {
     if (!visible) {
@@ -133,23 +134,19 @@ export default function ListsPickerModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#000000aa" }}>
-          <Pressable style={{ flex: 1 }} onPress={onClose} />
-          <View
-            style={{
-              backgroundColor: sheetBg,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              paddingHorizontal: 20,
-              paddingTop: 22,
-              paddingBottom: 36,
-              maxHeight: "72%",
-            }}
-          >
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#000000aa" }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View
+          style={{
+            backgroundColor: sheetBg,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            paddingHorizontal: 20,
+            paddingTop: 22,
+            paddingBottom: Math.max(36, keyboardInset + 20),
+            maxHeight: "72%",
+          }}
+        >
             <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 10 }}>
               <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={{ color: text, fontSize: 22, fontWeight: "800" }}>{t.title}</Text>
@@ -320,7 +317,6 @@ export default function ListsPickerModal({
             </ScrollView>
           </View>
         </View>
-      </KeyboardAvoidingView>
     </Modal>
   );
 }

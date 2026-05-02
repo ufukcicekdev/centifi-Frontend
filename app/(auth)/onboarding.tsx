@@ -16,6 +16,7 @@ import {
   OnboardingCategoryEditModal,
   isBuiltinCategoryId,
 } from "../../components/onboarding/OnboardingCategoryManageModals";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset";
 
 const PURPLE = "#6C63FF";
 /** Categories grid: 3 columns; horizontal padding must match ScrollView `paddingHorizontal` */
@@ -63,6 +64,7 @@ export default function Onboarding() {
   const [manageListOpen, setManageListOpen] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const reopenListAfterAdd = useRef(false);
+  const keyboardInset = useKeyboardInset();
 
   const tr = language === "tr";
   const catManageLabels = {
@@ -535,7 +537,15 @@ export default function Onboarding() {
       {/* ── ADD CATEGORY MODAL ── */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={closeAddCategoryModal}>
         <View style={{ flex: 1, backgroundColor: "#00000088", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 }}>
+          <View
+            style={{
+              backgroundColor: card,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40 + keyboardInset,
+            }}
+          >
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <Text style={{ color: text, fontSize: 18, fontWeight: "800" }}>New category</Text>
               <Pressable onPress={closeAddCategoryModal} hitSlop={12}>

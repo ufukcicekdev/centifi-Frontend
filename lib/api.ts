@@ -12,6 +12,36 @@ export type ApiError = {
   details?: unknown;
 };
 
+/** Flatten DRF / custom JSON bodies from `details` into a short user-facing string. */
+export function formatApiErrorDetailBody(details: unknown): string | undefined {
+  if (details == null) return undefined;
+  if (typeof details === "string") return details;
+  if (typeof details !== "object" || Array.isArray(details)) return undefined;
+  const o = details as Record<string, unknown>;
+  if (typeof o.detail === "string") return o.detail;
+  if (Array.isArray(o.detail)) {
+    const parts = (o.detail as unknown[]).filter((x): x is string => typeof x === "string");
+    return parts.length ? parts.join("\n") : undefined;
+  }
+  const lines: string[] = [];
+  for (const [k, val] of Object.entries(o)) {
+    if (k === "code") continue;
+    if (typeof val === "string") lines.push(`${k}: ${val}`);
+    else if (Array.isArray(val)) {
+      const strs = (val as unknown[]).filter((x): x is string => typeof x === "string");
+      if (strs.length) lines.push(`${k}: ${strs.join(", ")}`);
+    }
+  }
+  return lines.length ? lines.join("\n") : undefined;
+}
+
+/** Optional machine code from `{ code: "GEMINI_*" }` style API errors. */
+export function getApiErrorDetailCode(details: unknown): string | undefined {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return undefined;
+  const c = (details as Record<string, unknown>).code;
+  return typeof c === "string" ? c : undefined;
+}
+
 /** When apiFetch throws after building `{ status }`; raw fetch errors have no status. */
 export function getApiErrorStatus(e: unknown): number | undefined {
   if (e && typeof e === "object" && "status" in e) {

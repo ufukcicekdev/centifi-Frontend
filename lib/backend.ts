@@ -20,12 +20,17 @@ export type BackendUser = {
   budget_alert_threshold_percent?: number;
 };
 
-export type ParseResult = {
+/** Tek AI yanıtında bir veya birden fazla harcama */
+export type ParsedExpenseItem = {
   amount: number;
   description: string;
   category: string;
   date: string;
   currency: string;
+};
+
+export type ParseResult = {
+  expenses: ParsedExpenseItem[];
   receipt_url?: string;
 };
 
@@ -186,8 +191,26 @@ export async function deleteExpense(id: number) {
   await apiFetch<unknown>(`/api/expenses/${id}/`, { method: "DELETE", auth: true });
 }
 
-export async function listExpenses() {
-  return apiFetch<{ results: ExpenseDto[] }>("/api/expenses/", { method: "GET", auth: true });
+/** DRF PageNumberPagination (`settings.PAGE_SIZE`); use `fetchExpensesPage` + `nextPath` for extra pages. */
+type ExpenseListPage = { results: ExpenseDto[]; next: string | null };
+
+function pathFromPaginationNext(next: string | null | undefined): string | null {
+  if (!next) return null;
+  try {
+    const { pathname, search } = new URL(next);
+    return `${pathname}${search}`;
+  } catch {
+    return null;
+  }
+}
+
+export type ExpensesFetchPage = { results: ExpenseDto[]; nextPath: string | null };
+
+/** One API page (~`PAGE_SIZE` rows); append older rows via `nextPath`. */
+export async function fetchExpensesPage(relativePath = "/api/expenses/"): Promise<ExpensesFetchPage> {
+  const norm = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+  const p = await apiFetch<ExpenseListPage>(norm, { method: "GET", auth: true });
+  return { results: p.results, nextPath: pathFromPaginationNext(p.next) };
 }
 
 export async function listExpenseLists() {

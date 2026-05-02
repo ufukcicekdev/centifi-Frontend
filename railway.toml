@@ -1,0 +1,11 @@
+# Railway: servis "Root Directory" = `frontend` (monorepo). EXPO_PUBLIC_API_BASE_URL
+# build zamanında gerekir — env.prod / Dashboard Variables ile verin.
+[build]
+builder = "nixpacks"
+buildCommand = "npm ci && npm run export:web"
+
+[deploy]
+startCommand = "./node_modules/.bin/serve dist -s -l tcp://0.0.0.0:$PORT"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"

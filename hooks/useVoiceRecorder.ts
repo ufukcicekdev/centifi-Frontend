@@ -1,56 +1,123 @@
-import { useState, useRef } from "react";
-import { requireOptionalNativeModule } from "expo";
+import { useEffect, useRef } from "react";
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
+
+/** Basılı çok erken bırakıldığında `permission_denied` ile karışmasın diye ayrı sonuçlar */
+export type VoiceStartResult =
+  | "ok"
+  | "permission_denied"
+  | "failed"
+  | "cancelled";
 
 interface UseVoiceRecorder {
   isRecording: boolean;
-  startRecording: () => Promise<void>;
-  stopRecording: () => Promise<string | null>; // returns local file URI or null
+  startRecording: () => Promise<VoiceStartResult>;
+  stopRecording: () => Promise<string | null>;
 }
 
-export function useVoiceRecorder(): UseVoiceRecorder {
-  const [isRecording, setIsRecording] = useState(false);
-  const recordingRef = useRef<any>(null);
+const MIN_RECORD_MS = 500;
 
-  const startRecording = async () => {
-    const exponentAv = requireOptionalNativeModule("ExponentAV");
-    if (!exponentAv) {
-      console.warn("[useVoiceRecorder] ExponentAV not available — native build needed.");
-      setIsRecording(true);
-      return;
-    }
+function resolvedRecordingUri(recorder: {
+  uri: string | null;
+  getStatus: () => { url: string | null };
+}): string | null {
+  const fromProp =
+    recorder.uri != null && typeof recorder.uri === "string" ? recorder.uri.trim() : "";
+  if (fromProp.length > 0) return fromProp;
+  const url = recorder.getStatus().url;
+  if (url != null && url.trim().length > 0) return url.trim();
+  return null;
+}
+
+/**
+ * Ses kaydı — expo-audio (SDK 55).
+ * stop ile start aynı sayaçta birbirini iptal ettiği için önceki sürümde çok kısa basışta
+ * yanlışlıkla «izin yok» uyarısı ve sessiz başarısızlık oluyordu; buna göre düzeltildi.
+ */
+export function useVoiceRecorder(): UseVoiceRecorder {
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder, 100);
+  /** stop, start’tan önce gelirse prepare sonrası record() çağrılmasın */
+  const recordingEpoch = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      recordingEpoch.current += 1;
+      void recorder.stop().catch(() => {});
+    };
+  }, [recorder]);
+
+  const startRecording = async (): Promise<VoiceStartResult> => {
+    recordingEpoch.current += 1;
+    const epoch = recordingEpoch.current;
+
     try {
-      const { Audio } = await import("expo-av");
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
-        console.warn("[useVoiceRecorder] Microphone permission denied.");
-        return;
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        return "permission_denied";
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      recordingRef.current = recording;
-      setIsRecording(true);
+
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        interruptionMode: "doNotMix",
+      });
+
+      await recorder.stop().catch(() => {});
+
+      await recorder.prepareToRecordAsync();
+
+      if (recordingEpoch.current !== epoch) {
+        return "cancelled";
+      }
+
+      recorder.record();
+
+      if (recordingEpoch.current !== epoch) {
+        await recorder.stop().catch(() => {});
+        return "cancelled";
+      }
+
+      return "ok";
     } catch (e) {
-      console.warn("[useVoiceRecorder] Failed to start:", e);
-      setIsRecording(true); // UI feedback even if recording failed
+      if (__DEV__) {
+        console.warn("[useVoiceRecorder] Failed to start:", e);
+      }
+      await recorder.stop().catch(() => {});
+      return "failed";
     }
   };
 
   const stopRecording = async (): Promise<string | null> => {
-    setIsRecording(false);
-    if (!recordingRef.current) return null;
+    recordingEpoch.current += 1;
+
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri: string | null = recordingRef.current.getURI();
-      recordingRef.current = null;
-      return uri ?? null;
+      const durationBefore = recorder.getStatus().durationMillis;
+      await recorder.stop();
+      const durationAfter = recorder.getStatus().durationMillis;
+      const duration = Math.max(durationBefore, durationAfter);
+      if (duration < MIN_RECORD_MS) {
+        return null;
+      }
+
+      const uri = resolvedRecordingUri(recorder);
+      return uri;
     } catch (e) {
-      console.warn("[useVoiceRecorder] Failed to stop:", e);
-      recordingRef.current = null;
+      if (__DEV__) {
+        console.warn("[useVoiceRecorder] Failed to stop:", e);
+      }
       return null;
     }
   };
 
-  return { isRecording, startRecording, stopRecording };
+  return {
+    isRecording: recorderState.isRecording,
+    startRecording,
+    stopRecording,
+  };
 }

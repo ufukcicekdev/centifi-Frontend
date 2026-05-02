@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, TextInput, Pressable,
-  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -11,8 +11,10 @@ import { loadTokens } from "../../lib/api";
 import { registerUser } from "../../lib/backend";
 import { isValidEmail } from "../../lib/isValidEmail";
 import CentifiLogo from "../../components/CentifiLogo";
+import { useAppDialog } from "../../context/AppDialogContext";
 
 export default function Register() {
+  const { showAlert } = useAppDialog();
   const router = useRouter();
   const setUser = useStore((s) => s.setUser);
   const [name, setName] = useState("");
@@ -30,15 +32,15 @@ export default function Register() {
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      Alert.alert("Error", "Please fill in all fields.");
+      showAlert("Error", "Please fill in all fields.");
       return;
     }
     if (!isValidEmail(email)) {
-      Alert.alert("Invalid email", "Please enter a valid email address.");
+      showAlert("Invalid email", "Please enter a valid email address.");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters.");
+      showAlert("Error", "Password must be at least 6 characters.");
       return;
     }
     setLoading(true);
@@ -48,14 +50,14 @@ export default function Register() {
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
         if (tokensKept) {
-          Alert.alert(
+          showAlert(
             "Bağlantı / profil",
             "Hesap oluştu ama profil yüklenemedi. EXPO_PUBLIC_API_BASE_URL: üretim https://centifi-backend-production.up.railway.app · yerel telefon http://Mac_IP:8000",
           );
         }
       }
     } catch (e: any) {
-      Alert.alert("Register Failed", "Please try again.");
+      showAlert("Register Failed", "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -82,8 +84,13 @@ export default function Register() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 28, paddingTop: 32, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 28, paddingTop: 32, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+        >
 
           {/* Back */}
           <Pressable onPress={() => router.back()} style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: cardBg, alignItems: "center", justifyContent: "center", marginBottom: 32, borderWidth: 1, borderColor }}>

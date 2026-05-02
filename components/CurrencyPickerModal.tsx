@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { getAllCurrencyCodes, getCurrencyLabel } from "../lib/currencies";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
 type Props = {
   visible: boolean;
@@ -25,6 +26,7 @@ type Props = {
 export function CurrencyPickerModal({ visible, onClose, onSelect, selectedCode, isDark }: Props) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
+  const keyboardInset = useKeyboardInset();
 
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
@@ -101,7 +103,7 @@ export function CurrencyPickerModal({ visible, onClose, onSelect, selectedCode, 
           data={filtered}
           keyExtractor={(item) => item}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: 32 + keyboardInset }}
           renderItem={({ item }) => {
             const label = getCurrencyLabel(item, locale);
             const sel = item === selectedCode;

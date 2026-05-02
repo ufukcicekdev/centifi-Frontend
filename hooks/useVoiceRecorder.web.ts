@@ -1,32 +1,41 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+
+export type VoiceStartResult =
+  | "ok"
+  | "permission_denied"
+  | "failed"
+  | "cancelled";
 
 interface UseVoiceRecorder {
   isRecording: boolean;
-  audioUri: string | null;
-  startRecording: () => Promise<void>;
+  startRecording: () => Promise<VoiceStartResult>;
   stopRecording: () => Promise<string | null>;
-  clearRecording: () => void;
 }
 
-/** Web: expo-av native module is unavailable; use mock URI flow used elsewhere in the app. */
+/** Web: gerçek kayıt yok; push-to-talk sözleşmesi ile aynı dönüş tipleri. */
 export function useVoiceRecorder(): UseVoiceRecorder {
   const [isRecording, setIsRecording] = useState(false);
-  const [audioUri, setAudioUri] = useState<string | null>(null);
+  const recordingEpoch = useRef(0);
+  const capturingRef = useRef(false);
 
-  const startRecording = async () => {
+  const startRecording = async (): Promise<VoiceStartResult> => {
+    recordingEpoch.current += 1;
+    const epoch = recordingEpoch.current;
+    await Promise.resolve();
+    if (recordingEpoch.current !== epoch) return "cancelled";
+    capturingRef.current = true;
     setIsRecording(true);
+    return "ok";
   };
 
   const stopRecording = async (): Promise<string | null> => {
+    recordingEpoch.current += 1;
+    const hadCapture = capturingRef.current;
+    capturingRef.current = false;
     setIsRecording(false);
-    const uri = "mock-audio-uri";
-    setAudioUri(uri);
-    return uri;
+    if (!hadCapture) return null;
+    return "mock-audio-uri";
   };
 
-  const clearRecording = () => {
-    setAudioUri(null);
-  };
-
-  return { isRecording, audioUri, startRecording, stopRecording, clearRecording };
+  return { isRecording, startRecording, stopRecording };
 }

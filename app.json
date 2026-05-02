@@ -22,6 +22,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6C63FF"
@@ -37,12 +38,18 @@
     },
     "plugins": [
       "expo-router",
-      "expo-av",
+      "expo-audio",
       "expo-image-picker",
       "expo-system-ui",
-      "expo-notifications"
+      "expo-notifications",
+      "@react-native-community/datetimepicker",
+      "@react-native-google-signin/google-signin"
     ],
     "scheme": "centifi",
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
     "experiments": {
       "typedRoutes": true
     }

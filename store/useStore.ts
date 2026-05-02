@@ -11,7 +11,7 @@ import i18n, { Language } from "../i18n";
 import { getApiErrorStatus, loadTokens, saveTokens } from "../lib/api";
 import {
   getMe,
-  listExpenses,
+  fetchExpensesPage,
   listExpenseLists,
   listUserCustomCategories,
   createExpenseList,
@@ -85,6 +85,11 @@ interface AppState {
   updateExpense: (id: string, patch: Partial<Omit<Expense, "id">>) => Promise<void>;
   removeExpense: (id: string) => Promise<void>;
   replaceExpenses: (expenses: Expense[]) => void;
+
+  /** Relative URL path for `/api/expenses/?page=N` (null when everything loaded into store). */
+  expensesNextPagePath: string | null;
+  expensesLoadingMore: boolean;
+  loadMoreExpenses: () => Promise<void>;
 
   // Budget
   monthlyBudget: number;
@@ -199,6 +204,8 @@ export const useStore = create<AppState>((set, get) => {
       categoryBudgets: {},
       budgetAlertsEnabled: true,
       budgetAlertThresholdPercent: 90,
+      expensesNextPagePath: null,
+      expensesLoadingMore: false,
     });
   },
   hydrateFromBackend: async () => {
@@ -209,9 +216,9 @@ export const useStore = create<AppState>((set, get) => {
     }
     try {
       const me: BackendUser = await getMe();
-      const [listsResp, expensesResp, catsResp] = await Promise.all([
+      const [listsResp, expensesPage, catsResp] = await Promise.all([
         listExpenseLists().catch(() => null),
-        listExpenses().catch(() => null),
+        fetchExpensesPage("/api/expenses/").catch(() => null),
         listUserCustomCategories().catch(() => null),
       ]);
 
@@ -297,8 +304,11 @@ export const useStore = create<AppState>((set, get) => {
         patch.budgetAlertThresholdPercent = budgetPrefs.budgetAlertThresholdPercent;
       }
 
-      if (expensesResp?.results) {
-        patch.expenses = expensesResp.results.map((e) => mapExpenseDto(e, fallbackListId));
+      if (expensesPage?.results) {
+        patch.expenses = expensesPage.results.map((e) => mapExpenseDto(e, fallbackListId));
+        patch.expensesNextPagePath = expensesPage.nextPath;
+      } else {
+        patch.expensesNextPagePath = null;
       }
 
       if (catsResp?.results) {
@@ -320,7 +330,12 @@ export const useStore = create<AppState>((set, get) => {
       if (status === 401 || status === 403) {
         await saveTokens(null);
       }
-      set({ user: null, isAuthenticated: false });
+      set({
+        user: null,
+        isAuthenticated: false,
+        expensesNextPagePath: null,
+        expensesLoadingMore: false,
+      });
       if (status === 401 || status === 403) return "session_invalid";
       return "unreachable";
     }
@@ -382,8 +397,35 @@ export const useStore = create<AppState>((set, get) => {
     queueBudgetThresholdCheck(get);
   },
   replaceExpenses: (expenses) => {
-    set({ expenses });
+    set({ expenses, expensesNextPagePath: null });
     queueBudgetThresholdCheck(get);
+  },
+
+  expensesNextPagePath: null,
+  expensesLoadingMore: false,
+  loadMoreExpenses: async () => {
+    const s = get();
+    if (!s.isAuthenticated || !s.expensesNextPagePath || s.expensesLoadingMore) return;
+
+    const defaultList = s.lists.find((l) => l.isDefault) ?? s.lists[0];
+    const fallbackListId = defaultList?.id ?? "private";
+
+    set({ expensesLoadingMore: true });
+    try {
+      const page = await fetchExpensesPage(s.expensesNextPagePath);
+      const seen = new Set(get().expenses.map((e) => e.id));
+      const incoming = page.results
+        .filter((dto) => !seen.has(String(dto.id)))
+        .map((dto) => mapExpenseDto(dto, fallbackListId));
+      set((prev) => ({
+        expenses: [...prev.expenses, ...incoming],
+        expensesNextPagePath: page.nextPath,
+        expensesLoadingMore: false,
+      }));
+      queueBudgetThresholdCheck(get);
+    } catch {
+      set({ expensesLoadingMore: false });
+    }
   },
 
   monthlyBudget: MONTHLY_BUDGET,

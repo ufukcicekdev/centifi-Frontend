@@ -152,7 +152,7 @@ export default function Processing() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 24, paddingVertical: 16 }}>
           <Pressable onPress={() => router.back()}
             style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: cardBg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor, marginRight: 14 }}>
@@ -163,7 +163,13 @@ export default function Processing() {
           </Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+        >
           {isLoading ? (
             <AILoadingAnimation isDark={isDark} />
           ) : (

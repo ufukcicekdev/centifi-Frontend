@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
   useWindowDimensions,
   StyleSheet,
@@ -17,10 +16,13 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useStore } from "../../store/useStore";
-import { loadTokens } from "../../lib/api";
+import { getApiErrorStatus, loadTokens, type ApiError } from "../../lib/api";
 import { loginWithEmail, socialAuth } from "../../lib/backend";
+import { getGoogleOAuthClientIds } from "../../lib/googleAuthConfig";
+import { useAppDialog } from "../../context/AppDialogContext";
 import { isValidEmail } from "../../lib/isValidEmail";
 import CentifiLogo from "../../components/CentifiLogo";
+import GoogleSignInButton from "../../components/GoogleSignInButton";
 import Svg, { Path } from "react-native-svg";
 
 // Design tokens (dark-only, matching HTML)
@@ -87,6 +89,7 @@ const styles = StyleSheet.create({
 });
 
 export default function Login() {
+  const { showAlert } = useAppDialog();
   const router = useRouter();
   const { height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -96,15 +99,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleConfigured = getGoogleOAuthClientIds().isConfigured;
 
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert("Missing fields", "Please enter your email and password.");
+      showAlert("Missing fields", "Please enter your email and password.");
       return;
     }
     if (!isValidEmail(email)) {
-      Alert.alert("Invalid email", "Please enter a valid email address.");
+      showAlert("Invalid email", "Please enter a valid email address.");
       return;
     }
     setLoading(true);
@@ -114,7 +117,7 @@ export default function Login() {
       if (result === "ok") return;
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
-        Alert.alert(
+        showAlert(
           "Bağlantı / profil",
           tokensKept
             ? "Giriş başarılı ama profil API’den yüklenemedi. frontend/.env → EXPO_PUBLIC_API_BASE_URL: üretimde https://centifi-backend-production.up.railway.app; yerelde telefonda http://BILGISAYAR_IP:8000 (localhost olmaz, Django runserver 0.0.0.0:8000). Expo’yu yeniden başlatın."
@@ -123,10 +126,31 @@ export default function Login() {
         return;
       }
       if (result === "session_invalid") {
-        Alert.alert("Session error", "Could not verify your session. Try signing in again.");
+        showAlert("Session error", "Could not verify your session. Try signing in again.");
       }
-    } catch {
-      Alert.alert("Login failed", "Incorrect email or password.");
+    } catch (e: unknown) {
+      const status = getApiErrorStatus(e);
+      const details =
+        e && typeof e === "object" && "details" in e ? (e as ApiError).details : undefined;
+      let msg = "Incorrect email or password.";
+      if (e instanceof TypeError || (e instanceof Error && /network|fetch|failed/i.test(e.message))) {
+        msg =
+          "Sunucuya ulaşılamadı. Telefonda EXPO_PUBLIC_API_BASE_URL bilgisayarın IP adresi olmalı (127.0.0.1 değil), Django runserver 0.0.0.0:8000.";
+      } else if (details && typeof details === "object") {
+        const d = details as Record<string, unknown>;
+        if (typeof d.detail === "string") {
+          msg = d.detail;
+        } else if (Array.isArray(d.non_field_errors) && d.non_field_errors[0]) {
+          msg = String(d.non_field_errors[0]);
+        } else if (d.email) {
+          const em = d.email;
+          msg = Array.isArray(em) ? String(em[0]) : String(em);
+        }
+      }
+      if (status === 401 && msg === "Incorrect email or password.") {
+        msg = "E-posta veya şifre hatalı (veya bu sunucuda hesap yok).";
+      }
+      showAlert("Login failed", msg);
     } finally {
       setLoading(false);
     }
@@ -147,24 +171,24 @@ export default function Login() {
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
         if (tokensKept) {
-          Alert.alert(
+          showAlert(
             "Bağlantı / profil",
             "Profil yüklenemedi. EXPO_PUBLIC_API_BASE_URL kontrolü: üretim https://centifi-backend-production.up.railway.app · yerel telefon http://Mac_IP:8000",
           );
         }
       }
     } catch (e: any) {
-      if (e.code !== "ERR_REQUEST_CANCELED") Alert.alert("Apple Sign-In failed", "Please try again.");
+      if (e.code !== "ERR_REQUEST_CANCELED") showAlert("Apple Sign-In failed", "Please try again.");
     }
-  };
-
-  const handleGoogle = () => {
-    Alert.alert("Coming soon", "Google Sign-In will be available in the next update.");
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={["top", "left", "right", "bottom"]}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+      >
         <ScrollView
           contentContainerStyle={{
             flexGrow: 1,
@@ -175,6 +199,8 @@ export default function Login() {
             alignItems: "stretch",
           }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           <View style={{ flex: 1, justifyContent: "center", paddingVertical: 16, width: "100%" }}>
@@ -214,24 +240,36 @@ export default function Login() {
                 />
               )}
 
-              {/* Google */}
-              <Pressable
-                onPress={handleGoogle}
-                disabled={googleLoading}
-                style={({ pressed }) => [
-                  styles.socialButton,
-                  { marginBottom: SOCIAL_GAP, opacity: pressed || googleLoading ? 0.72 : 1 },
-                ]}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator size="small" color={TEXT} />
-                ) : (
+              {/* Google — .env’de üç OAuth client id gerekir; yoksa yapılandırma uyarısı */}
+              {googleConfigured ? (
+                <GoogleSignInButton
+                  borderColor={BORDER}
+                  surfaceColor={SURFACE}
+                  textColor={TEXT}
+                  minHeight={SOCIAL_BTN_HEIGHT}
+                  marginBottom={SOCIAL_GAP}
+                  label="Continue with Google"
+                  renderIcon={() => <GoogleIcon />}
+                />
+              ) : (
+                <Pressable
+                  onPress={() =>
+                    showAlert(
+                      "Google Sign-In",
+                      "Android/iOS: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID (veya iOS), EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (idToken için Web application istemcisi) ve gerekirse iOS id. Google Cloud’da Android’e SHA-1 ekleyin. Sonra Expo’yu yeniden başlatın.",
+                    )
+                  }
+                  style={({ pressed }) => [
+                    styles.socialButton,
+                    { marginBottom: SOCIAL_GAP, opacity: pressed ? 0.72 : 1 },
+                  ]}
+                >
                   <View style={styles.socialButtonInner}>
                     <GoogleIcon />
                     <Text style={styles.socialLabel}>Continue with Google</Text>
                   </View>
-                )}
-              </Pressable>
+                </Pressable>
+              )}
 
               {/* Divider */}
               {!showEmail && (
@@ -317,19 +355,28 @@ export default function Login() {
                   onPress={handleEmailLogin}
                   disabled={loading}
                   style={({ pressed }) => ({
-                    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                    borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20,
-                    borderWidth: 1, borderColor: BORDER, backgroundColor: "transparent",
-                    opacity: pressed || loading ? 0.7 : 1,
+                    width: "100%",
+                    minHeight: SOCIAL_BTN_HEIGHT,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    paddingHorizontal: 20,
+                    borderWidth: 1,
+                    borderColor: PRIMARY,
+                    backgroundColor: PRIMARY_CTR,
+                    opacity: pressed || loading ? 0.82 : 1,
                   })}
                 >
-                  {loading
-                    ? <ActivityIndicator color={TEXT} />
-                    : <>
-                        <Text style={{ color: TEXT, fontSize: 15, fontWeight: "600" }}>Sign In</Text>
-                        <Ionicons name="arrow-forward" size={18} color={TEXT} />
-                      </>
-                  }
+                  {loading ? (
+                    <ActivityIndicator color={TEXT} />
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={{ color: TEXT, fontSize: 16, fontWeight: "700" }}>Sign In</Text>
+                      <Ionicons name="arrow-forward" size={18} color={TEXT} style={{ marginLeft: 10 }} />
+                    </View>
+                  )}
                 </Pressable>
               </View>
             </>

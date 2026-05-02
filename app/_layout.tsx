@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useStore } from "../store/useStore";
+import { AppDialogProvider } from "../context/AppDialogContext";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -57,15 +58,17 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={{ flex: 1, backgroundColor: isDark ? "#0f0f0f" : "#f8f8f8" }}>
-        <StatusBar style={isDark ? "light" : "dark"} />
-        <AuthGuard>
-          <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(app)" />
-          </Stack>
-        </AuthGuard>
-      </View>
+      <AppDialogProvider>
+        <View style={{ flex: 1, backgroundColor: isDark ? "#0f0f0f" : "#f8f8f8" }}>
+          <StatusBar style={isDark ? "light" : "dark"} />
+          <AuthGuard>
+            <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(app)" />
+            </Stack>
+          </AuthGuard>
+        </View>
+      </AppDialogProvider>
     </GestureHandlerRootView>
   );
 }

@@ -1,14 +1,6 @@
 import { useState } from "react";
-import { parseText as parseTextBackend } from "../lib/backend";
+import { parseText as parseTextBackend, type ParseResult } from "../lib/backend";
 import { useStore } from "../store/useStore";
-
-interface ParseResult {
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  currency: string;
-}
 
 interface UseAIParser {
   isLoading: boolean;

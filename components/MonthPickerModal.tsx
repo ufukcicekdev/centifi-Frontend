@@ -6,7 +6,9 @@ import {
   Modal,
   ScrollView,
   useWindowDimensions,
+  Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { Expense } from "../constants/mockData";
 import type { Language } from "../i18n";
@@ -47,6 +49,7 @@ export default function MonthPickerModal({
   isDark: boolean;
 }) {
   const { width: winW } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const t = COPY[language];
   const labels = useMemo(() => monthShortLabels(language), [language]);
 
@@ -83,6 +86,9 @@ export default function MonthPickerModal({
 
   const cellW = (winW - 40 - 16) / 3;
 
+  /** Modal + Android: sistem nav bar’ı üstüne binmesin; inset 0 gelse de minimum pay */
+  const sheetBottomPadding = 16 + Math.max(insets.bottom, Platform.OS === "android" ? 28 : 12);
+
   const apply = () => {
     if (scopeAll) {
       onApply({ kind: "all_time" });
@@ -96,15 +102,17 @@ export default function MonthPickerModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#000000aa" }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={{
-          backgroundColor: sheetBg,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingHorizontal: 20,
-          paddingTop: 22,
-          paddingBottom: 28,
-          maxHeight: "85%",
-        }}>
+        <View
+          style={{
+            backgroundColor: sheetBg,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            paddingHorizontal: 20,
+            paddingTop: 22,
+            paddingBottom: sheetBottomPadding,
+            maxHeight: "85%",
+          }}
+        >
           <Text style={{ color: text, fontSize: 22, fontWeight: "800", marginBottom: 18 }}>{t.title}</Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 16 }}>

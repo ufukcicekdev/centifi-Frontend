@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -9,15 +10,21 @@ import {
   Platform,
   TextInput,
   StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as ImagePicker from "expo-image-picker";
 import { buildCategoriesForHome, useStore } from "../../store/useStore";
-import { useAIParser } from "../../hooks/useAIParser";
 import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
-import ReviewExpenseModal from "../../components/ReviewExpenseModal";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset";
+import { useThrottledRouter, clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
+import ReviewExpenseModal, { type ReviewParsingKind } from "../../components/ReviewExpenseModal";
 import ListsPickerModal from "../../components/ListsPickerModal";
 import ExpenseTxRow from "../../components/ExpenseTxRow";
 import {
@@ -25,14 +32,31 @@ import {
   formatDayNetTotal,
   formatPeriodPillLabel,
   groupByDate,
+  isExpenseInPeriod,
 } from "../../lib/expenseFilters";
 import MonthPickerModal from "../../components/MonthPickerModal";
 import CategorySpendScroller from "../../components/CategorySpendScroller";
-import { parseImage as parseImageBackend, parseAudio as parseAudioBackend } from "../../lib/backend";
-import type { Category } from "../../constants/mockData";
+import {
+  parseImage as parseImageBackend,
+  parseAudio as parseAudioBackend,
+  type ParseResult,
+  type ParsedExpenseItem,
+} from "../../lib/backend";
+import { formatApiErrorDetailBody, type ApiError } from "../../lib/api";
 
 const PURPLE = "#6C63FF";
 const CORAL = "#FF6B6B";
+const MICFAB_FILL_ACTIVE = "#FF5252";
+
+function mimeForRecordedAudioUri(uri: string): string {
+  const pathOnly = uri.split("?")[0]?.split("#")[0]?.toLowerCase() ?? "";
+  if (pathOnly.endsWith(".wav")) return "audio/wav";
+  if (pathOnly.endsWith(".webm")) return "audio/webm";
+  if (pathOnly.endsWith(".3gp") || pathOnly.endsWith(".3gpp")) return "audio/3gpp";
+  if (pathOnly.endsWith(".caf")) return "audio/x-caf";
+  if (pathOnly.endsWith(".mp4") || pathOnly.endsWith(".mpeg4")) return "audio/mp4";
+  return "audio/m4a";
+}
 
 type TxFlowFilter = "all" | "expense" | "income";
 
@@ -40,27 +64,54 @@ type TxFlowFilter = "all" | "expense" | "income";
 
 export default function Dashboard() {
   const router = useRouter();
+  const throttledPush = useThrottledRouter();
+  const insets = useSafeAreaInsets();
+  /** Sistem gezinme çubuğunun üstünde kalsın; inset 0 olsa bile Android’de minimum boşluk */
+  const bottomBarInset =
+    Math.max(insets.bottom, Platform.OS === "android" ? 8 : 0) + (Platform.OS === "android" ? 20 : 12);
+  /** Alt çubuk yüksekliği (padding + ikon satırı ~60) — kaydırma ve üstteki input için */
+  const bottomBarBlockHeight = 12 + 64 + bottomBarInset;
   const {
-    isDark, expenses,
-    lists, activeListId, setActiveList, addList,
-    periodFilter, setPeriodFilter,
+    isDark,
+    expenses,
+    lists,
+    activeListId,
+    setActiveList,
+    addList,
+    periodFilter,
+    setPeriodFilter,
     language,
     enabledCategoryIds,
     customCategories,
     categoryDisplayOverrides,
+    isAuthenticated,
+    expensesNextPagePath,
+    expensesLoadingMore,
+    loadMoreExpenses,
   } = useStore();
-  const { parseText } = useAIParser();
   const { isRecording, startRecording, stopRecording } = useVoiceRecorder();
+  const keyboardInset = useKeyboardInset();
 
-  const [showInput, setShowInput] = useState(false);
-  const [promptText, setPromptText] = useState("");
-  const inputAnim = useRef(new Animated.Value(0)).current;
+  /** Ayarlardan dönünce aynı throttle yüzünden ilk dokunuş yutulmasın */
+  useFocusEffect(
+    useCallback(() => {
+      clearRouterPushCooldown();
+    }, []),
+  );
+
+  /** Yerel işlem listesi araması (AI yok) */
+  const [transactionSearch, setTransactionSearch] = useState("");
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+  const searchAnim = useRef(new Animated.Value(0)).current;
+
+  /** + menüsü: manuel ekle / görsel yükle */
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
 
   const [reviewVisible, setReviewVisible] = useState(false);
   const [reviewParsing, setReviewParsing] = useState(false);
-  const [reviewExpense, setReviewExpense] = useState<{
-    amount: number; description: string; category: Category; date: string; currency: string;
-  } | null>(null);
+  const [reviewParsingKind, setReviewParsingKind] = useState<ReviewParsingKind>("receipt");
+  const [reviewExpenses, setReviewExpenses] = useState<ParsedExpenseItem[] | null>(null);
   const [monthModalOpen, setMonthModalOpen] = useState(false);
   const [listsModalOpen, setListsModalOpen] = useState(false);
   const [txCategoryFilter, setTxCategoryFilter] = useState<string | null>(null);
@@ -90,6 +141,12 @@ export default function Dashboard() {
     return flowFilteredExpenses.filter((e) => e.category === txCategoryFilter);
   }, [flowFilteredExpenses, txCategoryFilter]);
 
+  const searchNorm = transactionSearch.trim().toLowerCase();
+  const displayFiltered = useMemo(() => {
+    if (!searchNorm) return listFiltered;
+    return listFiltered.filter((e) => e.description.toLowerCase().includes(searchNorm));
+  }, [listFiltered, searchNorm]);
+
   /** Üst özet: ay + liste + Harcama/Gelir kutuları. Kategori seçimi listeyi süzer; özetleri sıfırlamaz. */
   const { totalNet, totalExpenseOut, totalIncomeIn } = useMemo(() => {
     const exp = flowFilteredExpenses.filter((e) => !e.isIncome).reduce((s, e) => s + e.amount, 0);
@@ -98,7 +155,31 @@ export default function Dashboard() {
     return { totalNet: net, totalExpenseOut: exp, totalIncomeIn: inc };
   }, [flowFilteredExpenses]);
 
-  const grouped = useMemo(() => groupByDate(listFiltered), [listFiltered]);
+  const grouped = useMemo(() => groupByDate(displayFiltered), [displayFiltered]);
+
+  /** Seçili takvim ayında sıfır görünür satır var ama liste + filtre için başka tarihlerde işlem var → genelde üstteki “ay” filtresi. */
+  const hintExpandPeriod = useMemo(() => {
+    if (periodFilter.kind !== "calendar_month" || grouped.length > 0) return false;
+    const matches = expenses.filter(
+      (e) =>
+        (!e.listId || e.listId === activeListId) &&
+        (txFlowFilter === "all" ||
+          (txFlowFilter === "expense" && !e.isIncome) ||
+          (txFlowFilter === "income" && e.isIncome)) &&
+        (!txCategoryFilter || e.category === txCategoryFilter),
+    );
+    return matches.some((e) => !isExpenseInPeriod(e.date, periodFilter));
+  }, [periodFilter, grouped.length, expenses, activeListId, txFlowFilter, txCategoryFilter]);
+
+  const onMomentumScrollEndLoadMore = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!isAuthenticated || !expensesNextPagePath || expensesLoadingMore) return;
+      const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+      const y = layoutMeasurement.height + contentOffset.y;
+      if (y >= contentSize.height - 120) void loadMoreExpenses();
+    },
+    [isAuthenticated, expensesNextPagePath, expensesLoadingMore, loadMoreExpenses],
+  );
 
   const activeList = lists.find((l) => l.id === activeListId);
   const periodLabel = formatPeriodPillLabel(periodFilter, language);
@@ -108,62 +189,198 @@ export default function Dashboard() {
     [enabledCategoryIds, customCategories, categoryDisplayOverrides],
   );
 
-  // Input animation
-  const toggleInput = () => {
-    const toVal = showInput ? 0 : 1;
-    setShowInput(!showInput);
-    Animated.spring(inputAnim, { toValue: toVal, useNativeDriver: true, tension: 80, friction: 10 }).start();
+  const openSearchBar = useCallback(() => {
+    setFabMenuOpen(false);
+    setShowSearchBar(true);
+    Animated.spring(searchAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 10,
+    }).start();
+    setTimeout(() => searchInputRef.current?.focus(), 120);
+  }, [searchAnim]);
+
+  const closeSearchBar = useCallback(() => {
+    setFabMenuOpen(false);
+    Animated.spring(searchAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 10,
+    }).start(({ finished }) => {
+      if (finished) {
+        setShowSearchBar(false);
+        setTransactionSearch("");
+      }
+    });
+  }, [searchAnim]);
+
+  const toggleSearchBar = useCallback(() => {
+    if (showSearchBar) closeSearchBar();
+    else openSearchBar();
+  }, [showSearchBar, closeSearchBar, openSearchBar]);
+
+  const closeFabMenu = () => setFabMenuOpen(false);
+
+  const openReview = (parsed: ParseResult) => {
+    setReviewExpenses(parsed.expenses);
+    setReviewParsing(false);
+    setReviewVisible(true);
   };
 
-  const openReview = (parsed: any) => { setReviewExpense(parsed); setReviewParsing(false); setReviewVisible(true); };
-
-  const handleTextSubmit = async () => {
-    if (!promptText.trim()) return;
-    setReviewExpense(null); setReviewParsing(true); setReviewVisible(true);
-    setPromptText(""); if (showInput) toggleInput();
-    try { openReview(await parseText(promptText)); }
-    catch { setReviewVisible(false); Alert.alert("Error", "Could not parse expense."); }
-  };
+  function resetReviewFlow() {
+    setReviewExpenses(null);
+    setReviewParsing(false);
+    setReviewParsingKind("receipt");
+  }
 
   const handleImagePick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") { Alert.alert("Permission needed", "Allow photo access to scan receipts."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, base64: true, quality: 0.8 });
-    if (result.canceled || !result.assets[0]?.base64) return;
-    const { base64, mimeType } = result.assets[0];
-    setReviewExpense(null); setReviewParsing(true); setReviewVisible(true);
-    try { openReview(await parseImageBackend(base64!, mimeType ?? "image/jpeg")); }
-    catch { setReviewVisible(false); Alert.alert("Error", "Could not parse receipt."); }
-  };
-
-  const handleVoice = async () => {
-    if (isRecording) {
-      const uri = await stopRecording();
-      if (!uri) return;
-      setReviewExpense(null); setReviewParsing(true); setReviewVisible(true);
-      try {
-        const FileSystem = await import("expo-file-system");
-        const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
-        const mimeType = uri.endsWith(".wav") ? "audio/wav" : "audio/m4a";
-        openReview(await parseAudioBackend(b64, mimeType, language));
-      } catch { setReviewVisible(false); Alert.alert("Error", "Could not analyze voice. Try again."); }
-    } else {
-      await startRecording();
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.8,
+      allowsMultipleSelection: false,
+      selectionLimit: 1,
+    });
+    if (result.canceled) return;
+    const first = result.assets[0];
+    if (!first?.base64) return;
+    const { base64, mimeType } = first;
+    setReviewExpenses(null);
+    setReviewParsingKind("receipt");
+    setReviewParsing(true);
+    setReviewVisible(true);
+    try {
+      openReview(await parseImageBackend(base64!, mimeType ?? "image/jpeg"));
+    } catch {
+      setReviewVisible(false);
+      resetReviewFlow();
+      Alert.alert("Error", "Could not parse receipt.");
     }
   };
 
-  const inputTranslateY = inputAnim.interpolate({ inputRange: [0, 1], outputRange: [100, 0] });
+  /** Basılı tut: kayıt; bırak: durdur ve analiz et */
+  const micPressIn = async () => {
+    const result = await startRecording();
+    if (result === "permission_denied") {
+      Alert.alert(
+        language === "tr" ? "Mikrofon izni gerekli" : "Microphone permission needed",
+        language === "tr"
+          ? "Sesle harcama eklemek için ayarlardan mikrofon erişimine izin ver."
+          : "Allow microphone access in settings to add expenses by voice.",
+      );
+      return;
+    }
+    if (result === "failed") {
+      Alert.alert(
+        language === "tr" ? "Kayıt başlamadı" : "Could not start recording",
+        language === "tr"
+          ? "Mikrofon başka bir uygulama tarafından kullanılıyor olabilir. Tekrar dene."
+          : "Another app may be using the microphone. Try again.",
+      );
+    }
+  };
+
+  const micPressOut = async () => {
+    const uri = await stopRecording();
+    if (!uri) {
+      const tr = language === "tr";
+      Alert.alert(
+        tr ? "Ses kaydı alınamadı" : "No voice capture",
+        tr
+          ? "Mikrofonu basılı tutarak konuş (en az yarım saniye). Çok kısa dokunup bırakma."
+          : "Hold the mic while you speak (at least half a second). Don’t tap too briefly.",
+      );
+      return;
+    }
+    setReviewExpenses(null);
+    setReviewParsingKind("voice");
+    setReviewParsing(true);
+    setReviewVisible(true);
+    try {
+      const { readAsStringAsync } = await import("expo-file-system/legacy");
+      const b64 = await readAsStringAsync(uri, { encoding: "base64" });
+      const mimeType = mimeForRecordedAudioUri(uri);
+      openReview(await parseAudioBackend(b64, mimeType, language));
+    } catch (e) {
+      setReviewVisible(false);
+      resetReviewFlow();
+      const tr = language === "tr";
+      const detail = formatApiErrorDetailBody(
+        e && typeof e === "object" && "details" in e ? (e as ApiError).details : null,
+      );
+      Alert.alert(
+        tr ? "Ses analizi çalışmadı" : "Voice analysis failed",
+        detail ??
+          (tr
+            ? "Bağlantı veya oturum hatası. Birkaç saniye daha konuşup tekrar dene ya da fotoğraf ile eklemeyi dene."
+            : "Network or session error. Hold the mic longer, try again, or add via photo."),
+      );
+    }
+  };
+
+  /** RNGH jesti: parlak kenara kayınca / kaydırma rekabetinde RN Pressable erken `onPressOut` verebiliyor. */
+  const micPressInRef = useRef(micPressIn);
+  const micPressOutRef = useRef(micPressOut);
+  micPressInRef.current = micPressIn;
+  micPressOutRef.current = micPressOut;
+
+  const micHoldGesture = useMemo(
+    () =>
+      Gesture.LongPress()
+        .minDuration(0)
+        .maxDistance(1000)
+        .shouldCancelWhenOutside(false)
+        .runOnJS(true)
+        .onStart(() => {
+          void micPressInRef.current();
+        })
+        .onFinalize(() => {
+          void micPressOutRef.current();
+        }),
+    [],
+  );
+
+  const searchTranslateY = searchAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
 
   const fmt = (n: number) => n.toFixed(2).replace(".", ",");
   const netAccent = totalNet >= 0 ? "#55efc4" : CORAL;
+  /** Arama açıkken liste altına ekstra boşluk (hap liste üzerinde yüzer) */
+  const searchStripExtra = showSearchBar ? 58 : 0;
+  /** Alt yüzen şeridin kapladığı yükseklik — ScrollView içeriği bunun altına kaydırılabilsin */
+  const floatingChromeHeight = showSearchBar ? 12 + searchStripExtra + bottomBarInset : bottomBarBlockHeight;
+  const scrollBottomPad = floatingChromeHeight + 36;
+  /** Arama + klavye: hap klavyenin üstünde; ikonlar: tam alt */
+  const floatingBarBottom = showSearchBar ? keyboardInset : 0;
+
+  const micRed = "#FF4757";
+  const trUi = language === "tr";
+  const fabMenuBg = isDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.96)";
+  const fabIconTint = isDark ? "rgba(108,99,255,0.22)" : "rgba(108,99,255,0.18)";
+  const searchPillBg = isDark ? "rgba(58, 58, 60, 0.92)" : "rgba(235, 235, 240, 0.96)";
+  const searchPillBorder = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
+  /** Alt sol: tek hap içinde + ve arama — düz siyah zemin, beyaz ikonlar */
+  const fabSearchPillBg = "#000000";
+  const fabSearchPillIcon = "#FFFFFF";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+      >
       <ScrollView
         style={{ flex: 1 }}
         stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        onMomentumScrollEnd={onMomentumScrollEndLoadMore}
       >
         {/* Yapışkan: ayarlar + net tutar + harcama/gelir kutuları + tarih/liste filtreleri */}
         <View
@@ -176,7 +393,8 @@ export default function Dashboard() {
         >
           <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
             <Pressable
-              onPress={() => router.push("/(app)/settings")}
+              unstable_pressDelay={0}
+              onPress={() => throttledPush("/(app)/settings")}
               style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }}
             >
               <Ionicons name="settings-outline" size={22} color={mutedColor} />
@@ -321,7 +539,7 @@ export default function Dashboard() {
         </Text>
         <CategorySpendScroller
           categories={homeCats}
-          expenses={listFiltered}
+          expenses={displayFiltered}
           selectedCategoryId={txCategoryFilter}
           onSelectCategory={setTxCategoryFilter}
           onLongPressCategory={(id) => router.push({ pathname: "/category/[id]", params: { id } })}
@@ -331,20 +549,42 @@ export default function Dashboard() {
         {/* ── Transactions ── */}
         <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
           {grouped.length === 0 ? (
-            <View style={{ alignItems: "center", paddingTop: 40 }}>
+            <View style={{ alignItems: "center", paddingTop: 40, paddingHorizontal: 20 }}>
               <Text style={{ color: mutedColor, fontSize: 15, textAlign: "center", paddingHorizontal: 24 }}>
-                {language === "tr"
-                  ? txFlowFilter === "expense"
-                    ? "Bu dönemde harcama yok."
-                    : txFlowFilter === "income"
-                      ? "Bu dönemde gelir yok."
-                      : "Bu dönemde işlem yok."
-                  : txFlowFilter === "expense"
-                    ? "No spending this period."
-                    : txFlowFilter === "income"
-                      ? "No income this period."
-                      : "No transactions this period."}
+                {searchNorm && listFiltered.length > 0
+                  ? trUi
+                    ? "Arama ile eşleşen işlem yok."
+                    : "No transactions match your search."
+                  : language === "tr"
+                    ? txFlowFilter === "expense"
+                      ? "Bu dönemde harcama yok."
+                      : txFlowFilter === "income"
+                        ? "Bu dönemde gelir yok."
+                        : "Bu dönemde işlem yok."
+                    : txFlowFilter === "expense"
+                      ? "No spending this period."
+                      : txFlowFilter === "income"
+                        ? "No income this period."
+                        : "No transactions this period."}
               </Text>
+              {hintExpandPeriod && (
+                <Pressable
+                  onPress={() => setPeriodFilter({ kind: "all_time" })}
+                  style={{
+                    marginTop: 16,
+                    paddingVertical: 12,
+                    paddingHorizontal: 18,
+                    borderRadius: 14,
+                    backgroundColor: isDark ? "#252528" : "#e8e8ec",
+                  }}
+                >
+                  <Text style={{ color: PURPLE, fontSize: 14, fontWeight: "700", textAlign: "center" }}>
+                    {language === "tr"
+                      ? "Tüm zamanları göster (başka tarihlerde işlemler olabilir)"
+                      : "Show all time (you may have transactions in other months)"}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             grouped.map((group) => (
@@ -375,7 +615,387 @@ export default function Dashboard() {
             ))
           )}
         </View>
+
+        {isAuthenticated && expensesNextPagePath ? (
+          <View style={{ paddingHorizontal: 20, marginTop: 20, marginBottom: 8, alignItems: "stretch" }}>
+            <Pressable
+              onPress={() => void loadMoreExpenses()}
+              disabled={expensesLoadingMore}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: isDark ? "#333" : "#ddd",
+                backgroundColor: cardBg,
+                opacity: expensesLoadingMore ? 0.7 : 1,
+              }}
+            >
+              {expensesLoadingMore ? (
+                <ActivityIndicator color={PURPLE} />
+              ) : (
+                <>
+                  <Ionicons name="chevron-down-circle-outline" size={20} color={PURPLE} />
+                  <Text style={{ color: textColor, fontSize: 15, fontWeight: "600" }}>
+                    {language === "tr" ? "Daha fazla işlem yükle" : "Load more transactions"}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+            <Text style={{ color: mutedColor, fontSize: 11, textAlign: "center", marginTop: 8 }}>
+              {language === "tr"
+                ? "Sunucu her seferinde bir sayfa getirir — aşağı kaydırınca da yüklenir."
+                : "The server loads one page at a time — scroll to the bottom to load more."}
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
+
+      </KeyboardAvoidingView>
+
+      {/* Liste üzerinde yüzen alt kontroller (haracamaların üstünde); klavyede arama hapı yukarı */}
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: floatingBarBottom,
+          zIndex: 30,
+          backgroundColor: "transparent",
+        }}
+      >
+        {showSearchBar ? (
+          <Animated.View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 12,
+              marginBottom: 10,
+              paddingBottom: bottomBarInset,
+              opacity: searchAnim,
+              transform: [{ translateY: searchTranslateY }],
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: searchPillBg,
+                borderRadius: 28,
+                paddingLeft: 18,
+                paddingRight: 6,
+                paddingVertical: Platform.OS === "ios" ? 11 : 9,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: searchPillBorder,
+                ...Platform.select({
+                  ios: {
+                    shadowColor: "#000",
+                    shadowOpacity: 0.22,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 8 },
+                  },
+                  android: { elevation: 6 },
+                  default: {},
+                }),
+              }}
+            >
+              <TextInput
+                ref={searchInputRef}
+                value={transactionSearch}
+                onChangeText={setTransactionSearch}
+                placeholder={trUi ? "Ara" : "Search"}
+                placeholderTextColor={isDark ? "rgba(152, 152, 159, 1)" : "rgba(110, 110, 118, 1)"}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  color: textColor,
+                  fontSize: 17,
+                  paddingVertical: Platform.OS === "ios" ? 6 : 8,
+                }}
+                returnKeyType="search"
+                autoCorrect={false}
+              />
+              <Pressable
+                onPress={closeSearchBar}
+                hitSlop={10}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginLeft: 4,
+                  flexShrink: 0,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={trUi ? "Aramayı kapat" : "Close search"}
+              >
+                <Ionicons name="close" size={22} color={isDark ? "#ebebf0" : "#3a3a3c"} />
+              </Pressable>
+            </View>
+          </Animated.View>
+        ) : null}
+
+        {!showSearchBar ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 20,
+              paddingBottom: bottomBarInset,
+              paddingTop: 12,
+              backgroundColor: "transparent",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: fabSearchPillBg,
+                borderRadius: 28,
+                paddingLeft: 6,
+                paddingRight: 8,
+                paddingVertical: 8,
+              }}
+            >
+              <Pressable
+                onPress={() => setFabMenuOpen((o) => !o)}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 6 }}
+                style={{
+                  width: 42,
+                  height: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={trUi ? "Menü: ekle" : "Add menu"}
+              >
+                <Ionicons name="add" size={26} color={fabSearchPillIcon} />
+              </Pressable>
+              <Pressable
+                onPress={toggleSearchBar}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 4 }}
+                style={{
+                  width: 42,
+                  height: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={trUi ? "İşlem ara" : "Search transactions"}
+              >
+                <Ionicons name="search-outline" size={22} color={fabSearchPillIcon} />
+              </Pressable>
+            </View>
+
+            <View
+              pointerEvents="box-none"
+              style={{
+                width: 80,
+                height: 80,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "transparent",
+              }}
+            >
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: isRecording ? "rgba(255, 71, 87, 0.26)" : "transparent",
+                  transform: [{ scale: isRecording ? 1.06 : 1 }],
+                }}
+              />
+              <GestureDetector gesture={micHoldGesture}>
+                <View
+                  collapsable={false}
+                  accessibilityRole="button"
+                  accessibilityLabel={trUi ? "Sesle harcama — basılı tutarak konuş" : "Voice expense — hold to speak"}
+                  accessibilityHint={
+                    trUi ? "Konuşmayı bitirince parmağını kaldır" : "Release when you finish speaking"
+                  }
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: isRecording ? MICFAB_FILL_ACTIVE : micRed,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    ...Platform.select({
+                      ios: {
+                        shadowColor: "#FF3949",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.4,
+                        shadowRadius: 10,
+                      },
+                      android: { elevation: 6 },
+                      default: {},
+                    }),
+                  }}
+                >
+                  <Ionicons name="mic" size={30} color="#FFFFFF" />
+                </View>
+              </GestureDetector>
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {/* + hızlı menü */}
+      {fabMenuOpen ? (
+        <>
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.35)", zIndex: 40 }]}
+            onPress={closeFabMenu}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: 18,
+              bottom: bottomBarBlockHeight + 12,
+              zIndex: 50,
+              maxWidth: "92%",
+              width: 280,
+            }}
+            pointerEvents="box-none"
+          >
+            <View
+              style={{
+                backgroundColor: fabMenuBg,
+                borderRadius: 20,
+                padding: 8,
+                borderWidth: 1,
+                borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                ...Platform.select({
+                  ios: {
+                    shadowColor: "#000",
+                    shadowOpacity: 0.35,
+                    shadowRadius: 20,
+                    shadowOffset: { width: 0, height: 10 },
+                  },
+                  android: { elevation: 14 },
+                  default: {},
+                }),
+              }}
+            >
+              <Pressable
+                onPress={() => {
+                  closeFabMenu();
+                  router.push("/add" as any);
+                }}
+                style={({ pressed }) => ({
+                  position: "relative",
+                  paddingVertical: 12,
+                  paddingLeft: 12,
+                  paddingRight: 40,
+                  borderRadius: 14,
+                  backgroundColor: pressed ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)") : "transparent",
+                })}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 13,
+                      marginRight: 12,
+                      flexShrink: 0,
+                      backgroundColor: fabIconTint,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="create-outline" size={22} color={PURPLE} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, justifyContent: "center" }}>
+                    <Text numberOfLines={1} style={{ color: textColor, fontSize: 16, fontWeight: "700" }}>
+                      {trUi ? "Manuel ekle" : "Add manually"}
+                    </Text>
+                    <Text numberOfLines={2} style={{ color: mutedColor, fontSize: 12, marginTop: 2 }}>
+                      {trUi ? "Tutar ve kategori ile gir" : "Enter amount & category"}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    top: 0,
+                    bottom: 0,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="chevron-forward" size={20} color={mutedColor} />
+                </View>
+              </Pressable>
+
+              <View style={{ height: 6 }} />
+
+              <Pressable
+                onPress={() => {
+                  closeFabMenu();
+                  void handleImagePick();
+                }}
+                style={({ pressed }) => ({
+                  position: "relative",
+                  paddingVertical: 12,
+                  paddingLeft: 12,
+                  paddingRight: 40,
+                  borderRadius: 14,
+                  backgroundColor: pressed ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)") : "transparent",
+                })}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 13,
+                      marginRight: 12,
+                      flexShrink: 0,
+                      backgroundColor: fabIconTint,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="image-outline" size={22} color={PURPLE} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, justifyContent: "center" }}>
+                    <Text numberOfLines={1} style={{ color: textColor, fontSize: 16, fontWeight: "700" }}>
+                      {trUi ? "Görsel yükle" : "Upload image"}
+                    </Text>
+                    <Text numberOfLines={2} style={{ color: mutedColor, fontSize: 12, marginTop: 2 }}>
+                      {trUi ? "Fiş veya ekran görüntüsü" : "Receipt or screenshot"}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    top: 0,
+                    bottom: 0,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="chevron-forward" size={20} color={mutedColor} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </>
+      ) : null}
 
       <MonthPickerModal
         visible={monthModalOpen}
@@ -395,78 +1015,24 @@ export default function Dashboard() {
         activeListId={activeListId}
         onSelectList={setActiveList}
         onAddList={addList}
-        onEditLists={() => router.push("/(app)/settings")}
+        onEditLists={() => throttledPush("/(app)/settings")}
         isDark={isDark}
         language={language}
       />
 
-      {/* ── AI text input (slides up) ── */}
-      {showInput && (
-        <Animated.View style={{
-          position: "absolute", bottom: 90, left: 20, right: 20,
-          backgroundColor: cardBg, borderRadius: 18,
-          shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10,
-          opacity: inputAnim, transform: [{ translateY: inputTranslateY }],
-        }}>
-          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 4 }}>
-            <Ionicons name="sparkles-outline" size={18} color={PURPLE} style={{ marginRight: 10 }} />
-            <TextInput
-              value={promptText} onChangeText={setPromptText}
-              placeholder="Describe your expense…"
-              placeholderTextColor={mutedColor}
-              style={{ flex: 1, color: textColor, fontSize: 15, paddingVertical: 14 }}
-              returnKeyType="send" onSubmitEditing={handleTextSubmit} autoFocus
-            />
-            {promptText.length > 0 && (
-              <Pressable onPress={handleTextSubmit} style={{ backgroundColor: PURPLE, borderRadius: 10, padding: 8 }}>
-                <Ionicons name="arrow-up" size={14} color="#fff" />
-              </Pressable>
-            )}
-          </View>
-        </Animated.View>
-      )}
-
-      {/* ── Bottom bar ── */}
-      <View style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-        paddingHorizontal: 32, paddingBottom: Platform.OS === "ios" ? 30 : 16, paddingTop: 12,
-        backgroundColor: bg,
-      }}>
-        {/* + */}
-        <Pressable onPress={() => router.push("/add" as any)}
-          style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
-          <Ionicons name="add" size={28} color={textColor} />
-        </Pressable>
-
-        {/* Search */}
-        <Pressable onPress={toggleInput}
-          style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
-          <Ionicons name="search-outline" size={24} color={showInput ? PURPLE : mutedColor} />
-        </Pressable>
-
-        {/* Image scan */}
-        <Pressable onPress={handleImagePick}
-          style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
-          <Ionicons name="camera-outline" size={24} color={mutedColor} />
-        </Pressable>
-
-        {/* Voice FAB */}
-        <Pressable onPress={handleVoice}
-          style={{
-            width: 60, height: 60, borderRadius: 30,
-            backgroundColor: isRecording ? "#FF6B6B" : "#FF6B6B",
-            alignItems: "center", justifyContent: "center",
-            shadowColor: "#FF6B6B", shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8,
-          }}>
-          <Ionicons name={isRecording ? "stop" : "mic"} size={26} color="#fff" />
-        </Pressable>
-      </View>
-
       <ReviewExpenseModal
-        visible={reviewVisible} parsing={reviewParsing} parsedExpense={reviewExpense}
-        onClose={() => setReviewVisible(false)}
-        onSaved={() => setReviewVisible(false)}
+        visible={reviewVisible}
+        parsing={reviewParsing}
+        parsingKind={reviewParsingKind}
+        parsedExpenses={reviewExpenses}
+        onClose={() => {
+          setReviewVisible(false);
+          resetReviewFlow();
+        }}
+        onSaved={() => {
+          setReviewVisible(false);
+          resetReviewFlow();
+        }}
       />
     </SafeAreaView>
   );
