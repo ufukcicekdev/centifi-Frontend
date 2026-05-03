@@ -1,5 +1,8 @@
 <resources>
   <string name="app_name">Centifi</string>
+  <string name="bank_pending_channel_name" translatable="false">Bank activity</string>
+  <string name="bank_pending_channel_desc" translatable="false">When Centifi captures a bank app notification</string>
+  <string name="bank_pending_default_body" translatable="false">New activity — open Centifi to review</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
 </resources>
