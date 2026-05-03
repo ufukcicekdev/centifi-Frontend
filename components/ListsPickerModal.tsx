@@ -7,12 +7,14 @@ import {
   ScrollView,
   TextInput,
   Platform,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import type { ExpenseList } from "../constants/mockData";
 import type { Language } from "../i18n";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
+import { useAppDialog } from "../context/AppDialogContext";
+import { displayExpenseListName } from "../lib/listDisplayName";
 
 const COPY: Record<
   Language,
@@ -99,6 +101,8 @@ export default function ListsPickerModal({
   isDark: boolean;
   language: Language;
 }) {
+  const { showAlert } = useAppDialog();
+  const { t: ti18n } = useTranslation();
   const t = COPY[language];
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -125,10 +129,7 @@ export default function ListsPickerModal({
       setNewName("");
       setAdding(false);
     } catch {
-      Alert.alert(
-        language === "tr" ? "Hata" : "Error",
-        language === "tr" ? "Liste kaydedilemedi." : "Could not save the list.",
-      );
+      showAlert(ti18n("common.error"), ti18n("settings.listSaveFailed"));
     }
   };
 
@@ -300,7 +301,9 @@ export default function ListsPickerModal({
                       <Text style={{ fontSize: 24 }}>{listEmoji(list)}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: text, fontSize: 17, fontWeight: "700" }}>{list.name}</Text>
+                      <Text style={{ color: text, fontSize: 17, fontWeight: "700" }}>
+                        {displayExpenseListName(list.name, ti18n)}
+                      </Text>
                       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, gap: 6 }}>
                         <Ionicons name="person-outline" size={14} color={muted} />
                         <Text style={{ color: muted, fontSize: 13 }}>{subtitle}</Text>

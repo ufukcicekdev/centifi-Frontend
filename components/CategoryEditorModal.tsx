@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  Platform,
-  TextInput,
-  Alert,
-} from "react-native";
+import { useTranslation } from "react-i18next";
+import { View, Text, Pressable, Modal, TextInput } from "react-native";
 import type { CustomCategory } from "../constants/mockData";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
+import { useAppDialog } from "../context/AppDialogContext";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 const PURPLE = "#6C63FF";
 
@@ -30,67 +29,72 @@ export function EmojiPickerSheet({
   onClose: () => void;
   isDark: boolean;
 }) {
+  const { t } = useTranslation();
+  /** İç içe Modal’da kök SafeAreaProvider inset vermez; bu sheet için yerel provider + SafeAreaView şart. */
   const keyboardInset = useKeyboardInset();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: "#00000066" }} onPress={onClose} />
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: isDark ? "#1a1a1a" : "#fff",
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingBottom: (Platform.OS === "ios" ? 36 : 24) + keyboardInset,
-          paddingTop: 16,
-        }}
-      >
-        <View
+      <SafeAreaProvider style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1, backgroundColor: "#00000066" }} onPress={onClose} />
+        <SafeAreaView
+          edges={["bottom"]}
           style={{
-            width: 36,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: isDark ? "#444" : "#ddd",
-            alignSelf: "center",
-            marginBottom: 16,
-          }}
-        />
-        <Text
-          style={{
-            color: isDark ? "#fff" : "#000",
-            fontSize: 16,
-            fontWeight: "700",
-            paddingHorizontal: 20,
-            marginBottom: 12,
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: isDark ? "#1a1a1a" : "#fff",
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            paddingTop: 16,
+            paddingBottom: keyboardInset,
           }}
         >
-          Choose emoji
-        </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 6 }}>
-          {EMOJI_LIST.map((em) => (
-            <Pressable
-              key={em}
-              onPress={() => {
-                onSelect(em);
-                onClose();
-              }}
-              style={({ pressed }) => ({
-                width: 48,
-                height: 48,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 12,
-                backgroundColor: isDark ? "#252525" : "#f5f5f5",
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 26 }}>{em}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+          <View
+            style={{
+              width: 36,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: isDark ? "#444" : "#ddd",
+              alignSelf: "center",
+              marginBottom: 16,
+            }}
+          />
+          <Text
+            style={{
+              color: isDark ? "#fff" : "#000",
+              fontSize: 16,
+              fontWeight: "700",
+              paddingHorizontal: 20,
+              marginBottom: 12,
+            }}
+          >
+            {t("common.chooseEmoji")}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 6 }}>
+            {EMOJI_LIST.map((em) => (
+              <Pressable
+                key={em}
+                onPress={() => {
+                  onSelect(em);
+                  onClose();
+                }}
+                style={({ pressed }) => ({
+                  width: 48,
+                  height: 48,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  backgroundColor: isDark ? "#252525" : "#f5f5f5",
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text style={{ fontSize: 26 }}>{em}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -118,10 +122,13 @@ export default function CategoryEditorModal({
   onClose: () => void;
   isDark: boolean;
 }) {
+  const { showAlert } = useAppDialog();
+  const { t } = useTranslation();
   const [name, setName] = useState(existing?.name ?? "");
   const [emoji, setEmoji] = useState(existing?.emoji ?? "📦");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const keyboardInset = useKeyboardInset();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
@@ -137,7 +144,7 @@ export default function CategoryEditorModal({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter a category name.");
+      showAlert(t("common.error"), t("settings.enterCategoryName"));
       return;
     }
     const payload: CategoryEditorPayload = {
@@ -150,7 +157,7 @@ export default function CategoryEditorModal({
       await Promise.resolve(onSave(payload));
       onClose();
     } catch {
-      Alert.alert("Error", "Could not save category.");
+      showAlert(t("common.error"), t("settings.categorySaveFailed"));
     }
   };
 
@@ -167,7 +174,7 @@ export default function CategoryEditorModal({
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           padding: 24,
-          paddingBottom: (Platform.OS === "ios" ? 40 : 28) + keyboardInset,
+          paddingBottom: 20 + insets.bottom + keyboardInset,
         }}
       >
         <View
@@ -225,12 +232,18 @@ export default function CategoryEditorModal({
           style={({ pressed }) => ({
             backgroundColor: PURPLE,
             borderRadius: 14,
-            padding: 16,
+            paddingVertical: 16,
+            paddingHorizontal: 20,
             alignItems: "center",
+            justifyContent: "center",
+            alignSelf: "stretch",
+            width: "100%",
             opacity: pressed ? 0.8 : 1,
           })}
         >
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
+          <Text
+            style={{ color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" }}
+          >
             {existing ? "Update" : "Create Category"}
           </Text>
         </Pressable>

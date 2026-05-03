@@ -12,9 +12,11 @@ import { registerUser } from "../../lib/backend";
 import { isValidEmail } from "../../lib/isValidEmail";
 import CentifiLogo from "../../components/CentifiLogo";
 import { useAppDialog } from "../../context/AppDialogContext";
+import { useTranslation } from "react-i18next";
 
 export default function Register() {
   const { showAlert } = useAppDialog();
+  const { t } = useTranslation();
   const router = useRouter();
   const setUser = useStore((s) => s.setUser);
   const [name, setName] = useState("");
@@ -32,15 +34,15 @@ export default function Register() {
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      showAlert("Error", "Please fill in all fields.");
+      showAlert(t("common.error"), t("auth.registerFillFieldsBody"));
       return;
     }
     if (!isValidEmail(email)) {
-      showAlert("Invalid email", "Please enter a valid email address.");
+      showAlert(t("auth.invalidEmailTitle"), t("auth.invalidEmailBody"));
       return;
     }
     if (password.length < 6) {
-      showAlert("Error", "Password must be at least 6 characters.");
+      showAlert(t("common.error"), t("auth.passwordMinLength"));
       return;
     }
     setLoading(true);
@@ -50,14 +52,11 @@ export default function Register() {
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
         if (tokensKept) {
-          showAlert(
-            "Bağlantı / profil",
-            "Hesap oluştu ama profil yüklenemedi. EXPO_PUBLIC_API_BASE_URL: üretim https://centifi-backend-production.up.railway.app · yerel telefon http://Mac_IP:8000",
-          );
+          showAlert(t("auth.hydrateUnreachableTitle"), t("auth.hydrateUnreachableRegisterBody"));
         }
       }
     } catch (e: any) {
-      showAlert("Register Failed", "Please try again.");
+      showAlert(t("auth.registerFailedTitle"), t("auth.registerFailedBody"));
     } finally {
       setLoading(false);
     }
@@ -84,12 +83,17 @@ export default function Register() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        enabled={Platform.OS === "ios"}
+        style={{ flex: 1 }}
+      >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 28, paddingTop: 32, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "android" ? "none" : "on-drag"}
           showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
 
           {/* Back */}

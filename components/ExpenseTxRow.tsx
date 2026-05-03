@@ -3,6 +3,8 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "../store/useStore";
 import { getCategoryMeta, type Expense } from "../constants/mockData";
+import type { Language } from "../i18n";
+import { currencySymbolFor, formatAmountDigits } from "../lib/formatMoney";
 
 export default function ExpenseTxRow({
   expense,
@@ -15,6 +17,10 @@ export default function ExpenseTxRow({
 }) {
   const customCategories = useStore((s) => s.customCategories);
   const categoryDisplayOverrides = useStore((s) => s.categoryDisplayOverrides);
+  const language = useStore((s) => s.language);
+  const displayCurrency = useStore((s) => s.displayCurrency);
+  const lang = language as Language;
+  const sym = currencySymbolFor(displayCurrency, lang);
   const meta = getCategoryMeta(expense.category, customCategories, categoryDisplayOverrides);
   const textColor = isDark ? "#fff" : "#000";
   const mutedColor = isDark ? "#888" : "#666";
@@ -59,8 +65,8 @@ export default function ExpenseTxRow({
             fontSize: 14,
           }}
         >
-          {expense.currency === "USD" ? "$" : expense.currency === "TRY" ? "₺" : expense.currency}
-          {expense.amount.toFixed(2)}
+          {sym}
+          {formatAmountDigits(expense.amount, lang)}
         </Text>
       </View>
     </View>

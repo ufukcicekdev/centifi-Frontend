@@ -7,14 +7,13 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
-  Alert,
   ActivityIndicator,
   Modal,
   useWindowDimensions,
   StyleSheet,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { buildCategoriesForHome, useStore } from "../../store/useStore";
@@ -26,6 +25,9 @@ import CategoryEditorModal from "../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../components/ExpenseAmountSignRow";
 import type { Language } from "../../i18n";
 import { useThrottledRouter } from "../../hooks/useThrottledRouter";
+import { useAppDialog } from "../../context/AppDialogContext";
+import { displayExpenseListName } from "../../lib/listDisplayName";
+import { currencySymbolFor } from "../../lib/formatMoney";
 
 type RecurrenceId =
   | "once"
@@ -133,12 +135,22 @@ function formatDatePill(ymd: string, language: Language): string {
   }).format(dt);
 }
 
+function firstParam(v: string | string[] | undefined): string | undefined {
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v[0];
+  return undefined;
+}
+
 export default function AddExpense() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ pendingId?: string; bankPrefill?: string }>();
+  const pendingIdParam = firstParam(params.pendingId);
+  const bankPrefillParam = firstParam(params.bankPrefill);
   const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const { t } = useTranslation();
+  const { showAlert } = useAppDialog();
 
   const {
     isDark,
@@ -147,9 +159,11 @@ export default function AddExpense() {
     lists,
     addList,
     addExpense,
+    removePendingBankTransaction,
     customCategories,
     enabledCategoryIds,
     language,
+    displayCurrency,
     addCategory,
     categoryDisplayOverrides,
   } = useStore();
@@ -185,6 +199,12 @@ export default function AddExpense() {
     );
   }, [homeCats]);
 
+  useEffect(() => {
+    const pre = bankPrefillParam?.trim();
+    if (!pre) return;
+    setDescription((d) => (d.trim() ? d : pre));
+  }, [bankPrefillParam]);
+
   const lang = language as Language;
   const recLabels = REC_LABELS[lang];
 
@@ -195,22 +215,14 @@ export default function AddExpense() {
   const bottomBarBg = isDark ? "#0a0a0a" : "#fff";
   const saveBtnBg = isDark ? "#2c2c2e" : "#e2e2e6";
 
-  const placeholders = useMemo(() => {
-    if (lang === "tr") return { description: "Açıklama" };
-    if (lang === "de") return { description: "Beschreibung" };
-    if (lang === "fr") return { description: "Description" };
-    if (lang === "es") return { description: "Descripción" };
-    return { description: "Description" };
-  }, [lang]);
-
   const handleSave = async () => {
     const num = parseFloat(amount.replace(",", "."));
     if (!num || num <= 0) {
-      Alert.alert(t("common.error"), lang === "tr" ? "Geçerli bir tutar girin." : "Please enter a valid amount.");
+      showAlert(t("common.error"), t("forms.validAmount"));
       return;
     }
     if (!description.trim()) {
-      Alert.alert(t("common.error"), lang === "tr" ? "Açıklama ekleyin." : "Please add a description.");
+      showAlert(t("common.error"), t("forms.descriptionRequired"));
       return;
     }
 
@@ -222,20 +234,24 @@ export default function AddExpense() {
         description: description.trim(),
         category: selectedCategory,
         date,
-        currency: "USD",
+        currency: displayCurrency,
         is_income: isIncome,
         ...(list_id != null ? { list_id } : {}),
       });
-      addExpense({
-        id: String(dto.id),
-        amount: num,
-        description: description.trim(),
-        category: selectedCategory,
-        date,
-        currency: dto.currency ?? "USD",
-        listId: activeListId,
-        isIncome: dto.is_income ?? isIncome,
-      });
+      addExpense(
+        {
+          id: String(dto.id),
+          amount: num,
+          description: description.trim(),
+          category: selectedCategory,
+          date,
+          currency: dto.currency ?? displayCurrency,
+          listId: activeListId,
+          isIncome: dto.is_income ?? isIncome,
+        },
+        { deferBudgetCheckMs: 480 },
+      );
+      if (pendingIdParam) removePendingBankTransaction(pendingIdParam);
       try {
         const { notificationAsync, NotificationFeedbackType } = await import("expo-haptics");
         await notificationAsync(NotificationFeedbackType.Success);
@@ -244,7 +260,7 @@ export default function AddExpense() {
       }
       router.back();
     } catch {
-      Alert.alert(t("common.error"), lang === "tr" ? "Kaydedilemedi. Tekrar deneyin." : "Could not save. Try again.");
+      showAlert(t("common.error"), t("forms.saveFailedRetry"));
       setSaving(false);
     }
   };
@@ -304,10 +320,10 @@ export default function AddExpense() {
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
-                <Text style={{ color: mutedColor, fontSize: 13 }}>in</Text>
+                <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
                 <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
                   <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
-                    {activeList?.name ?? (lang === "tr" ? "Özel liste" : "Private list")}
+                    {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
@@ -316,7 +332,7 @@ export default function AddExpense() {
               <TextInput
                 value={description}
                 onChangeText={setDescription}
-                placeholder={placeholders.description}
+                placeholder={t("expenseDetail.descriptionPlaceholder")}
                 placeholderTextColor={mutedColor}
                 style={{
                   color: textColor,
@@ -333,7 +349,7 @@ export default function AddExpense() {
                 onSelectIncome={() => setIsIncome(true)}
                 amount={amount}
                 onChangeAmount={setAmount}
-                currencySuffix="$"
+                currencySuffix={currencySymbolFor(displayCurrency, lang)}
                 isDark={isDark}
               />
 

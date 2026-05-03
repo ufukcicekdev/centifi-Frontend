@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { AppState, DeviceEventEmitter, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Expense } from "../constants/mockData";
 import type { CategoryBudgetEntry } from "../constants/budgetTypes";
@@ -9,6 +9,7 @@ import {
 } from "../constants/mockData";
 import i18n, { type Language } from "../i18n";
 import { formatMoneyAmount } from "./formatMoney";
+import { BUDGET_ALERT_FOREGROUND_EVENT } from "./budgetAlertEvents";
 import { presentLocalNotificationIfEnabled } from "./localNotifications";
 
 const STORAGE_PREFIX = "centifi_budget_alert_";
@@ -21,7 +22,6 @@ export type BudgetNotificationStateSlice = {
   budgetAlertsEnabled: boolean;
   budgetAlertThresholdPercent: number;
   notificationsEnabled: boolean;
-  activeListId: string;
   displayCurrency: string;
   language: Language;
 };
@@ -33,30 +33,63 @@ function currentMonthKey(): string {
   return `${y}-${m}`;
 }
 
-function sumMonthSpendForCategory(
-  expenses: Expense[],
-  categoryId: string,
-  monthKey: string,
-  activeListId: string,
-): number {
+/** Aylık kategori bütçesi tüm listelerdeki harcamayı kapsar (bütçe detayı / ortalamalarla uyumlu). */
+function sumMonthSpendForCategoryAllLists(expenses: Expense[], categoryId: string, monthKey: string): number {
   let s = 0;
   for (const e of expenses) {
     if (e.category !== categoryId || e.isIncome) continue;
     if (!e.date.startsWith(monthKey)) continue;
-    if (e.listId && e.listId !== activeListId) continue;
     s += e.amount;
   }
   return s;
 }
 
+async function budgetAlertDedupeSeen(key: string): Promise<boolean> {
+  try {
+    return !!(await AsyncStorage.getItem(key));
+  } catch {
+    return false;
+  }
+}
+
+async function budgetAlertDedupeMark(key: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+function emitBudgetAlertOrSchedule(
+  notificationsEnabled: boolean,
+  payload: { title: string; body: string; data?: Record<string, unknown> },
+): Promise<void> {
+  if (AppState.currentState === "active") {
+    DeviceEventEmitter.emit(BUDGET_ALERT_FOREGROUND_EVENT, {
+      title: payload.title,
+      body: payload.body,
+    });
+    return Promise.resolve();
+  }
+  return presentLocalNotificationIfEnabled(notificationsEnabled, payload);
+}
 
 export function queueBudgetThresholdCheck(getState: () => BudgetNotificationStateSlice): void {
   if (Platform.OS === "web") return;
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     void runBudgetThresholdCheck(getState());
-  }, 700);
+  }, 280);
+}
+
+/** Bekleyen debounce’u iptal edip hemen kontrol eder — fiş/ses kaydından sonra modal kapandığında veya manuel eklemede ekran değişiminden sonra. */
+export function flushBudgetThresholdCheck(getState: () => BudgetNotificationStateSlice): void {
+  if (Platform.OS === "web") return;
+  clearTimeout(debounceTimer);
+  debounceTimer = undefined;
+  void runBudgetThresholdCheck(getState());
 }
 
 async function runBudgetThresholdCheck(s: BudgetNotificationStateSlice): Promise<void> {
@@ -72,28 +105,45 @@ async function runBudgetThresholdCheck(s: BudgetNotificationStateSlice): Promise
     const cap = entry.amount;
     if (cap == null || cap <= 0) continue;
 
-    const spent = sumMonthSpendForCategory(s.expenses, categoryId, monthKey, s.activeListId);
+    const spent = sumMonthSpendForCategoryAllLists(s.expenses, categoryId, monthKey);
     const pct = (spent / cap) * 100;
-    if (pct < threshold) continue;
+    const overCap = spent >= cap;
+    const crossedThreshold = pct >= threshold;
 
-    const dedupeKey = `${STORAGE_PREFIX}${monthKey}_${categoryId}_${threshold}`;
-    try {
-      const done = await AsyncStorage.getItem(dedupeKey);
-      if (done) continue;
-    } catch {
-      continue;
-    }
+    if (!overCap && !crossedThreshold) continue;
 
     const meta = getCategoryMeta(categoryId, s.customCategories, s.categoryDisplayOverrides);
     const spentStr = formatMoneyAmount(spent, lang, cur);
     const capStr = formatMoneyAmount(cap, lang, cur);
 
-    await presentLocalNotificationIfEnabled(s.notificationsEnabled, {
+    if (overCap) {
+      const dedupeKey = `${STORAGE_PREFIX}over_${monthKey}_${categoryId}`;
+      if (await budgetAlertDedupeSeen(dedupeKey)) continue;
+
+      await emitBudgetAlertOrSchedule(s.notificationsEnabled, {
+        title: String(i18n.t("notifications.budgetExceededTitle")),
+        body: String(
+          i18n.t("notifications.budgetExceededBody", {
+            category: meta.name,
+            spent: spentStr,
+            cap: capStr,
+          }),
+        ),
+        data: { type: "budget_over", categoryId },
+      });
+      await budgetAlertDedupeMark(dedupeKey);
+      continue;
+    }
+
+    const dedupeKey = `${STORAGE_PREFIX}${monthKey}_${categoryId}_${threshold}`;
+    if (await budgetAlertDedupeSeen(dedupeKey)) continue;
+
+    await emitBudgetAlertOrSchedule(s.notificationsEnabled, {
       title: String(i18n.t("notifications.budgetWarningTitle")),
       body: String(
         i18n.t("notifications.budgetWarningBody", {
           category: meta.name,
-          pct: Math.min(100, Math.round(pct)),
+          pct: Math.round(pct),
           spent: spentStr,
           cap: capStr,
         }),
@@ -101,10 +151,6 @@ async function runBudgetThresholdCheck(s: BudgetNotificationStateSlice): Promise
       data: { type: "budget_threshold", categoryId },
     });
 
-    try {
-      await AsyncStorage.setItem(dedupeKey, "1");
-    } catch {
-      /* ignore */
-    }
+    await budgetAlertDedupeMark(dedupeKey);
   }
 }

@@ -2,6 +2,8 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Expense, getCategoryMeta } from "../constants/mockData";
 import { useStore } from "../store/useStore";
+import type { Language } from "../i18n";
+import { currencySymbolFor, formatAmountDigits } from "../lib/formatMoney";
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -16,6 +18,9 @@ export default function ExpenseCard({
 }: ExpenseCardProps) {
   const customCategories = useStore((s) => s.customCategories);
   const categoryDisplayOverrides = useStore((s) => s.categoryDisplayOverrides);
+  const language = useStore((s) => s.language);
+  const displayCurrency = useStore((s) => s.displayCurrency);
+  const lang = language as Language;
   const meta = getCategoryMeta(expense.category, customCategories, categoryDisplayOverrides);
   const cardBg = isDark ? "#1a1a1a" : "#ffffff";
   const textColor = isDark ? "#ffffff" : "#0f0f0f";
@@ -77,8 +82,8 @@ export default function ExpenseCard({
       <Text
         style={{ color: textColor, fontSize: 15, fontWeight: "700" }}
       >
-        {expense.currency === "USD" ? "$" : expense.currency}
-        {expense.amount.toFixed(2)}
+        {currencySymbolFor(displayCurrency, lang)}
+        {formatAmountDigits(expense.amount, lang)}
       </Text>
     </Pressable>
   );

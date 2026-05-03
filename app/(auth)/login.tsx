@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useStore } from "../../store/useStore";
@@ -32,8 +33,10 @@ const SURFACE_HIGH = "#222a3d";
 const BORDER       = "#404758";
 const TEXT         = "#dee2f1";
 const MUTED        = "#bfc5d7";
-const PRIMARY      = "#bfc2ff";
-const PRIMARY_CTR  = "#3e4278";
+const PRIMARY = "#bfc2ff";
+/** Ana CTA — koyu yüzeyde net görünsün (PRIMARY_CTR ile karışmasın) */
+const CTA_FILL = "#6C63FF";
+const CTA_TEXT = "#ffffff";
 
 function GoogleIcon() {
   return (
@@ -90,10 +93,13 @@ const styles = StyleSheet.create({
 
 export default function Login() {
   const { showAlert } = useAppDialog();
+  const { t } = useTranslation();
   const router = useRouter();
   const { height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  /** E-posta formu açıkken tam ekran minHeight klavye + ortalamayı birlikte kırıyor; yalnız sosyal girişte kullan */
   const scrollMinHeight = Math.max(winH - insets.top - insets.bottom, 520);
+  const scrollRef = useRef<ScrollView>(null);
   const [showEmail, setShowEmail] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,11 +109,11 @@ export default function Login() {
 
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) {
-      showAlert("Missing fields", "Please enter your email and password.");
+      showAlert(t("auth.missingFieldsTitle"), t("auth.missingFieldsBody"));
       return;
     }
     if (!isValidEmail(email)) {
-      showAlert("Invalid email", "Please enter a valid email address.");
+      showAlert(t("auth.invalidEmailTitle"), t("auth.invalidEmailBody"));
       return;
     }
     setLoading(true);
@@ -118,24 +124,21 @@ export default function Login() {
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
         showAlert(
-          "Bağlantı / profil",
-          tokensKept
-            ? "Giriş başarılı ama profil API’den yüklenemedi. frontend/.env → EXPO_PUBLIC_API_BASE_URL: üretimde https://centifi-backend-production.up.railway.app; yerelde telefonda http://BILGISAYAR_IP:8000 (localhost olmaz, Django runserver 0.0.0.0:8000). Expo’yu yeniden başlatın."
-            : "Sunucuya ulaşılamadı. Ağ ve API adresini kontrol edin.",
+          t("auth.hydrateUnreachableTitle"),
+          tokensKept ? t("auth.hydrateUnreachableWithTokensBody") : t("auth.hydrateUnreachableNoTokensBody"),
         );
         return;
       }
       if (result === "session_invalid") {
-        showAlert("Session error", "Could not verify your session. Try signing in again.");
+        showAlert(t("auth.sessionVerifyFailedTitle"), t("auth.sessionVerifyFailedBody"));
       }
     } catch (e: unknown) {
       const status = getApiErrorStatus(e);
       const details =
         e && typeof e === "object" && "details" in e ? (e as ApiError).details : undefined;
-      let msg = "Incorrect email or password.";
+      let msg = t("auth.incorrectCredentials");
       if (e instanceof TypeError || (e instanceof Error && /network|fetch|failed/i.test(e.message))) {
-        msg =
-          "Sunucuya ulaşılamadı. Telefonda EXPO_PUBLIC_API_BASE_URL bilgisayarın IP adresi olmalı (127.0.0.1 değil), Django runserver 0.0.0.0:8000.";
+        msg = t("auth.networkUnreachableLogin");
       } else if (details && typeof details === "object") {
         const d = details as Record<string, unknown>;
         if (typeof d.detail === "string") {
@@ -147,10 +150,13 @@ export default function Login() {
           msg = Array.isArray(em) ? String(em[0]) : String(em);
         }
       }
-      if (status === 401 && msg === "Incorrect email or password.") {
-        msg = "E-posta veya şifre hatalı (veya bu sunucuda hesap yok).";
+      if (
+        status === 401 &&
+        (msg === t("auth.incorrectCredentials") || msg === "Incorrect email or password.")
+      ) {
+        msg = t("auth.wrongCredentialsLocalized");
       }
-      showAlert("Login failed", msg);
+      showAlert(t("auth.loginFailedTitle"), msg);
     } finally {
       setLoading(false);
     }
@@ -171,39 +177,48 @@ export default function Login() {
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
         if (tokensKept) {
-          showAlert(
-            "Bağlantı / profil",
-            "Profil yüklenemedi. EXPO_PUBLIC_API_BASE_URL kontrolü: üretim https://centifi-backend-production.up.railway.app · yerel telefon http://Mac_IP:8000",
-          );
+          showAlert(t("auth.hydrateUnreachableTitle"), t("auth.hydrateUnreachableAppleBody"));
         }
       }
     } catch (e: any) {
-      if (e.code !== "ERR_REQUEST_CANCELED") showAlert("Apple Sign-In failed", "Please try again.");
+      if (e.code !== "ERR_REQUEST_CANCELED") showAlert(t("auth.appleSignInFailedTitle"), t("auth.appleSignInFailedBody"));
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={["top", "left", "right", "bottom"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        enabled={Platform.OS === "ios"}
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{
             flexGrow: 1,
-            minHeight: scrollMinHeight,
+            minHeight: showEmail ? undefined : scrollMinHeight,
             paddingHorizontal: 24,
-            paddingTop: 12,
-            paddingBottom: Math.max(insets.bottom, 16),
+            paddingTop: showEmail ? 16 : 12,
+            paddingBottom: showEmail
+              ? Math.max(insets.bottom, 24) + (Platform.OS === "android" ? 32 : 56)
+              : Math.max(insets.bottom, 16),
             alignItems: "stretch",
           }}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode={Platform.OS === "android" ? "none" : "interactive"}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios" || (Platform.OS === "android" && showEmail)}
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ flex: 1, justifyContent: "center", paddingVertical: 16, width: "100%" }}>
+          <View
+            style={{
+              width: "100%",
+              flexGrow: showEmail ? 0 : 1,
+              minHeight: showEmail ? undefined : 0,
+              justifyContent: showEmail ? "flex-start" : "center",
+              paddingVertical: showEmail ? 4 : 16,
+            }}
+          >
             {/* Logo */}
             <View style={{ alignItems: "center", marginBottom: 32 }}>
               <View
@@ -318,9 +333,12 @@ export default function Login() {
                 }}>
                   <Ionicons name="mail-outline" size={18} color={MUTED} style={{ marginRight: 10 }} />
                   <TextInput
-                    value={email} onChangeText={setEmail}
-                    placeholder="you@example.com" placeholderTextColor={MUTED}
-                    keyboardType="email-address" autoCapitalize="none"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor={MUTED}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     style={{ flex: 1, color: TEXT, fontSize: 15, paddingVertical: 14 }}
                   />
                 </View>
@@ -336,9 +354,18 @@ export default function Login() {
                 }}>
                   <Ionicons name="lock-closed-outline" size={18} color={MUTED} style={{ marginRight: 10 }} />
                   <TextInput
-                    value={password} onChangeText={setPassword}
-                    placeholder="••••••••" placeholderTextColor={MUTED}
-                    secureTextEntry={!showPass} returnKeyType="done"
+                    value={password}
+                    onChangeText={setPassword}
+                    onFocus={() => {
+                      if (Platform.OS !== "android") return;
+                      requestAnimationFrame(() => {
+                        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+                      });
+                    }}
+                    placeholder="••••••••"
+                    placeholderTextColor={MUTED}
+                    secureTextEntry={!showPass}
+                    returnKeyType="done"
                     onSubmitEditing={handleEmailLogin}
                     style={{ flex: 1, color: TEXT, fontSize: 15, paddingVertical: 14 }}
                   />
@@ -360,21 +387,24 @@ export default function Login() {
                     flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: 12,
+                    borderRadius: 14,
                     paddingVertical: 14,
                     paddingHorizontal: 20,
-                    borderWidth: 1,
-                    borderColor: PRIMARY,
-                    backgroundColor: PRIMARY_CTR,
-                    opacity: pressed || loading ? 0.82 : 1,
+                    backgroundColor: CTA_FILL,
+                    shadowColor: CTA_FILL,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 12,
+                    elevation: 8,
+                    opacity: pressed || loading ? 0.88 : 1,
                   })}
                 >
                   {loading ? (
-                    <ActivityIndicator color={TEXT} />
+                    <ActivityIndicator color={CTA_TEXT} />
                   ) : (
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={{ color: TEXT, fontSize: 16, fontWeight: "700" }}>Sign In</Text>
-                      <Ionicons name="arrow-forward" size={18} color={TEXT} style={{ marginLeft: 10 }} />
+                      <Text style={{ color: CTA_TEXT, fontSize: 16, fontWeight: "800" }}>Sign In</Text>
+                      <Ionicons name="arrow-forward" size={18} color={CTA_TEXT} style={{ marginLeft: 10 }} />
                     </View>
                   )}
                 </Pressable>

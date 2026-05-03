@@ -6,7 +6,6 @@ import {
   Modal,
   ScrollView,
   TextInput,
-  Alert,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +14,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useAppDialog } from "../../context/AppDialogContext";
 import {
   BUILTIN_CATEGORIES,
   CustomCategory,
@@ -309,6 +310,8 @@ export function OnboardingCategoryEditModal({
   isDark,
   labels,
 }: EditModalProps) {
+  const { t } = useTranslation();
+  const { showAlert, showConfirm } = useAppDialog();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("📦");
@@ -335,18 +338,23 @@ export function OnboardingCategoryEditModal({
   const closeRowPaddingTop = Math.max(statusBarTop, 12);
 
   const handleDeletePress = () => {
-    if (isBuiltin) {
-      Alert.alert(labels.cannotDeleteBuiltin);
-      return;
-    }
-    if (hasTransactions) {
-      Alert.alert(labels.cannotDeleteHasTx);
-      return;
-    }
-    Alert.alert(labels.delete, "", [
-      { text: "Cancel", style: "cancel" },
-      { text: labels.delete, style: "destructive", onPress: onDelete },
-    ]);
+    void (async () => {
+      if (isBuiltin) {
+        showAlert(labels.cannotDeleteBuiltin);
+        return;
+      }
+      if (hasTransactions) {
+        showAlert(labels.cannotDeleteHasTx);
+        return;
+      }
+      const ok = await showConfirm({
+        title: labels.delete,
+        confirmText: labels.delete,
+        cancelText: t("common.cancel"),
+        destructive: true,
+      });
+      if (ok) onDelete();
+    })();
   };
 
   const handleSave = () => {

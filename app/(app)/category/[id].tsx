@@ -23,6 +23,9 @@ import ExpenseTxRow from "../../../components/ExpenseTxRow";
 import { getCategoryMeta } from "../../../constants/mockData";
 import type { Language } from "../../../i18n";
 import { useThrottledRouter } from "../../../hooks/useThrottledRouter";
+import { useTranslation } from "react-i18next";
+import { displayExpenseListName } from "../../../lib/listDisplayName";
+import { currencySymbolFor, formatAmountDigits } from "../../../lib/formatMoney";
 
 const CORAL = "#FF6B6B";
 const INCOME_GREEN = "#55efc4";
@@ -38,6 +41,7 @@ const SCOPE_PILL: Record<Language, Record<ScopeFlow, string>> = {
 };
 
 export default function CategoryDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
@@ -57,6 +61,7 @@ export default function CategoryDetailScreen() {
     setPeriodFilter,
     language,
     categoryDisplayOverrides,
+    displayCurrency,
   } = useStore();
 
   const lang = language as Language;
@@ -134,13 +139,8 @@ export default function CategoryDetailScreen() {
   const activeList = lists.find((l) => l.id === activeListId);
   const periodLabel = formatPeriodPillLabel(periodFilter, language);
 
-  const fmt = (n: number) => n.toFixed(2).replace(".", ",");
-  const currencySuffix =
-    filtered[0]?.currency === "USD"
-      ? "$"
-      : filtered[0]?.currency === "TRY"
-        ? "₺"
-        : (filtered[0]?.currency ?? "$");
+  const fmt = (n: number) => formatAmountDigits(n, lang);
+  const currencySuffix = currencySymbolFor(displayCurrency, lang);
   const amtColor = highlightIncome ? INCOME_GREEN : CORAL;
   const stepperBg = isDark ? "#2c2c2e" : "#e8e8ec";
   const segPad = { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 } as const;
@@ -156,7 +156,7 @@ export default function CategoryDetailScreen() {
           <Ionicons name="close" size={28} color={textColor} />
         </Pressable>
         <Text style={{ color: mutedColor, textAlign: "center", marginTop: 48, paddingHorizontal: 24 }}>
-          {lang === "tr" ? "Kategori bulunamadı." : "Category not found."}
+          {t("categoryDetail.notFound")}
         </Text>
       </SafeAreaView>
     );
@@ -193,10 +193,10 @@ export default function CategoryDetailScreen() {
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={mutedColor} />
               </Pressable>
-              <Text style={{ color: mutedColor, fontSize: 13 }}>in</Text>
+              <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
               <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
                 <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
-                  {activeList?.name ?? (lang === "tr" ? "Liste" : "List")}
+                  {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={mutedColor} />
               </Pressable>
@@ -292,9 +292,7 @@ export default function CategoryDetailScreen() {
             {grouped.length === 0 ? (
               <View style={{ alignItems: "center", paddingTop: 24 }}>
                 <Text style={{ color: mutedColor, fontSize: 15, textAlign: "center" }}>
-                  {lang === "tr"
-                    ? "Bu dönemde bu kategoride işlem yok."
-                    : "No transactions in this category for this period."}
+                  {t("categoryDetail.emptyPeriod")}
                 </Text>
               </View>
             ) : (
@@ -309,7 +307,9 @@ export default function CategoryDetailScreen() {
                     }}
                   >
                     <Text style={{ color: mutedColor, fontSize: 13, fontWeight: "600" }}>{group.label}</Text>
-                    <Text style={{ color: mutedColor, fontSize: 13 }}>{formatDayNetTotal(group.total)}</Text>
+                    <Text style={{ color: mutedColor, fontSize: 13 }}>
+                      {formatDayNetTotal(group.total, lang, displayCurrency)}
+                    </Text>
                   </View>
                   <View style={{ backgroundColor: cardBg, borderRadius: 18, overflow: "hidden" }}>
                     {group.items.map((exp, idx) => (
@@ -445,7 +445,7 @@ export default function CategoryDetailScreen() {
                 paddingBottom: 8,
               }}
             >
-              {lang === "tr" ? "Listede göster" : "Show in list"}
+              {t("categoryDetail.showInList")}
             </Text>
             {(["all", "expense", "income"] as const).map((id, i) => (
               <Pressable

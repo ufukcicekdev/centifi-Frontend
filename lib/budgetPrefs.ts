@@ -25,7 +25,7 @@ export async function loadBudgetPrefs(userId: string): Promise<SerializedBudgetP
         typeof parsed.budgetAlertThresholdPercent === "number" &&
         Number.isFinite(parsed.budgetAlertThresholdPercent) ?
           Math.min(100, Math.max(50, Math.round(parsed.budgetAlertThresholdPercent))) :
-        90,
+        80,
     };
   } catch {
     return null;

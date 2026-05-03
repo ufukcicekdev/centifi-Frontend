@@ -1,3 +1,4 @@
+import type { BankAutomation } from "../constants/mockData";
 import { apiFetch, saveTokens, type AuthTokens } from "./api";
 
 export type BackendUser = {
@@ -14,6 +15,9 @@ export type BackendUser = {
   notifications_enabled: boolean;
   alert_email: string;
   onboarding_completed: boolean;
+  /** ISO 8601 — RevenueCat ``pro`` entitlement bitişi */
+  pro_entitlement_expires_at?: string | null;
+  is_pro?: boolean;
   /** Per-category budgets (synced when logged in). */
   category_budgets?: Record<string, { amount: number | null; budgetColor: string }> | null;
   budget_alerts_enabled?: boolean;
@@ -213,6 +217,33 @@ export async function fetchExpensesPage(relativePath = "/api/expenses/"): Promis
   return { results: p.results, nextPath: pathFromPaginationNext(p.next) };
 }
 
+export type SendExpenseReportResponse = {
+  ok: boolean;
+  sent_to: string;
+  expense_count: number;
+};
+
+/** E-posta: HTML tablo + CSV ek; tarih YYYY-MM-DD, list_id opsiyonel (yalnızca sayısal API list id). */
+export async function sendExpenseReportEmail(body: {
+  start_date: string;
+  end_date: string;
+  list_id?: number | null;
+}) {
+  const payload: Record<string, unknown> = {
+    start_date: body.start_date,
+    end_date: body.end_date,
+  };
+  if (body.list_id != null && Number.isFinite(body.list_id)) {
+    payload.list_id = Math.floor(body.list_id);
+  }
+  return apiFetch<SendExpenseReportResponse>("/api/expenses/send-report-email/", {
+    method: "POST",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function listExpenseLists() {
   return apiFetch<{ results: ExpenseListDto[] }>("/api/expense-lists/", { method: "GET", auth: true });
 }
@@ -293,6 +324,109 @@ export async function patchUserCustomCategory(
 
 export async function deleteUserCustomCategory(id: number) {
   return apiFetch<void>(`/api/custom-categories/${id}/`, { method: "DELETE", auth: true });
+}
+
+export type UserBankAppDto = {
+  id: number;
+  name: string;
+  emoji: string;
+  store_url: string;
+  package_name: string;
+  icon_url?: string;
+  enabled: boolean;
+  created_at: string;
+};
+
+export type PlayStoreLookupDto = {
+  package_name: string;
+  name: string | null;
+  icon_url: string | null;
+};
+
+/** Numeric API id from client id `ubank_<pk>` */
+export function parseUserBankAppApiId(id: string): number | null {
+  const m = /^ubank_(\d+)$/.exec(id);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+}
+
+export function mapUserBankAppDto(d: UserBankAppDto): BankAutomation {
+  const icon = d.icon_url?.trim();
+  return {
+    id: `ubank_${d.id}`,
+    name: d.name,
+    emoji: d.emoji,
+    storeUrl: d.store_url,
+    packageName: d.package_name,
+    enabled: d.enabled,
+    ...(icon ? { iconUrl: icon } : {}),
+  };
+}
+
+export async function listUserBankApps() {
+  return apiFetch<{ results: UserBankAppDto[] }>("/api/bank-apps/", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function lookupPlayStoreMeta(params: { package?: string; store_url?: string }) {
+  const qs = new URLSearchParams();
+  if (params.package?.trim()) qs.set("package", params.package.trim());
+  if (params.store_url?.trim()) qs.set("store_url", params.store_url.trim());
+  const q = qs.toString();
+  if (!q) {
+    return Promise.reject(new Error("lookupPlayStoreMeta: pass package or store_url"));
+  }
+  return apiFetch<PlayStoreLookupDto>(`/api/bank-apps/play-store-lookup/?${q}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createUserBankApp(body: {
+  name: string;
+  emoji: string;
+  store_url: string;
+  package_name: string;
+  icon_url?: string;
+  enabled: boolean;
+}) {
+  return apiFetch<UserBankAppDto>("/api/bank-apps/", {
+    method: "POST",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchUserBankApp(
+  id: number,
+  patch: Partial<{
+    name: string;
+    emoji: string;
+    store_url: string;
+    package_name: string;
+    icon_url: string;
+    enabled: boolean;
+  }>,
+) {
+  return apiFetch<UserBankAppDto>(`/api/bank-apps/${id}/`, {
+    method: "PATCH",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteUserBankApp(id: number) {
+  return apiFetch<void>(`/api/bank-apps/${id}/`, { method: "DELETE", auth: true });
+}
+
+/** RevenueCat REST ile sunucuda ``pro`` bitişini günceller (satın alma / restore sonrası). */
+export async function syncSubscriptionFromRevenueCat() {
+  return apiFetch<BackendUser>("/api/users/subscription/sync/", { method: "POST", auth: true });
 }
 
 export async function parseText(input: string, language = "en") {

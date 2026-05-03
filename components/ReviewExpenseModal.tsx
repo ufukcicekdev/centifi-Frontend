@@ -11,13 +11,12 @@ import {
   Animated,
   ActivityIndicator,
   StyleSheet,
-  Alert,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import { getCategoryMeta } from "../constants/mockData";
+import { getCategoryMeta, type Expense } from "../constants/mockData";
 import { createExpense, expenseListIdForApi, type ParsedExpenseItem } from "../lib/backend";
 import { formatApiErrorDetailBody, type ApiError } from "../lib/api";
 import { currencySymbolFor } from "../lib/formatMoney";
@@ -25,6 +24,7 @@ import type { Language } from "../i18n";
 import { buildCategoriesForHome, useStore } from "../store/useStore";
 import AddExpenseDatePickerModal from "./AddExpenseDatePickerModal";
 import CategoryEditorModal from "./CategoryEditorModal";
+import { useAppDialog } from "../context/AppDialogContext";
 
 export type ReviewParsingKind = "receipt" | "voice" | "text";
 
@@ -63,15 +63,21 @@ function toApiDateOnly(d: Date): string {
   return `${y}-${mo}-${day}`;
 }
 
+/** Cihazın yerel takvim günü (sunucu saat diliminden bağımsız) */
+function localTodayAtNoon(): Date {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12, 0, 0, 0);
+}
+
 /** Add expense ekranı ile aynı “Bugün / 27 Eki” etiketi */
-function formatDatePill(ymd: string, language: Language): string {
+function formatDatePill(ymd: string, language: Language, todayLabel: string): string {
   const dt = parseYmdToLocal(ymd);
   const now = new Date();
   const sameDay =
     dt.getFullYear() === now.getFullYear() &&
     dt.getMonth() === now.getMonth() &&
     dt.getDate() === now.getDate();
-  if (sameDay) return language === "tr" ? "Bugün" : "Today";
+  if (sameDay) return todayLabel;
   const locale =
     language === "tr"
       ? "tr-TR"
@@ -117,11 +123,12 @@ export default function ReviewExpenseModal({
   onSaved,
 }: Props) {
   const { t } = useTranslation();
+  const { showAlert } = useAppDialog();
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const {
     isDark,
-    addExpense,
+    addExpensesBatch,
     addCategory,
     activeListId,
     customCategories,
@@ -178,6 +185,25 @@ export default function ReviewExpenseModal({
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }, []);
 
+  const removeRowAt = useCallback(
+    (index: number) => {
+      setDateModalRow((d) =>
+        d === null ? null : d === index ? null : d > index ? d - 1 : d,
+      );
+      setCategoryModalRow((c) =>
+        c === null ? null : c === index ? null : c > index ? c - 1 : c,
+      );
+      setRows((prev) => {
+        const next = prev.filter((_, idx) => idx !== index);
+        if (next.length === 0) {
+          setTimeout(() => onClose(), 0);
+        }
+        return next;
+      });
+    },
+    [onClose],
+  );
+
   useEffect(() => {
     if (!visible || !parsing) return;
     setRows([]);
@@ -192,12 +218,17 @@ export default function ReviewExpenseModal({
         const amt =
           typeof p.amount === "number" && Number.isFinite(p.amount) ? Number(p.amount).toFixed(2) : "0.00";
         const cur = (p.currency || expenseCurrency).trim().toUpperCase();
+        /** Fiş/ses: her zaman işlemin yapıldığı gün (yerel bugün). Metin ayrıştırmada API tarihi. */
+        const defaultDate =
+          parsingKind === "text"
+            ? parseYmdToLocal(p.date || toApiDateOnly(new Date()))
+            : localTodayAtNoon();
         return {
-          key: `e-${i}-${p.description.slice(0, 12)}`,
+          key: `e-${i}-${String(p.amount)}-${String(p.category)}-${(p.description ?? "").slice(0, 24)}`,
           amount: amt,
           description: p.description ?? "",
           category: String(p.category || "other"),
-          occurredAt: parseYmdToLocal(p.date || toApiDateOnly(new Date())),
+          occurredAt: defaultDate,
           currency: cur,
         };
       }),
@@ -206,7 +237,16 @@ export default function ReviewExpenseModal({
       Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: true }),
     ]).start();
-  }, [visible, parsing, parsedExpenses, success, expenseCurrency, fadeAnim, slideAnim]);
+  }, [
+    visible,
+    parsing,
+    parsedExpenses,
+    success,
+    expenseCurrency,
+    parsingKind,
+    fadeAnim,
+    slideAnim,
+  ]);
 
   useEffect(() => {
     if (!visible) {
@@ -226,12 +266,7 @@ export default function ReviewExpenseModal({
       const row = rows[i];
       const num = parseAmountInput(row.amount);
       if (!Number.isFinite(num) || num <= 0) {
-        Alert.alert(
-          language === "tr" ? "Geçersiz tutar" : "Invalid amount",
-          language === "tr"
-            ? `Satır ${i + 1}: geçerli bir tutar girin (örn. 13,50 veya 13.50).`
-            : `Row ${i + 1}: enter a valid amount (e.g. 13.50 or 13,50).`,
-        );
+        showAlert(t("review.invalidAmountTitle"), t("review.invalidAmountRow", { n: i + 1 }));
         return;
       }
     }
@@ -246,6 +281,7 @@ export default function ReviewExpenseModal({
 
     try {
       const list_id = expenseListIdForApi(activeListId);
+      const inserted: Expense[] = [];
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const num = parseAmountInput(row.amount);
@@ -260,7 +296,7 @@ export default function ReviewExpenseModal({
           is_income: false,
           ...(list_id != null ? { list_id } : {}),
         });
-        addExpense({
+        inserted.push({
           id: String(dto.id),
           amount: num,
           description: row.description.trim(),
@@ -271,6 +307,7 @@ export default function ReviewExpenseModal({
           isIncome: false,
         });
       }
+      addExpensesBatch(inserted);
       setSaving(false);
       setSuccess(true);
       setTimeout(() => {
@@ -281,13 +318,7 @@ export default function ReviewExpenseModal({
       const detail = formatApiErrorDetailBody(
         e && typeof e === "object" && "details" in e ? (e as ApiError).details : null,
       );
-      Alert.alert(
-        language === "tr" ? "Kaydedilemedi" : "Could not save",
-        detail ??
-          (language === "tr"
-            ? "Bağlantı veya sunucu hatası. Tekrar dene."
-            : "Network or server error. Please try again."),
-      );
+      showAlert(t("review.saveFailedTitle"), detail ?? t("review.saveFailedBody"));
     }
   };
 
@@ -298,29 +329,21 @@ export default function ReviewExpenseModal({
     showForm ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR + Math.min(80, Math.max(0, (rows.length - 1) * 28)) : 40;
 
   const parsingCopy = useMemo(() => {
-    const tr = language === "tr";
-    if (parsingKind === "voice") {
-      return tr ? "Centifi sesini analiz ediyor…" : "Centifi is analyzing what you said…";
-    }
-    if (parsingKind === "text") {
-      return tr ? "Centifi metnini analiz ediyor…" : "Centifi is analyzing your text…";
-    }
-    return tr ? "Centifi fişini analiz ediyor…" : "Centifi is analyzing your receipt…";
-  }, [parsingKind, language]);
+    if (parsingKind === "voice") return t("review.parsingVoice");
+    if (parsingKind === "text") return t("review.parsingText");
+    return t("review.parsingReceipt");
+  }, [parsingKind, t]);
 
   const saveLabel = useMemo(() => {
     if (rows.length <= 1) return t("common.save");
-    const tr = language === "tr";
-    return tr ? `Tümünü kaydet (${rows.length})` : `Save all (${rows.length})`;
-  }, [rows.length, t, language]);
+    return t("review.saveAll", { count: rows.length });
+  }, [rows.length, t]);
 
   const successTitle = useMemo(() => {
-    const tr = language === "tr";
-    if (rows.length > 1) {
-      return tr ? "Masraflar kaydedildi!" : "Expenses saved!";
-    }
-    return tr ? "Masraf kaydedildi!" : "Expense saved!";
-  }, [language, rows.length]);
+    return rows.length > 1 ? t("review.successMany") : t("review.successOne");
+  }, [rows.length, t]);
+
+  const todayLabel = t("common.today");
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -336,7 +359,7 @@ export default function ReviewExpenseModal({
               hitSlop={12}
               style={{ alignSelf: "flex-start", paddingHorizontal: 20, paddingVertical: 12 }}
               accessibilityRole="button"
-              accessibilityLabel={t("common.close", { defaultValue: "Close" })}
+              accessibilityLabel={t("common.close")}
             >
               <Ionicons name="close" size={28} color={textColor} />
             </Pressable>
@@ -382,9 +405,7 @@ export default function ReviewExpenseModal({
               ) : emptyParsed ? (
                 <View style={{ alignItems: "center", paddingTop: 72, paddingHorizontal: 16 }}>
                   <Text style={{ color: mutedColor, fontSize: 15, textAlign: "center" }}>
-                    {language === "tr"
-                      ? "Bu girişten harcama çıkarılamadı. Farklı bir ifade veya fiş dene."
-                      : "Could not extract any expenses from this input. Try different wording or another receipt."}
+                    {t("review.emptyParsed")}
                   </Text>
                 </View>
               ) : (
@@ -405,21 +426,35 @@ export default function ReviewExpenseModal({
                               letterSpacing: 0.5,
                             }}
                           >
-                            {language === "tr" ? `Kalem ${i + 1} / ${rows.length}` : `Item ${i + 1} / ${rows.length}`}
+                            {t("review.itemLabel", { current: i + 1, total: rows.length })}
                           </Text>
                         )}
-                        <View
-                          style={{
-                            backgroundColor: cardBg,
-                            borderRadius: 22,
-                            paddingVertical: 22,
-                            paddingHorizontal: 20,
-                            marginBottom: 14,
-                            borderWidth: 1,
-                            borderColor,
-                            alignItems: "center",
-                          }}
-                        >
+                        <View style={{ position: "relative", width: "100%", marginBottom: 14 }}>
+                          <Pressable
+                            onPress={() => removeRowAt(i)}
+                            hitSlop={12}
+                            style={{
+                              position: "absolute",
+                              top: 10,
+                              right: 10,
+                              zIndex: 2,
+                              padding: 6,
+                            }}
+                            accessibilityLabel={t("review.removeItemA11y")}
+                          >
+                            <Ionicons name="trash-outline" size={22} color={mutedColor} />
+                          </Pressable>
+                          <View
+                            style={{
+                              backgroundColor: cardBg,
+                              borderRadius: 22,
+                              paddingVertical: 22,
+                              paddingHorizontal: 20,
+                              borderWidth: 1,
+                              borderColor,
+                              alignItems: "center",
+                            }}
+                          >
                           <View
                             style={{
                               width: 64,
@@ -464,18 +499,19 @@ export default function ReviewExpenseModal({
                                 padding: 0,
                                 textAlign: "center",
                               }}
-                              accessibilityLabel={t("review.amount", { defaultValue: "Amount" })}
+                              accessibilityLabel={t("review.amount")}
                             />
                           </View>
                           <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600", marginTop: 6 }}>
                             {meta.emoji} {meta.name}
                           </Text>
+                          </View>
                         </View>
 
                         <View style={{ marginBottom: 12 }}>
                           <Pressable onPress={() => setDateModalRow(i)} style={pillStyle}>
                             <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
-                              {formatDatePill(toApiDateOnly(row.occurredAt), lang)}
+                              {formatDatePill(toApiDateOnly(row.occurredAt), lang, todayLabel)}
                             </Text>
                             <Ionicons name="chevron-down" size={14} color={mutedColor} />
                           </Pressable>
@@ -500,7 +536,7 @@ export default function ReviewExpenseModal({
                               marginBottom: 8,
                             }}
                           >
-                            {language === "tr" ? "Açıklama" : "Description"}
+                            {t("expenseDetail.descriptionPlaceholder")}
                           </Text>
                           <TextInput
                             value={row.description}
@@ -528,7 +564,7 @@ export default function ReviewExpenseModal({
                               marginBottom: 10,
                             }}
                           >
-                            {language === "tr" ? "Kategori" : "Category"}
+                            {t("expenseDetail.categoryLabel")}
                           </Text>
                           <ScrollView
                             horizontal

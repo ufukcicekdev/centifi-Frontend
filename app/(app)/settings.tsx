@@ -9,13 +9,14 @@ import {
   TextInput,
   Modal,
   Platform,
-  Alert,
   Linking,
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +28,7 @@ import {
   BUILTIN_CATEGORIES,
   CustomCategory,
   getCategoryMeta,
+  PRESET_BANK_APP_IDS,
   type ExpenseList,
 } from "../../constants/mockData";
 import CategoryEditorModal from "../../components/CategoryEditorModal";
@@ -38,11 +40,14 @@ import {
 import { CurrencyPickerModal } from "../../components/CurrencyPickerModal";
 import { getCurrencyLabel } from "../../lib/currencies";
 import { currencySymbolFor } from "../../lib/formatMoney";
-import { updateMe, type BackendUser } from "../../lib/backend";
+import { lookupPlayStoreMeta, updateMe, type BackendUser } from "../../lib/backend";
+import { extractPlayStorePackageId, playStoreDetailsUrl } from "../../lib/playStoreUrl";
 import type { ApiError } from "../../lib/api";
 import { isValidEmail } from "../../lib/isValidEmail";
 import { ensureLocalNotificationPermissions } from "../../lib/localNotifications";
 import { clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
+import { useAppDialog } from "../../context/AppDialogContext";
+import { displayExpenseListName } from "../../lib/listDisplayName";
 
 const PURPLE = "#6C63FF";
 const DESTRUCTIVE = "#FF453A";
@@ -218,61 +223,322 @@ function EmojiLeading({
   );
 }
 
+function StoreIconOrEmoji({
+  emoji,
+  iconUrl,
+  isDark,
+}: {
+  emoji: string;
+  iconUrl?: string | null;
+  isDark: boolean;
+}) {
+  const u = iconUrl?.trim();
+  if (u && /^https?:\/\//i.test(u)) {
+    return (
+      <View
+        style={{
+          width: ICON_COL,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Image
+          source={{ uri: u }}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            backgroundColor: isDark ? "#2c2c2e" : "#f2f2f7",
+          }}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+        />
+      </View>
+    );
+  }
+  return <EmojiLeading emoji={emoji} isDark={isDark} />;
+}
+
+function fallbackAppLabelFromPackage(pkg: string): string {
+  const parts = pkg.split(".").filter(Boolean);
+  const last = parts[parts.length - 1] ?? pkg;
+  if (!last) return pkg;
+  return last.charAt(0).toUpperCase() + last.slice(1);
+}
+
 // ── Bank automation modal ─────────────────────────────────────────────────────
 
-function AddBankModal({ visible, onSave, onClose, isDark }: {
+function AddBankModal({
+  visible,
+  onSave,
+  onClose,
+  isDark,
+  isAuthenticated,
+}: {
   visible: boolean;
-  onSave: (data: { name: string; emoji: string; storeUrl: string; packageName: string; enabled: boolean }) => void;
-  onClose: () => void; isDark: boolean;
+  onSave: (
+    data: {
+      name: string;
+      emoji: string;
+      storeUrl: string;
+      packageName: string;
+      enabled: boolean;
+      iconUrl?: string;
+    },
+  ) => void | Promise<void>;
+  onClose: () => void;
+  isDark: boolean;
+  isAuthenticated: boolean;
 }) {
-  const [name, setName] = useState("");
+  const { t } = useTranslation();
+  const { showAlert } = useAppDialog();
+  const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   const [storeUrl, setStoreUrl] = useState("");
+  const [manualName, setManualName] = useState("");
+  const [showNameEdit, setShowNameEdit] = useState(false);
+  const [resolvedPkg, setResolvedPkg] = useState("");
+  const [resolvedName, setResolvedName] = useState("");
+  const [resolvedIcon, setResolvedIcon] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const textColor = isDark ? "#fff" : "#000";
   const mutedColor = isDark ? "#888" : "#666";
   const inputBg = isDark ? "#111" : "#f5f5f5";
   const borderColor = isDark ? "#2a2a2a" : "#e5e5e5";
 
-  React.useEffect(() => { if (visible) { setName(""); setStoreUrl(""); } }, [visible]);
+  const reset = React.useCallback(() => {
+    setStoreUrl("");
+    setManualName("");
+    setShowNameEdit(false);
+    setResolvedPkg("");
+    setResolvedName("");
+    setResolvedIcon("");
+    setLookupLoading(false);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
 
-  const handleSave = () => {
-    if (!name.trim() || !storeUrl.trim()) { Alert.alert("Error", "Please fill in all fields."); return; }
-    // Extract package name from Play Store URL if possible
-    const match = storeUrl.match(/id=([a-zA-Z0-9._]+)/);
-    const packageName = match?.[1] ?? name.toLowerCase().replace(/\s/g, ".");
-    onSave({ name: name.trim(), emoji: "🏦", storeUrl: storeUrl.trim(), packageName, enabled: true });
-    onClose();
+  React.useEffect(() => {
+    if (visible) reset();
+  }, [visible, reset]);
+
+  React.useEffect(() => {
+    if (!visible) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void (async () => {
+        const trimmed = storeUrl.trim();
+        if (!trimmed) {
+          setResolvedPkg("");
+          setResolvedName("");
+          setResolvedIcon("");
+          return;
+        }
+        const pkg = extractPlayStorePackageId(trimmed);
+        if (!pkg) {
+          setResolvedPkg("");
+          setResolvedName("");
+          setResolvedIcon("");
+          return;
+        }
+        setResolvedPkg(pkg);
+        setLookupLoading(true);
+        try {
+          if (isAuthenticated) {
+            const meta = trimmed.includes("play.google") ?
+              await lookupPlayStoreMeta({ store_url: trimmed }) :
+              await lookupPlayStoreMeta({ package: pkg });
+            setResolvedName((meta.name ?? "").trim() || fallbackAppLabelFromPackage(meta.package_name || pkg));
+            setResolvedIcon((meta.icon_url ?? "").trim());
+          } else {
+            const { fetchPlayStoreMetaClient } = await import("../../lib/playStoreClientLookup");
+            const meta = await fetchPlayStoreMetaClient(pkg);
+            setResolvedName((meta.name ?? "").trim() || fallbackAppLabelFromPackage(pkg));
+            setResolvedIcon((meta.iconUrl ?? "").trim());
+          }
+        } catch {
+          setResolvedName(fallbackAppLabelFromPackage(pkg));
+          setResolvedIcon("");
+        } finally {
+          setLookupLoading(false);
+        }
+      })();
+    }, 600);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [storeUrl, visible, isAuthenticated]);
+
+  const displayName = manualName.trim() || resolvedName.trim();
+  const previewIcon = resolvedIcon;
+
+  const handleSave = async () => {
+    const trimmedUrl = storeUrl.trim();
+    const pkg = resolvedPkg || extractPlayStorePackageId(trimmedUrl);
+    if (!pkg) {
+      showAlert(t("common.error"), t("settings.bankInvalidStoreUrl"));
+      return;
+    }
+    const name = displayName.trim() || fallbackAppLabelFromPackage(pkg);
+    if (!name) {
+      showAlert(t("common.error"), t("settings.bankFillFields"));
+      return;
+    }
+    const normalizedStoreUrl =
+      trimmedUrl.includes("http") ? trimmedUrl : playStoreDetailsUrl(pkg);
+    try {
+      await Promise.resolve(
+        onSave({
+          name,
+          emoji: "🏦",
+          storeUrl: normalizedStoreUrl,
+          packageName: pkg,
+          enabled: true,
+          ...(previewIcon ? { iconUrl: previewIcon } : {}),
+        }),
+      );
+      onClose();
+    } catch {
+      showAlert(t("common.error"), t("settings.bankAddFailed"));
+    }
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: "#00000066" }} onPress={onClose} />
-      <View style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        backgroundColor: isDark ? "#1a1a1a" : "#fff",
-        borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: Platform.OS === "ios" ? 40 : 28,
-      }}>
-        <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: isDark ? "#444" : "#ddd", alignSelf: "center", marginBottom: 20 }} />
-        <Text style={{ color: textColor, fontSize: 18, fontWeight: "700", marginBottom: 6 }}>Add Bank App</Text>
-        <Text style={{ color: mutedColor, fontSize: 13, marginBottom: 20, lineHeight: 18 }}>
-          Paste the Play Store or App Store link of your bank app. Centifi will read payment notifications to auto-log expenses.
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          padding: 24,
+          paddingBottom: 20 + insets.bottom + keyboardInset,
+        }}
+      >
+        <View
+          style={{
+            width: 36,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: isDark ? "#444" : "#ddd",
+            alignSelf: "center",
+            marginBottom: 20,
+          }}
+        />
+        <Text style={{ color: textColor, fontSize: 18, fontWeight: "700", marginBottom: 6 }}>
+          {t("settings.addBankModalTitle")}
+        </Text>
+        <Text style={{ color: mutedColor, fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
+          {t("settings.addBankModalBody")}
         </Text>
 
-        <View style={{ backgroundColor: inputBg, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor, marginBottom: 12 }}>
-          <TextInput value={name} onChangeText={setName} placeholder="Bank name (e.g. Garanti BBVA)"
-            placeholderTextColor={mutedColor} style={{ color: textColor, fontSize: 15, padding: 0 }} />
+        <View
+          style={{
+            backgroundColor: inputBg,
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderWidth: 1,
+            borderColor,
+            marginBottom: 14,
+          }}
+        >
+          <TextInput
+            value={storeUrl}
+            onChangeText={setStoreUrl}
+            placeholder={t("settings.bankStoreUrlPlaceholder")}
+            placeholderTextColor={mutedColor}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{ color: textColor, fontSize: 14, padding: 0 }}
+          />
         </View>
 
-        <View style={{ backgroundColor: inputBg, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor, marginBottom: 20 }}>
-          <TextInput value={storeUrl} onChangeText={setStoreUrl}
-            placeholder="https://play.google.com/store/apps/details?id=…"
-            placeholderTextColor={mutedColor} autoCapitalize="none" autoCorrect={false}
-            style={{ color: textColor, fontSize: 14, padding: 0 }} />
-        </View>
+        {lookupLoading ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <ActivityIndicator color={PURPLE} />
+            <Text style={{ color: mutedColor, fontSize: 13 }}>{t("settings.bankFetchingMeta")}</Text>
+          </View>
+        ) : resolvedPkg ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 14,
+              padding: 12,
+              borderRadius: 12,
+              backgroundColor: isDark ? "#252528" : "#f0f0f5",
+            }}
+          >
+            <StoreIconOrEmoji emoji="🏦" iconUrl={previewIcon} isDark={isDark} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: textColor, fontSize: 16, fontWeight: "700" }} numberOfLines={2}>
+                {displayName || resolvedName || fallbackAppLabelFromPackage(resolvedPkg)}
+              </Text>
+              <Text style={{ color: mutedColor, fontSize: 12, marginTop: 4 }} numberOfLines={1}>
+                {resolvedPkg}
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
-        <Pressable onPress={handleSave}
-          style={({ pressed }) => ({ backgroundColor: PURPLE, borderRadius: 14, padding: 16, alignItems: "center", opacity: pressed ? 0.8 : 1 })}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Add Bank</Text>
+        {showNameEdit ? (
+          <View
+            style={{
+              backgroundColor: inputBg,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              borderWidth: 1,
+              borderColor,
+              marginBottom: 12,
+            }}
+          >
+            <TextInput
+              value={manualName}
+              onChangeText={setManualName}
+              placeholder={t("settings.bankNamePlaceholder")}
+              placeholderTextColor={mutedColor}
+              style={{ color: textColor, fontSize: 15, padding: 0 }}
+            />
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={() => setShowNameEdit((v) => !v)}
+          style={{ marginBottom: 16, alignSelf: "flex-start" }}
+        >
+          <Text style={{ color: PURPLE, fontSize: 14, fontWeight: "600" }}>
+            {showNameEdit ? t("settings.bankHideNameEdit") : t("settings.bankEditNameHint")}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => void handleSave()}
+          style={({ pressed }) => ({
+            backgroundColor: PURPLE,
+            borderRadius: 14,
+            paddingVertical: 16,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            justifyContent: "center",
+            alignSelf: "stretch",
+            width: "100%",
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" }}>
+            {t("settings.bankModalSubmit")}
+          </Text>
         </Pressable>
       </View>
     </Modal>
@@ -283,12 +549,37 @@ function AddBankModal({ visible, onSave, onClose, isDark }: {
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
+  const { showAlert, showConfirm } = useAppDialog();
   const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
       return () => {
         clearRouterPushCooldown();
+      };
+    }, []),
+  );
+
+  const [bankListenerOn, setBankListenerOn] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      if (Platform.OS !== "android") {
+        return () => {
+          cancelled = true;
+        };
+      }
+      void (async () => {
+        try {
+          const { isBankNotificationListenerEnabled } = await import("../../lib/bankNotificationAndroid");
+          const on = await isBankNotificationListenerEnabled();
+          if (!cancelled) setBankListenerOn(on);
+        } catch {
+          if (!cancelled) setBankListenerOn(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
       };
     }, []),
   );
@@ -369,6 +660,7 @@ export default function Settings() {
   const [profileEmail, setProfileEmail] = useState("");
   const [profileName, setProfileName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const bg = isDark ? "#000000" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#000";
@@ -426,14 +718,14 @@ export default function Settings() {
     }
     void updateCategory(editCategoryId, payload)
       .then(() => closeCategoryEdit())
-      .catch(() => Alert.alert(t("common.error"), t("settings.categorySaveFailed")));
+      .catch(() => showAlert(t("common.error"), t("settings.categorySaveFailed")));
   };
 
   const handleCategoryDeleteConfirm = () => {
     if (!editCategoryId || isBuiltinCategoryId(editCategoryId)) return;
     void removeCategory(editCategoryId)
       .then(() => closeCategoryEdit())
-      .catch(() => Alert.alert(t("common.error"), t("settings.categoryDeleteFailed")));
+      .catch(() => showAlert(t("common.error"), t("settings.categoryDeleteFailed")));
   };
 
   const openCategoryEdit = (id: string) => {
@@ -481,15 +773,15 @@ export default function Settings() {
     if (!user) return;
     const nameTrim = profileName.trim();
     if (!nameTrim) {
-      Alert.alert(t("common.error"), t("settings.nameRequired"));
+      showAlert(t("common.error"), t("settings.nameRequired"));
       return;
     }
     if (!profileEmail.trim()) {
-      Alert.alert(t("common.error"), t("settings.emailRequired"));
+      showAlert(t("common.error"), t("settings.emailRequired"));
       return;
     }
     if (!isValidEmail(profileEmail)) {
-      Alert.alert(t("common.error"), t("settings.emailInvalid"));
+      showAlert(t("common.error"), t("settings.emailInvalid"));
       return;
     }
     const trimmedEmail = profileEmail.trim().toLowerCase();
@@ -520,7 +812,7 @@ export default function Settings() {
     } catch (e: unknown) {
       const details = (e as ApiError)?.details;
       const serverMsg = firstFieldError(details);
-      Alert.alert(t("common.error"), serverMsg ?? t("settings.profileSaveFailed"));
+      showAlert(t("common.error"), serverMsg ?? t("settings.profileSaveFailed"));
     } finally {
       setSavingProfile(false);
     }
@@ -548,7 +840,7 @@ export default function Settings() {
     if (!editingList) return;
     const name = editListName.trim();
     if (!name) {
-      Alert.alert(t("common.error"), t("settings.listNameRequired"));
+      showAlert(t("common.error"), t("settings.listNameRequired"));
       return;
     }
     setSavingListEdit(true);
@@ -557,7 +849,7 @@ export default function Settings() {
       setEditingList(null);
       setEditListName("");
     } catch {
-      Alert.alert(t("common.error"), t("settings.listUpdateFailed"));
+      showAlert(t("common.error"), t("settings.listUpdateFailed"));
     } finally {
       setSavingListEdit(false);
     }
@@ -636,12 +928,18 @@ export default function Settings() {
             title={t("settings.logOut")}
             dividerTop
             destructive
-            onPress={() =>
-              Alert.alert(t("settings.logOut"), t("settings.logOutConfirm"), [
-                { text: t("common.cancel"), style: "cancel" },
-                { text: t("settings.logOut"), style: "destructive", onPress: logout },
-              ])
-            }
+            onPress={() => {
+              void (async () => {
+                const ok = await showConfirm({
+                  title: t("settings.logOut"),
+                  message: t("settings.logOutConfirm"),
+                  confirmText: t("settings.logOut"),
+                  cancelText: t("common.cancel"),
+                  destructive: true,
+                });
+                if (ok) logout();
+              })();
+            }}
           />
         </Card>
 
@@ -757,7 +1055,7 @@ export default function Settings() {
             dividerTop
             onPress={() => {
               if (!isAuthenticated) {
-                Alert.alert(t("budgets.signInRequiredTitle"), t("budgets.signInRequiredBody"));
+                showAlert(t("budgets.signInRequiredTitle"), t("budgets.signInRequiredBody"));
                 return;
               }
               router.push("/budgets");
@@ -789,7 +1087,7 @@ export default function Settings() {
                 key={list.id}
                 isDark={isDark}
                 icon="list-outline"
-                title={list.name}
+                title={displayExpenseListName(list.name, t)}
                 dividerTop={idx !== 0}
                 onPress={
                   editable
@@ -854,7 +1152,7 @@ export default function Settings() {
                         setNewListName("");
                         setShowAddList(false);
                       } catch {
-                        Alert.alert(t("common.error"), t("settings.listSaveFailed"));
+                        showAlert(t("common.error"), t("settings.listSaveFailed"));
                       }
                     })();
                   }}
@@ -897,10 +1195,65 @@ export default function Settings() {
           }}
         >
           <Ionicons name="information-circle-outline" size={18} color={PURPLE} style={{ marginTop: 1 }} />
-          <Text style={{ color: isDark ? "#c4b5fd" : PURPLE, fontSize: 13, flex: 1, lineHeight: 18 }}>
-            {t("settings.bankAutomationHint")}
-          </Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {Platform.OS === "android" ? (
+              <>
+                <Text
+                  style={{
+                    color: isDark ? "#e8e4ff" : "#2d2652",
+                    fontSize: 13,
+                    fontWeight: "700",
+                    marginBottom: 8,
+                    lineHeight: 18,
+                  }}
+                >
+                  {t("settings.bankAutomationChecklistTitle")}
+                </Text>
+                <Text style={{ color: isDark ? "#c4b5fd" : PURPLE, fontSize: 13, lineHeight: 20 }}>
+                  {t("settings.bankAutomationStepsAndroid")}
+                </Text>
+              </>
+            ) : (
+              <Text style={{ color: isDark ? "#c4b5fd" : PURPLE, fontSize: 13, flex: 1, lineHeight: 18 }}>
+                {t("settings.bankAutomationHintIos")}
+              </Text>
+            )}
+          </View>
         </View>
+        {Platform.OS === "android" ? (
+          <Pressable
+            onPress={() => {
+              void import("../../lib/bankNotificationAndroid").then((m) => m.openBankNotificationListenerSettings());
+            }}
+            style={{
+              marginBottom: 12,
+              marginTop: -4,
+              backgroundColor: cardBg,
+              borderRadius: 12,
+              padding: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: divider,
+            }}
+          >
+            <Ionicons
+              name={bankListenerOn ? "notifications-outline" : "notifications-off-outline"}
+              size={22}
+              color={PURPLE}
+            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
+                {bankListenerOn ? t("settings.bankListenerStatusOn") : t("settings.bankListenerStatusOff")}
+              </Text>
+              <Text style={{ color: PURPLE, fontSize: 13, fontWeight: "600", marginTop: 6 }}>
+                {t("settings.bankListenerOpenSettings")}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={mutedColor} />
+          </Pressable>
+        ) : null}
         <Card isDark={isDark}>
           {bankAutomations.map((bank, idx) => (
             <View
@@ -914,24 +1267,45 @@ export default function Settings() {
                 borderTopColor: divider,
               }}
             >
-              <EmojiLeading emoji={bank.emoji} isDark={isDark} />
+              <StoreIconOrEmoji emoji={bank.emoji} iconUrl={bank.iconUrl} isDark={isDark} />
               <View style={{ flex: 1, marginLeft: ICON_GAP, minWidth: 0, justifyContent: "center" }}>
                 <Text style={{ color: textColor, fontSize: 16, fontWeight: "500" }} numberOfLines={1}>
                   {bank.name}
                 </Text>
                 <Pressable onPress={() => Linking.openURL(bank.storeUrl)} hitSlop={6}>
                   <Text style={{ color: PURPLE, fontSize: 12, marginTop: 4 }} numberOfLines={1}>
-                    View in store ↗
+                    {t("settings.viewInStore")}
                   </Text>
                 </Pressable>
               </View>
-              <Switch
-                value={bank.enabled}
-                onValueChange={() => toggleBankAutomation(bank.id)}
-                trackColor={{ false: "#3a3a3c", true: PURPLE }}
-                thumbColor="#fff"
-                ios_backgroundColor="#3a3a3c"
-              />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                {!PRESET_BANK_APP_IDS.has(bank.id) ? (
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() => {
+                      void (async () => {
+                        const ok = await showConfirm({
+                          title: t("settings.bankDeleteTitle"),
+                          message: t("settings.bankDeleteMessage", { name: bank.name }),
+                          confirmText: t("common.delete"),
+                          destructive: true,
+                        });
+                        if (ok) void removeBankAutomation(bank.id);
+                      })();
+                    }}
+                    accessibilityLabel={t("settings.bankDeleteA11y")}
+                  >
+                    <Ionicons name="trash-outline" size={22} color={DESTRUCTIVE} />
+                  </Pressable>
+                ) : null}
+                <Switch
+                  value={bank.enabled}
+                  onValueChange={() => toggleBankAutomation(bank.id)}
+                  trackColor={{ false: "#3a3a3c", true: PURPLE }}
+                  thumbColor="#fff"
+                  ios_backgroundColor="#3a3a3c"
+                />
+              </View>
             </View>
           ))}
           <SettingsRow
@@ -941,6 +1315,29 @@ export default function Settings() {
             title={t("settings.addBank")}
             dividerTop={bankAutomations.length > 0}
             onPress={() => setShowBankModal(true)}
+            right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+          />
+        </Card>
+
+        {/* REPORT */}
+        <SectionLabel label={t("settings.reportSection")} isDark={isDark} />
+        <Card isDark={isDark}>
+          <SettingsRow
+            isDark={isDark}
+            icon="star-outline"
+            title={t("settings.centifiPro")}
+            subtitle={t("settings.centifiProSubtitle")}
+            dividerTop={false}
+            onPress={() => router.push("/subscribe" as any)}
+            right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+          />
+          <SettingsRow
+            isDark={isDark}
+            icon="mail-outline"
+            title={t("settings.reportMenu")}
+            subtitle={t("settings.reportMenuSubtitle")}
+            dividerTop
+            onPress={() => router.push("/report" as any)}
             right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
           />
         </Card>
@@ -1003,7 +1400,12 @@ export default function Settings() {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 paddingTop: 12,
-                paddingBottom: Platform.OS === "ios" ? 34 : 22,
+                paddingBottom:
+                  16 +
+                  Math.max(
+                    insets.bottom,
+                    Platform.OS === "android" ? 32 : Platform.OS === "ios" ? 8 : 0,
+                  ),
               }}
             >
               <View
@@ -1122,7 +1524,9 @@ export default function Settings() {
       <AddBankModal
         visible={showBankModal}
         onSave={(data) => addBankAutomation(data)}
-        onClose={() => setShowBankModal(false)} isDark={isDark}
+        onClose={() => setShowBankModal(false)}
+        isDark={isDark}
+        isAuthenticated={isAuthenticated}
       />
 
       <Modal

@@ -14,6 +14,7 @@ import {
   googleIdsForCurrentPlatform,
 } from "../lib/googleAuthConfig";
 import { useAppDialog } from "../context/AppDialogContext";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   borderColor: string;
@@ -66,6 +67,7 @@ function formatBackendOrNetworkError(e: unknown): string {
  */
 export default function GoogleSignInButton(props: Props) {
   const { showAlert } = useAppDialog();
+  const { t } = useTranslation();
   const ids = getGoogleOAuthClientIds();
   const [busy, setBusy] = useState(false);
   const configured = useRef(false);
@@ -76,10 +78,7 @@ export default function GoogleSignInButton(props: Props) {
     if (result === "unreachable") {
       const tokensKept = await loadTokens();
       if (tokensKept) {
-        showAlert(
-          "Bağlantı / profil",
-          "Profil yüklenemedi. EXPO_PUBLIC_API_BASE_URL ve backend adresini kontrol edin.",
-        );
+        showAlert(t("auth.hydrateUnreachableTitle"), t("auth.googleProfileLoadFailedShort"));
       }
     }
   }
@@ -97,17 +96,11 @@ export default function GoogleSignInButton(props: Props) {
   const onPress = async () => {
     const check = googleIdsForCurrentPlatform(ids);
     if (!check.ok) {
-      showAlert(
-        "Google yapılandırması",
-        `${check.missing} .env içinde tanımlı olmalı (Expo’yu yeniden başlatın).`,
-      );
+      showAlert(t("auth.googleSetupTitle"), t("auth.googleEnvMissing", { missing: check.missing }));
       return;
     }
     if (!configured.current) {
-      showAlert(
-        "Google Sign-In",
-        "Yapılandırma yüklenemedi. EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ve platform client id’lerini kontrol edin.",
-      );
+      showAlert(t("auth.googleSignInTitle"), t("auth.googleSignInNotConfiguredBody"));
       return;
     }
 
@@ -122,16 +115,13 @@ export default function GoogleSignInButton(props: Props) {
       }
       const idToken = res.data.idToken;
       if (!idToken) {
-        showAlert(
-          "Google Sign-In",
-          "Kimlik jetonu alınamadı. Google Cloud’da Web application OAuth istemcisi oluşturup EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID olarak ekleyin.",
-        );
+        showAlert(t("auth.googleSignInTitle"), t("auth.googleNoIdTokenBody"));
         return;
       }
       try {
         await completeBackendLogin(idToken);
       } catch (be: unknown) {
-        showAlert("Google ile giriş (sunucu)", formatBackendOrNetworkError(be));
+        showAlert(t("auth.googleSignInServerTitle"), formatBackendOrNetworkError(be));
       }
     } catch (e: unknown) {
       if (isErrorWithCode(e)) {
@@ -139,7 +129,7 @@ export default function GoogleSignInButton(props: Props) {
           return;
         }
       }
-      showAlert("Google Sign-In", formatGoogleNativeError(e));
+      showAlert(t("auth.googleSignInTitle"), formatGoogleNativeError(e));
     } finally {
       setBusy(false);
     }

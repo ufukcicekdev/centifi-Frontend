@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
   View, Text, Pressable, ScrollView,
-  TextInput, ActivityIndicator, Modal, Alert,
+  TextInput, ActivityIndicator, Modal,
   StyleSheet, useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +17,7 @@ import {
   isBuiltinCategoryId,
 } from "../../components/onboarding/OnboardingCategoryManageModals";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
+import { useAppDialog } from "../../context/AppDialogContext";
 
 const PURPLE = "#6C63FF";
 /** Categories grid: 3 columns; horizontal padding must match ScrollView `paddingHorizontal` */
@@ -43,6 +44,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 export default function Onboarding() {
   const { t } = useTranslation();
+  const { showAlert } = useAppDialog();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   /** Web + first paint: module `Dimensions` was 0 → mashed footer & clipped grid */
@@ -152,7 +154,10 @@ export default function Onboarding() {
     setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
   const addCat = () => {
-    if (!newName.trim()) { Alert.alert("Name required"); return; }
+    if (!newName.trim()) {
+      showAlert(t("common.error"), t("onboarding.categoryNameRequired"));
+      return;
+    }
     const c: CustomCategory = {
       id: `c_${Date.now()}`, name: newName.trim(),
       emoji: newEmoji, color: newColor.color, bgColor: newColor.bg,

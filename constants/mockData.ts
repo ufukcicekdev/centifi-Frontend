@@ -41,8 +41,10 @@ export interface BankAutomation {
   name: string;
   emoji: string;
   storeUrl: string;
-  packageName: string;  // Android package for notification filter
+  packageName: string; // Android package for notification filter
   enabled: boolean;
+  /** Play Store yüksek çözünürlüklü ikon (HTTPS); yoksa emoji kullanılır */
+  iconUrl?: string;
 }
 
 export interface CategorySummary {
@@ -123,6 +125,9 @@ export const PRESET_BANK_AUTOMATIONS: BankAutomation[] = [
     enabled: false,
   },
 ];
+
+/** Ayarlarda silinemez hazır banka / cüzdan satırları */
+export const PRESET_BANK_APP_IDS = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.id));
 
 export const MONTHLY_BUDGET = 2000;
 

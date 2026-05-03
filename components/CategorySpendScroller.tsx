@@ -17,6 +17,7 @@ export default function CategorySpendScroller({
   onSelectCategory,
   onLongPressCategory,
   isDark,
+  currencySymbol = "",
 }: {
   categories: CustomCategory[];
   expenses: Expense[];
@@ -24,6 +25,8 @@ export default function CategorySpendScroller({
   onSelectCategory: (id: string | null) => void;
   onLongPressCategory: (id: string) => void;
   isDark: boolean;
+  /** Prefix for category totals (user display currency). */
+  currencySymbol?: string;
 }) {
   const totals = useMemo(() => {
     const m = new Map<string, number>();
@@ -122,7 +125,7 @@ export default function CategorySpendScroller({
                 }}
                 numberOfLines={1}
               >
-                {rounded}
+                {currencySymbol ? `${currencySymbol}${rounded}` : rounded}
               </Text>
             </View>
           </Pressable>

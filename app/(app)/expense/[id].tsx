@@ -7,7 +7,6 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
-  Alert,
   ActivityIndicator,
   Modal,
   StyleSheet,
@@ -24,6 +23,9 @@ import CategoryEditorModal from "../../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../../components/ExpenseAmountSignRow";
 import type { Language } from "../../../i18n";
 import { useThrottledRouter } from "../../../hooks/useThrottledRouter";
+import { useAppDialog } from "../../../context/AppDialogContext";
+import { displayExpenseListName } from "../../../lib/listDisplayName";
+import { currencySymbolFor } from "../../../lib/formatMoney";
 
 type RecurrenceId =
   | "once"
@@ -130,6 +132,7 @@ export default function ExpenseDetailScreen() {
   const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const { showAlert, showConfirm } = useAppDialog();
   const rawId = useLocalSearchParams<{ id: string | string[] }>().id;
   const expenseId = Array.isArray(rawId) ? rawId[0] : rawId ?? "";
 
@@ -145,6 +148,7 @@ export default function ExpenseDetailScreen() {
     removeExpense,
     addCategory,
     categoryDisplayOverrides,
+    displayCurrency,
   } = useStore();
 
   const expense = useMemo(
@@ -204,7 +208,7 @@ export default function ExpenseDetailScreen() {
           <Ionicons name="close" size={28} color={nfText} />
         </Pressable>
         <Text style={{ color: nfText, textAlign: "center", marginTop: 48, paddingHorizontal: 24 }}>
-          {lang === "tr" ? "Harcama bulunamadı." : "Expense not found."}
+          {t("expenseDetail.notFound")}
         </Text>
       </SafeAreaView>
     );
@@ -236,11 +240,11 @@ export default function ExpenseDetailScreen() {
     if (!expense) return;
     const num = parseFloat(amount.replace(",", "."));
     if (!num || num <= 0) {
-      Alert.alert(t("common.error"), lang === "tr" ? "Geçerli bir tutar girin." : "Please enter a valid amount.");
+      showAlert(t("common.error"), t("forms.validAmount"));
       return;
     }
     if (!description.trim()) {
-      Alert.alert(t("common.error"), lang === "tr" ? "Açıklama ekleyin." : "Please add a description.");
+      showAlert(t("common.error"), t("forms.descriptionRequired"));
       return;
     }
     setSaving(true);
@@ -250,7 +254,7 @@ export default function ExpenseDetailScreen() {
         amount: num,
         category: selectedCategory,
         date,
-        currency: expense.currency,
+        currency: displayCurrency,
         listId,
         isIncome,
       });
@@ -262,7 +266,7 @@ export default function ExpenseDetailScreen() {
       }
       router.back();
     } catch {
-      Alert.alert(t("common.error"), lang === "tr" ? "Kaydedilemedi." : "Could not save.");
+      showAlert(t("common.error"), t("forms.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -270,21 +274,22 @@ export default function ExpenseDetailScreen() {
 
   const handleDelete = () => {
     if (!expense) return;
-    Alert.alert(
-      lang === "tr" ? "Silinsin mi?" : "Delete expense?",
-      lang === "tr" ? "Bu işlem geri alınamaz." : "This cannot be undone.",
-      [
-        { text: lang === "tr" ? "İptal" : "Cancel", style: "cancel" },
-        {
-          text: lang === "tr" ? "Sil" : "Delete",
-          style: "destructive",
-          onPress: () =>
-            void removeExpense(expense.id)
-              .then(() => router.back())
-              .catch(() => Alert.alert(t("common.error"), lang === "tr" ? "Silinemedi." : "Could not delete.")),
-        },
-      ],
-    );
+    void (async () => {
+      const ok = await showConfirm({
+        title: t("expenseDetail.deleteConfirmTitle"),
+        message: t("expenseDetail.deleteConfirmMessage"),
+        confirmText: t("common.delete"),
+        cancelText: t("common.cancel"),
+        destructive: true,
+      });
+      if (!ok) return;
+      try {
+        await removeExpense(expense.id);
+        router.back();
+      } catch {
+        showAlert(t("common.error"), t("expenseDetail.deleteFailed"));
+      }
+    })();
   };
 
   const appendHashtag = () => {
@@ -339,10 +344,10 @@ export default function ExpenseDetailScreen() {
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
-                <Text style={{ color: mutedColor, fontSize: 13 }}>in</Text>
+                <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
                 <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
                   <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
-                    {activeList?.name ?? (lang === "tr" ? "Liste" : "List")}
+                    {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
@@ -351,7 +356,7 @@ export default function ExpenseDetailScreen() {
               <TextInput
                 value={description}
                 onChangeText={setDescription}
-                placeholder={lang === "tr" ? "Açıklama" : "Description"}
+                placeholder={t("expenseDetail.descriptionPlaceholder")}
                 placeholderTextColor={mutedColor}
                 style={{
                   color: textColor,
@@ -368,9 +373,7 @@ export default function ExpenseDetailScreen() {
                 onSelectIncome={() => setIsIncome(true)}
                 amount={amount}
                 onChangeAmount={setAmount}
-                currencySuffix={
-                  expense.currency === "USD" ? "$" : expense.currency === "TRY" ? "₺" : expense.currency
-                }
+                currencySuffix={currencySymbolFor(displayCurrency, lang)}
                 isDark={isDark}
               />
 
@@ -547,7 +550,7 @@ export default function ExpenseDetailScreen() {
         >
           <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: isDark ? "#444" : "#ccc", alignSelf: "center", marginBottom: 16 }} />
           <Text style={{ color: textColor, fontSize: 17, fontWeight: "700", paddingHorizontal: 20, marginBottom: 12 }}>
-            {lang === "tr" ? "Kategori" : "Category"}
+            {t("expenseDetail.categoryLabel")}
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20, paddingBottom: 8 }}>
             <Pressable

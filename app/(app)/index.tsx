@@ -5,7 +5,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   Animated,
   Platform,
   TextInput,
@@ -36,6 +35,8 @@ import {
 } from "../../lib/expenseFilters";
 import MonthPickerModal from "../../components/MonthPickerModal";
 import CategorySpendScroller from "../../components/CategorySpendScroller";
+import PendingBankTransactionsStrip from "../../components/PendingBankTransactionsStrip";
+import type { PendingBankTransaction } from "../../lib/pendingBankTypes";
 import {
   parseImage as parseImageBackend,
   parseAudio as parseAudioBackend,
@@ -43,6 +44,12 @@ import {
   type ParsedExpenseItem,
 } from "../../lib/backend";
 import { formatApiErrorDetailBody, type ApiError } from "../../lib/api";
+import { useAppDialog } from "../../context/AppDialogContext";
+import { useTranslation } from "react-i18next";
+import { displayExpenseListName } from "../../lib/listDisplayName";
+import { flushBudgetThresholdCheck } from "../../lib/budgetThresholdNotifications";
+import type { Language } from "../../i18n";
+import { currencySymbolFor, formatAmountDigits } from "../../lib/formatMoney";
 
 const PURPLE = "#6C63FF";
 const CORAL = "#FF6B6B";
@@ -63,6 +70,8 @@ type TxFlowFilter = "all" | "expense" | "income";
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { showAlert } = useAppDialog();
+  const { t } = useTranslation();
   const router = useRouter();
   const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
@@ -81,6 +90,7 @@ export default function Dashboard() {
     periodFilter,
     setPeriodFilter,
     language,
+    displayCurrency,
     enabledCategoryIds,
     customCategories,
     categoryDisplayOverrides,
@@ -88,6 +98,9 @@ export default function Dashboard() {
     expensesNextPagePath,
     expensesLoadingMore,
     loadMoreExpenses,
+    pendingBankTransactions,
+    removePendingBankTransaction,
+    bankAutomations,
   } = useStore();
   const { isRecording, startRecording, stopRecording } = useVoiceRecorder();
   const keyboardInset = useKeyboardInset();
@@ -237,7 +250,10 @@ export default function Dashboard() {
 
   const handleImagePick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") { Alert.alert("Permission needed", "Allow photo access to scan receipts."); return; }
+    if (status !== "granted") {
+      showAlert(t("dashboard.photoPermissionTitle"), t("dashboard.photoPermissionBody"));
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       base64: true,
@@ -258,7 +274,7 @@ export default function Dashboard() {
     } catch {
       setReviewVisible(false);
       resetReviewFlow();
-      Alert.alert("Error", "Could not parse receipt.");
+      showAlert(t("common.error"), t("dashboard.receiptParseFailed"));
     }
   };
 
@@ -266,34 +282,18 @@ export default function Dashboard() {
   const micPressIn = async () => {
     const result = await startRecording();
     if (result === "permission_denied") {
-      Alert.alert(
-        language === "tr" ? "Mikrofon izni gerekli" : "Microphone permission needed",
-        language === "tr"
-          ? "Sesle harcama eklemek için ayarlardan mikrofon erişimine izin ver."
-          : "Allow microphone access in settings to add expenses by voice.",
-      );
+      showAlert(t("dashboard.micPermissionTitle"), t("dashboard.micPermissionBody"));
       return;
     }
     if (result === "failed") {
-      Alert.alert(
-        language === "tr" ? "Kayıt başlamadı" : "Could not start recording",
-        language === "tr"
-          ? "Mikrofon başka bir uygulama tarafından kullanılıyor olabilir. Tekrar dene."
-          : "Another app may be using the microphone. Try again.",
-      );
+      showAlert(t("dashboard.recordingFailedTitle"), t("dashboard.recordingFailedBody"));
     }
   };
 
   const micPressOut = async () => {
     const uri = await stopRecording();
     if (!uri) {
-      const tr = language === "tr";
-      Alert.alert(
-        tr ? "Ses kaydı alınamadı" : "No voice capture",
-        tr
-          ? "Mikrofonu basılı tutarak konuş (en az yarım saniye). Çok kısa dokunup bırakma."
-          : "Hold the mic while you speak (at least half a second). Don’t tap too briefly.",
-      );
+      showAlert(t("dashboard.voiceCaptureFailedTitle"), t("dashboard.voiceCaptureFailedBody"));
       return;
     }
     setReviewExpenses(null);
@@ -308,16 +308,12 @@ export default function Dashboard() {
     } catch (e) {
       setReviewVisible(false);
       resetReviewFlow();
-      const tr = language === "tr";
       const detail = formatApiErrorDetailBody(
         e && typeof e === "object" && "details" in e ? (e as ApiError).details : null,
       );
-      Alert.alert(
-        tr ? "Ses analizi çalışmadı" : "Voice analysis failed",
-        detail ??
-          (tr
-            ? "Bağlantı veya oturum hatası. Birkaç saniye daha konuşup tekrar dene ya da fotoğraf ile eklemeyi dene."
-            : "Network or session error. Hold the mic longer, try again, or add via photo."),
+      showAlert(
+        t("dashboard.voiceAnalysisFailedTitle"),
+        detail ?? t("dashboard.voiceAnalysisFailedFallback"),
       );
     }
   };
@@ -346,7 +342,12 @@ export default function Dashboard() {
 
   const searchTranslateY = searchAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
 
-  const fmt = (n: number) => n.toFixed(2).replace(".", ",");
+  const langUi = language as Language;
+  const currencySymbol = useMemo(
+    () => currencySymbolFor(displayCurrency, langUi),
+    [displayCurrency, langUi],
+  );
+  const fmt = useMemo(() => (n: number) => formatAmountDigits(n, langUi), [langUi]);
   const netAccent = totalNet >= 0 ? "#55efc4" : CORAL;
   /** Arama açıkken liste altına ekstra boşluk (hap liste üzerinde yüzer) */
   const searchStripExtra = showSearchBar ? 58 : 0;
@@ -357,7 +358,6 @@ export default function Dashboard() {
   const floatingBarBottom = showSearchBar ? keyboardInset : 0;
 
   const micRed = "#FF4757";
-  const trUi = language === "tr";
   const fabMenuBg = isDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.96)";
   const fabIconTint = isDark ? "rgba(108,99,255,0.22)" : "rgba(108,99,255,0.18)";
   const searchPillBg = isDark ? "rgba(58, 58, 60, 0.92)" : "rgba(235, 235, 240, 0.96)";
@@ -403,12 +403,10 @@ export default function Dashboard() {
 
           <View style={{ paddingHorizontal: 20 }}>
             <Text style={{ color: mutedColor, fontSize: 13, marginBottom: 2 }}>
-              {language === "tr" ? "Net (gelir − harcama)" : "Net (income − expenses)"}
+              {t("dashboard.netBalanceCaption")}
             </Text>
             <Text style={{ color: mutedColor, fontSize: 11, marginBottom: 6, opacity: 0.9 }}>
-              {language === "tr"
-                ? "Ay + liste + üstteki Harcama/Gelir. Kategori yalnızca listeyi süzer."
-                : "Month + list + expense/income tiles. Category only filters the list below."}
+              {t("dashboard.netBalanceHint")}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
               <View
@@ -443,7 +441,9 @@ export default function Dashboard() {
                 >
                   {fmt(totalNet)}
                 </Text>
-                <Text style={{ color: textColor, fontSize: 26, fontWeight: "700", marginLeft: 6 }}>$</Text>
+                <Text style={{ color: textColor, fontSize: 26, fontWeight: "700", marginLeft: 6 }}>
+                  {currencySymbol}
+                </Text>
               </View>
             </View>
 
@@ -461,9 +461,11 @@ export default function Dashboard() {
                 }}
               >
                 <Text style={{ color: mutedColor, fontSize: 11, marginBottom: 4 }}>
-                  {language === "tr" ? "Harcama" : "Spending"}
+                  {t("dashboard.spendingTileLabel")}
                 </Text>
-                <Text style={{ color: textColor, fontSize: 15, fontWeight: "700" }}>- {fmt(totalExpenseOut)} $</Text>
+                <Text style={{ color: textColor, fontSize: 15, fontWeight: "700" }}>
+                  - {fmt(totalExpenseOut)} {currencySymbol}
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setTxFlowFilter((p) => (p === "income" ? "all" : "income"))}
@@ -478,10 +480,10 @@ export default function Dashboard() {
                 }}
               >
                 <Text style={{ color: mutedColor, fontSize: 11, marginBottom: 4 }}>
-                  {language === "tr" ? "Gelir" : "Income"}
+                  {t("dashboard.incomeTileLabel")}
                 </Text>
                 <Text style={{ color: totalIncomeIn > 0 ? "#55efc4" : mutedColor, fontSize: 15, fontWeight: "700" }}>
-                  + {fmt(totalIncomeIn)} $
+                  + {fmt(totalIncomeIn)} {currencySymbol}
                 </Text>
               </Pressable>
             </View>
@@ -503,7 +505,7 @@ export default function Dashboard() {
               <Text style={{ color: textColor, fontSize: 13, fontWeight: "600" }}>{periodLabel}</Text>
               <Ionicons name="chevron-down" size={13} color={mutedColor} />
             </Pressable>
-            <Text style={{ color: mutedColor, fontSize: 13 }}>in</Text>
+            <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
             <Pressable
               onPress={() => setListsModalOpen(true)}
               style={{
@@ -517,7 +519,7 @@ export default function Dashboard() {
               }}
             >
               <Text style={{ color: textColor, fontSize: 13, fontWeight: "600" }}>
-                {activeList?.name ?? "Private list"}
+                {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
               </Text>
               <Ionicons name="chevron-down" size={13} color={mutedColor} />
             </Pressable>
@@ -525,17 +527,11 @@ export default function Dashboard() {
         </View>
 
         <Text style={{ color: mutedColor, fontSize: 12, paddingHorizontal: 20, marginBottom: 8 }}>
-          {language === "tr"
-            ? txFlowFilter === "expense"
-              ? "Yalnızca harcamalar · Kategoriye dokun veya uzun bas"
-              : txFlowFilter === "income"
-                ? "Yalnızca gelirler · Kategoriye dokun veya uzun bas"
-                : "Kategoriye dokun: işlem filtresi · Uzun bas: kategori detayı"
-            : txFlowFilter === "expense"
-              ? "Expenses only · Tap category to filter · Long press for details"
-              : txFlowFilter === "income"
-                ? "Income only · Tap category to filter · Long press for details"
-                : "Tap a category to filter transactions · Long press for category details"}
+          {txFlowFilter === "expense"
+            ? t("dashboard.txHintExpenseOnly")
+            : txFlowFilter === "income"
+              ? t("dashboard.txHintIncomeOnly")
+              : t("dashboard.txHintAll")}
         </Text>
         <CategorySpendScroller
           categories={homeCats}
@@ -544,6 +540,22 @@ export default function Dashboard() {
           onSelectCategory={setTxCategoryFilter}
           onLongPressCategory={(id) => router.push({ pathname: "/category/[id]", params: { id } })}
           isDark={isDark}
+          currencySymbol={currencySymbol}
+        />
+
+        <PendingBankTransactionsStrip
+          items={pendingBankTransactions}
+          bankAutomations={bankAutomations}
+          isDark={isDark}
+          language={language}
+          onPressItem={(item: PendingBankTransaction) => {
+            const desc = [item.title, item.body].filter(Boolean).join(" · ").slice(0, 450);
+            throttledPush({
+              pathname: "/add",
+              params: { pendingId: item.id, bankPrefill: desc },
+            });
+          }}
+          onDismiss={(id) => removePendingBankTransaction(id)}
         />
 
         {/* ── Transactions ── */}
@@ -552,20 +564,12 @@ export default function Dashboard() {
             <View style={{ alignItems: "center", paddingTop: 40, paddingHorizontal: 20 }}>
               <Text style={{ color: mutedColor, fontSize: 15, textAlign: "center", paddingHorizontal: 24 }}>
                 {searchNorm && listFiltered.length > 0
-                  ? trUi
-                    ? "Arama ile eşleşen işlem yok."
-                    : "No transactions match your search."
-                  : language === "tr"
-                    ? txFlowFilter === "expense"
-                      ? "Bu dönemde harcama yok."
-                      : txFlowFilter === "income"
-                        ? "Bu dönemde gelir yok."
-                        : "Bu dönemde işlem yok."
-                    : txFlowFilter === "expense"
-                      ? "No spending this period."
-                      : txFlowFilter === "income"
-                        ? "No income this period."
-                        : "No transactions this period."}
+                  ? t("dashboard.emptySearchNoMatch")
+                  : txFlowFilter === "expense"
+                    ? t("dashboard.emptyNoExpensePeriod")
+                    : txFlowFilter === "income"
+                      ? t("dashboard.emptyNoIncomePeriod")
+                      : t("dashboard.emptyNoTxPeriod")}
               </Text>
               {hintExpandPeriod && (
                 <Pressable
@@ -579,9 +583,7 @@ export default function Dashboard() {
                   }}
                 >
                   <Text style={{ color: PURPLE, fontSize: 14, fontWeight: "700", textAlign: "center" }}>
-                    {language === "tr"
-                      ? "Tüm zamanları göster (başka tarihlerde işlemler olabilir)"
-                      : "Show all time (you may have transactions in other months)"}
+                    {t("dashboard.showAllTimeHint")}
                   </Text>
                 </Pressable>
               )}
@@ -592,7 +594,7 @@ export default function Dashboard() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <Text style={{ color: mutedColor, fontSize: 13, fontWeight: "600" }}>{group.label}</Text>
                   <Text style={{ color: mutedColor, fontSize: 13 }}>
-                    {formatDayNetTotal(group.total)}
+                    {formatDayNetTotal(group.total, langUi, displayCurrency)}
                   </Text>
                 </View>
                 <View style={{ backgroundColor: cardBg, borderRadius: 18, overflow: "hidden" }}>
@@ -641,15 +643,13 @@ export default function Dashboard() {
                 <>
                   <Ionicons name="chevron-down-circle-outline" size={20} color={PURPLE} />
                   <Text style={{ color: textColor, fontSize: 15, fontWeight: "600" }}>
-                    {language === "tr" ? "Daha fazla işlem yükle" : "Load more transactions"}
+                    {t("dashboard.loadMoreTransactions")}
                   </Text>
                 </>
               )}
             </Pressable>
             <Text style={{ color: mutedColor, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-              {language === "tr"
-                ? "Sunucu her seferinde bir sayfa getirir — aşağı kaydırınca da yüklenir."
-                : "The server loads one page at a time — scroll to the bottom to load more."}
+              {t("dashboard.paginationHint")}
             </Text>
           </View>
         ) : null}
@@ -707,7 +707,7 @@ export default function Dashboard() {
                 ref={searchInputRef}
                 value={transactionSearch}
                 onChangeText={setTransactionSearch}
-                placeholder={trUi ? "Ara" : "Search"}
+                placeholder={t("dashboard.searchPlaceholder")}
                 placeholderTextColor={isDark ? "rgba(152, 152, 159, 1)" : "rgba(110, 110, 118, 1)"}
                 style={{
                   flex: 1,
@@ -733,7 +733,7 @@ export default function Dashboard() {
                   flexShrink: 0,
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={trUi ? "Aramayı kapat" : "Close search"}
+                accessibilityLabel={t("dashboard.closeSearchA11y")}
               >
                 <Ionicons name="close" size={22} color={isDark ? "#ebebf0" : "#3a3a3c"} />
               </Pressable>
@@ -774,7 +774,7 @@ export default function Dashboard() {
                   justifyContent: "center",
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={trUi ? "Menü: ekle" : "Add menu"}
+                accessibilityLabel={t("dashboard.addMenuA11y")}
               >
                 <Ionicons name="add" size={26} color={fabSearchPillIcon} />
               </Pressable>
@@ -788,7 +788,7 @@ export default function Dashboard() {
                   justifyContent: "center",
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={trUi ? "İşlem ara" : "Search transactions"}
+                accessibilityLabel={t("dashboard.searchTransactionsA11y")}
               >
                 <Ionicons name="search-outline" size={22} color={fabSearchPillIcon} />
               </Pressable>
@@ -819,10 +819,8 @@ export default function Dashboard() {
                 <View
                   collapsable={false}
                   accessibilityRole="button"
-                  accessibilityLabel={trUi ? "Sesle harcama — basılı tutarak konuş" : "Voice expense — hold to speak"}
-                  accessibilityHint={
-                    trUi ? "Konuşmayı bitirince parmağını kaldır" : "Release when you finish speaking"
-                  }
+                  accessibilityLabel={t("dashboard.voiceExpenseA11y")}
+                  accessibilityHint={t("dashboard.voiceHoldHint")}
                   style={{
                     width: 64,
                     height: 64,
@@ -918,10 +916,10 @@ export default function Dashboard() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0, justifyContent: "center" }}>
                     <Text numberOfLines={1} style={{ color: textColor, fontSize: 16, fontWeight: "700" }}>
-                      {trUi ? "Manuel ekle" : "Add manually"}
+                      {t("dashboard.addManually")}
                     </Text>
                     <Text numberOfLines={2} style={{ color: mutedColor, fontSize: 12, marginTop: 2 }}>
-                      {trUi ? "Tutar ve kategori ile gir" : "Enter amount & category"}
+                      {t("dashboard.addManuallySubtitle")}
                     </Text>
                   </View>
                 </View>
@@ -972,10 +970,10 @@ export default function Dashboard() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0, justifyContent: "center" }}>
                     <Text numberOfLines={1} style={{ color: textColor, fontSize: 16, fontWeight: "700" }}>
-                      {trUi ? "Görsel yükle" : "Upload image"}
+                      {t("dashboard.uploadImage")}
                     </Text>
                     <Text numberOfLines={2} style={{ color: mutedColor, fontSize: 12, marginTop: 2 }}>
-                      {trUi ? "Fiş veya ekran görüntüsü" : "Receipt or screenshot"}
+                      {t("dashboard.uploadImageSubtitle")}
                     </Text>
                   </View>
                 </View>
@@ -1032,6 +1030,9 @@ export default function Dashboard() {
         onSaved={() => {
           setReviewVisible(false);
           resetReviewFlow();
+          setTimeout(() => {
+            flushBudgetThresholdCheck(useStore.getState);
+          }, 500);
         }}
       />
     </SafeAreaView>

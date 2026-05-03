@@ -23,6 +23,10 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
+      "splash": {
+        "backgroundColor": "#0f0f0f",
+        "resizeMode": "cover"
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6C63FF"

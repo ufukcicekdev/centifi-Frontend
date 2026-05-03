@@ -8,7 +8,11 @@ export default function AppLayout() {
   /** Ayarlar ~büyük chunk; ilk dokunuşta beklemeyi azaltmak için rota + modülü erken ısıt */
   useEffect(() => {
     router.prefetch("/(app)/settings");
+    router.prefetch("/report" as any);
+    router.prefetch("/subscribe" as any);
     void import("./settings");
+    void import("./report");
+    void import("./subscribe");
   }, []);
 
   return (
@@ -31,6 +35,8 @@ export default function AppLayout() {
       />
       <Stack.Screen name="processing" options={{ animation: "slide_from_bottom" }} />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="subscribe" />
+      <Stack.Screen name="report" />
       <Stack.Screen name="budgets" />
       <Stack.Screen
         name="budget/[categoryId]"

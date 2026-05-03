@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, TextInput, ScrollView, Pressable,
-  Alert, Platform, KeyboardAvoidingView, Animated,
+  Platform, KeyboardAvoidingView, Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -12,6 +12,7 @@ import { useStore } from "../../store/useStore";
 import { getCategoryMeta } from "../../constants/mockData";
 import AILoadingAnimation from "../../components/AILoadingAnimation";
 import { createExpense, expenseListIdForApi } from "../../lib/backend";
+import { useAppDialog } from "../../context/AppDialogContext";
 
 function EditableField({ label, value, onChangeText, keyboardType = "default", isDark, prefix }: {
   label: string; value: string; onChangeText: (v: string) => void;
@@ -35,6 +36,7 @@ function EditableField({ label, value, onChangeText, keyboardType = "default", i
 }
 
 function CategoryPicker({ selected, onSelect, isDark }: { selected: string; onSelect: (c: string) => void; isDark: boolean }) {
+  const { t } = useTranslation();
   const { allCategories, customCategories, categoryDisplayOverrides } = useStore();
   const categories = allCategories();
   const cardBg = isDark ? "#1a1a1a" : "#ffffff";
@@ -42,7 +44,7 @@ function CategoryPicker({ selected, onSelect, isDark }: { selected: string; onSe
   const borderColor = isDark ? "#2a2a2a" : "#e5e5e5";
   return (
     <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor }}>
-      <Text style={{ color: mutedColor, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>Category</Text>
+      <Text style={{ color: mutedColor, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>{t("processing.category")}</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {categories.map((cat) => {
           const meta = getCategoryMeta(cat.id, customCategories, categoryDisplayOverrides);
@@ -71,8 +73,18 @@ function CategoryPicker({ selected, onSelect, isDark }: { selected: string; onSe
 
 export default function Processing() {
   const { t } = useTranslation();
+  const { showAlert } = useAppDialog();
   const router = useRouter();
-  const { isDark, pendingExpense, addExpense, setPendingExpense, customCategories, activeListId, categoryDisplayOverrides } = useStore();
+  const {
+    isDark,
+    pendingExpense,
+    addExpense,
+    setPendingExpense,
+    customCategories,
+    activeListId,
+    categoryDisplayOverrides,
+    displayCurrency,
+  } = useStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [amount, setAmount] = useState("");
@@ -107,14 +119,14 @@ export default function Processing() {
 
   const handleConfirm = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert("Invalid Amount", "Please enter a valid amount.");
+      showAlert(t("processing.invalidAmountTitle"), t("forms.validAmount"));
       return;
     }
     try {
       const { notificationAsync, NotificationFeedbackType } = await import("expo-haptics");
       await notificationAsync(NotificationFeedbackType.Success);
     } catch {}
-    const payload = { amount: parseFloat(amount), description, category, date, currency: "USD" };
+    const payload = { amount: parseFloat(amount), description, category, date, currency: displayCurrency };
     const list_id = expenseListIdForApi(activeListId);
     try {
       const created = await createExpense({
@@ -122,18 +134,21 @@ export default function Processing() {
         is_income: false,
         ...(list_id != null ? { list_id } : {}),
       });
-      addExpense({
-        ...payload,
-        id: String(created.id),
-        listId: activeListId,
-        currency: created.currency ?? payload.currency,
-        isIncome: false,
-      });
+      addExpense(
+        {
+          ...payload,
+          id: String(created.id),
+          listId: activeListId,
+          currency: created.currency ?? payload.currency,
+          isIncome: false,
+        },
+        { deferBudgetCheckMs: 520 },
+      );
       setPendingExpense(null);
       setIsSuccess(true);
       setTimeout(() => router.replace("/(app)"), 1200);
     } catch {
-      Alert.alert("Save Failed", "Could not save to server. Please try again.");
+      showAlert(t("processing.saveFailedTitle"), t("processing.saveFailedServer"));
     }
   };
 

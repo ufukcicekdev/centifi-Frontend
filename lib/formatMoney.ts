@@ -18,6 +18,15 @@ export function formatMoneyAmount(amount: number, language: Language, currency =
   }).format(amount);
 }
 
+/** Numeric amount only (no symbol), locale-aware separators. */
+export function formatAmountDigits(amount: number, language: Language): string {
+  const loc = localeMap[language] ?? "en-US";
+  return new Intl.NumberFormat(loc, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
 /** Narrow symbol or code for inputs (e.g. $, €, ₺). */
 export function currencySymbolFor(code: string, language: Language): string {
   const loc = localeMap[language] ?? "en-US";

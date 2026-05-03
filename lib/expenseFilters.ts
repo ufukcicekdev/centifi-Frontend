@@ -1,5 +1,6 @@
 import type { Expense } from "../constants/mockData";
 import type { Language } from "../i18n";
+import { formatMoneyAmount } from "./formatMoney";
 
 /** Calendar month (monthIndex 0–11) or all-time. */
 export type PeriodFilter =
@@ -82,10 +83,11 @@ export function distinctExpenseYears(expenses: Expense[], listId: string): numbe
 }
 
 /** Günlük net: gelir − harcama (liste başlığında işaretli gösterim). */
-export function formatDayNetTotal(total: number): string {
-  if (total > 1e-9) return `+ ${total.toFixed(2).replace(".", ",")} $`;
-  if (total < -1e-9) return `- ${Math.abs(total).toFixed(2).replace(".", ",")} $`;
-  return `${(0).toFixed(2).replace(".", ",")} $`;
+export function formatDayNetTotal(total: number, lang: Language, currency: string): string {
+  const cur = (currency || "USD").trim().toUpperCase();
+  if (total > 1e-9) return `+ ${formatMoneyAmount(total, lang, cur)}`;
+  if (total < -1e-9) return `- ${formatMoneyAmount(Math.abs(total), lang, cur)}`;
+  return formatMoneyAmount(0, lang, cur);
 }
 
 export function groupByDate(expenses: Expense[]): { label: string; items: Expense[]; total: number }[] {

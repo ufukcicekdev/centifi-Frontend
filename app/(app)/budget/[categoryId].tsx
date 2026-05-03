@@ -7,7 +7,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StatusBar,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +20,7 @@ import { foregroundOnHex, hexToRgba } from "../../../lib/colorUi";
 import { currencySymbolFor, formatMoneyAmount } from "../../../lib/formatMoney";
 import { averageMonthlySpendForCategory } from "../../../lib/categoryBudgetStats";
 import type { Language } from "../../../i18n";
+import { useAppDialog } from "../../../context/AppDialogContext";
 
 const CORAL = "#FF6B6B";
 
@@ -29,6 +29,7 @@ export default function CategoryBudgetScreen() {
   const categoryId = typeof rawId === "string" ? rawId : rawId?.[0] ?? "";
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { showAlert, showConfirm } = useAppDialog();
   const insets = useSafeAreaInsets();
 
   const isDark = useStore((s) => s.isDark);
@@ -91,7 +92,7 @@ export default function CategoryBudgetScreen() {
     }
     const n = parseFloat(trimmed);
     if (Number.isNaN(n) || n < 0) {
-      Alert.alert(t("common.error"), t("budgets.invalidAmount"));
+      showAlert(t("common.error"), t("budgets.invalidAmount"));
       return;
     }
     if (n === 0) {
@@ -355,12 +356,17 @@ export default function CategoryBudgetScreen() {
           </View>
 
           <Pressable
-            onPress={() =>
-              Alert.alert(t("budgets.removeBudget"), "", [
-                { text: t("common.cancel"), style: "cancel" },
-                { text: t("common.delete"), style: "destructive", onPress: handleRemove },
-              ])
-            }
+            onPress={() => {
+              void (async () => {
+                const ok = await showConfirm({
+                  title: t("budgets.removeBudget"),
+                  confirmText: t("common.delete"),
+                  cancelText: t("common.cancel"),
+                  destructive: true,
+                });
+                if (ok) handleRemove();
+              })();
+            }}
             style={({ pressed }) => ({
               alignSelf: "stretch",
               flexDirection: "row",

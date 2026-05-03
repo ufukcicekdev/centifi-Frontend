@@ -5,8 +5,12 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
 import { AppDialogProvider } from "../context/AppDialogContext";
+import BudgetAlertForegroundListener from "../components/BudgetAlertForegroundListener";
+import BankPendingBridge from "../components/BankPendingBridge";
+import RevenueCatBridge from "../components/RevenueCatBridge";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -59,15 +63,22 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppDialogProvider>
-        <View style={{ flex: 1, backgroundColor: isDark ? "#0f0f0f" : "#f8f8f8" }}>
-          <StatusBar style={isDark ? "light" : "dark"} />
-          <AuthGuard>
-            <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(app)" />
-            </Stack>
-          </AuthGuard>
-        </View>
+        <SafeAreaProvider>
+          <View style={{ flex: 1, backgroundColor: isDark ? "#0f0f0f" : "#f8f8f8" }}>
+            <StatusBar style={isDark ? "light" : "dark"} />
+            <AuthGuard>
+              <>
+                <BudgetAlertForegroundListener />
+                <BankPendingBridge />
+                <RevenueCatBridge />
+                <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(app)" />
+                </Stack>
+              </>
+            </AuthGuard>
+          </View>
+        </SafeAreaProvider>
       </AppDialogProvider>
     </GestureHandlerRootView>
   );

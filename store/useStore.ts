@@ -26,6 +26,12 @@ import {
   deleteExpense as deleteExpenseRemote,
   expenseListIdForApi,
   updateMe,
+  listUserBankApps,
+  createUserBankApp,
+  patchUserBankApp,
+  deleteUserBankApp,
+  mapUserBankAppDto,
+  parseUserBankAppApiId,
   type BackendUser,
 } from "../lib/backend";
 import { mapCategoryBudgetsFromApi } from "../lib/budgetApiMap";
@@ -33,9 +39,11 @@ import { loadEnabledCategoryIds, clearEnabledCategoryIds, saveEnabledCategoryIds
 import { loadBudgetPrefs, saveBudgetPrefs } from "../lib/budgetPrefs";
 import { loadDisplayCurrency, saveDisplayCurrency } from "../lib/currencyPrefs";
 import { loadLanguage, saveLanguage } from "../lib/languagePrefs";
+import type { PendingBankTransaction } from "../lib/pendingBankTypes";
+import { loadPendingBankPrefs, savePendingBankPrefs } from "../lib/pendingBankPrefs";
 import type { PeriodFilter } from "../lib/expenseFilters";
 import { defaultPeriodFilter } from "../lib/expenseFilters";
-import { queueBudgetThresholdCheck } from "../lib/budgetThresholdNotifications";
+import { flushBudgetThresholdCheck, queueBudgetThresholdCheck } from "../lib/budgetThresholdNotifications";
 
 export interface AuthUser {
   uid: string;
@@ -72,6 +80,9 @@ interface AppState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   onboardingCompleted: boolean;
+  /** RevenueCat ``pro`` — backend /subscription/sync + /me */
+  isPro: boolean;
+  proEntitlementExpiresAt: string | null;
   setUser: (user: AuthUser | null) => void;
   logout: () => void;
   hydrateFromBackend: () => Promise<"ok" | "no_token" | "session_invalid" | "unreachable">;
@@ -81,7 +92,12 @@ interface AppState {
 
   // Expenses
   expenses: Expense[];
-  addExpense: (expense: Omit<Expense, "id"> & { id?: string }) => void;
+  addExpense: (
+    expense: Omit<Expense, "id"> & { id?: string },
+    opts?: { deferBudgetCheckMs?: number },
+  ) => void;
+  /** Fiş/ses: API sonrası toplu ekleme; bütçe kontrolü çağıran tarafın `flushBudgetThresholdCheck` ile yapılır. */
+  addExpensesBatch: (items: Expense[]) => void;
   updateExpense: (id: string, patch: Partial<Omit<Expense, "id">>) => Promise<void>;
   removeExpense: (id: string) => Promise<void>;
   replaceExpenses: (expenses: Expense[]) => void;
@@ -159,9 +175,15 @@ interface AppState {
 
   // Bank automations
   bankAutomations: BankAutomation[];
-  addBankAutomation: (b: Omit<BankAutomation, "id">) => void;
-  toggleBankAutomation: (id: string) => void;
-  removeBankAutomation: (id: string) => void;
+  addBankAutomation: (b: Omit<BankAutomation, "id"> & { iconUrl?: string }) => Promise<void>;
+  toggleBankAutomation: (id: string) => Promise<void>;
+  removeBankAutomation: (id: string) => Promise<void>;
+
+  /** Android bank bildirimleri — kayıt öncesi ana ekranda listelenir */
+  pendingBankTransactions: PendingBankTransaction[];
+  hydratePendingBankTransactions: () => Promise<void>;
+  ingestNativePendingBankRows: (rows: PendingBankTransaction[]) => void;
+  removePendingBankTransaction: (id: string) => void;
 }
 
 export const useStore = create<AppState>((set, get) => {
@@ -187,6 +209,8 @@ export const useStore = create<AppState>((set, get) => {
   user: null,
   isAuthenticated: false,
   onboardingCompleted: false,
+  isPro: false,
+  proEntitlementExpiresAt: null,
   setUser: (user) => set({ user, isAuthenticated: !!user, userName: user?.name.split(" ")[0] ?? "User" }),
   logout: () => {
     const uid = get().user?.uid;
@@ -196,6 +220,8 @@ export const useStore = create<AppState>((set, get) => {
       user: null,
       isAuthenticated: false,
       onboardingCompleted: false,
+      isPro: false,
+      proEntitlementExpiresAt: null,
       enabledCategoryIds: null,
       customCategories: [],
       categoryDisplayOverrides: {},
@@ -203,23 +229,26 @@ export const useStore = create<AppState>((set, get) => {
       activeListId: "private",
       categoryBudgets: {},
       budgetAlertsEnabled: true,
-      budgetAlertThresholdPercent: 90,
+      budgetAlertThresholdPercent: 80,
       expensesNextPagePath: null,
       expensesLoadingMore: false,
+      bankAutomations: PRESET_BANK_AUTOMATIONS,
+      pendingBankTransactions: [],
     });
   },
   hydrateFromBackend: async () => {
     const tokens = await loadTokens();
     if (!tokens) {
-      set({ user: null, isAuthenticated: false });
+      set({ user: null, isAuthenticated: false, isPro: false, proEntitlementExpiresAt: null });
       return "no_token";
     }
     try {
       const me: BackendUser = await getMe();
-      const [listsResp, expensesPage, catsResp] = await Promise.all([
+      const [listsResp, expensesPage, catsResp, banksResp] = await Promise.all([
         listExpenseLists().catch(() => null),
         fetchExpensesPage("/api/expenses/").catch(() => null),
         listUserCustomCategories().catch(() => null),
+        listUserBankApps().catch(() => null),
       ]);
 
       const listsMapped: ExpenseList[] =
@@ -264,6 +293,8 @@ export const useStore = create<AppState>((set, get) => {
         monthlyBudget,
         language: (me.language as Language) ?? "en",
         onboardingCompleted: !!me.onboarding_completed,
+        isPro: !!me.is_pro,
+        proEntitlementExpiresAt: me.pro_entitlement_expires_at ?? null,
         enabledCategoryIds: savedCats,
         lists: listsMapped,
         activeListId,
@@ -315,6 +346,11 @@ export const useStore = create<AppState>((set, get) => {
         patch.customCategories = catsResp.results.map(mapUserCustomCategoryDto);
       }
 
+      patch.bankAutomations = [
+        ...PRESET_BANK_AUTOMATIONS,
+        ...(banksResp?.results ?? []).map(mapUserBankAppDto),
+      ];
+
       set(patch);
       try {
         const lng = (me.language as Language) ?? "en";
@@ -324,6 +360,7 @@ export const useStore = create<AppState>((set, get) => {
         /* ignore bad locale from API */
       }
       queueBudgetThresholdCheck(get);
+      void get().hydratePendingBankTransactions().catch(() => {});
       return "ok";
     } catch (e: unknown) {
       const status = getApiErrorStatus(e);
@@ -333,8 +370,12 @@ export const useStore = create<AppState>((set, get) => {
       set({
         user: null,
         isAuthenticated: false,
+        isPro: false,
+        proEntitlementExpiresAt: null,
         expensesNextPagePath: null,
         expensesLoadingMore: false,
+        bankAutomations: PRESET_BANK_AUTOMATIONS,
+        pendingBankTransactions: [],
       });
       if (status === 401 || status === 403) return "session_invalid";
       return "unreachable";
@@ -344,11 +385,22 @@ export const useStore = create<AppState>((set, get) => {
   userName: "User",
 
   expenses: MOCK_EXPENSES,
-  addExpense: (expense) => {
+  addExpense: (expense, opts) => {
     set((state) => ({
       expenses: [{ ...expense, id: expense.id ?? Date.now().toString() }, ...state.expenses],
     }));
-    queueBudgetThresholdCheck(get);
+    const deferMs = opts?.deferBudgetCheckMs;
+    if (typeof deferMs === "number" && deferMs >= 0) {
+      setTimeout(() => flushBudgetThresholdCheck(get), deferMs);
+    } else {
+      queueBudgetThresholdCheck(get);
+    }
+  },
+  addExpensesBatch: (items) => {
+    if (items.length === 0) return;
+    set((state) => ({
+      expenses: [...items, ...state.expenses],
+    }));
   },
   updateExpense: async (id, patch) => {
     const cur = get().expenses.find((e) => e.id === id);
@@ -433,7 +485,7 @@ export const useStore = create<AppState>((set, get) => {
 
   categoryBudgets: {},
   budgetAlertsEnabled: true,
-  budgetAlertThresholdPercent: 90,
+  budgetAlertThresholdPercent: 80,
 
   setCategoryBudget: (categoryId, patch) => {
     set((state) => {
@@ -656,15 +708,82 @@ export const useStore = create<AppState>((set, get) => {
 
   // Bank automations
   bankAutomations: PRESET_BANK_AUTOMATIONS,
-  addBankAutomation: (b) =>
+  addBankAutomation: async (b) => {
+    if (!get().isAuthenticated) {
+      set((state) => ({
+        bankAutomations: [...state.bankAutomations, { ...b, id: `bank_${Date.now()}` }],
+      }));
+      return;
+    }
+    const dto = await createUserBankApp({
+      name: b.name,
+      emoji: b.emoji,
+      store_url: b.storeUrl,
+      package_name: b.packageName,
+      enabled: b.enabled,
+      ...(b.iconUrl?.trim() ? { icon_url: b.iconUrl.trim() } : {}),
+    });
+    const row = mapUserBankAppDto(dto);
+    set((state) => ({ bankAutomations: [...state.bankAutomations, row] }));
+  },
+  toggleBankAutomation: async (id) => {
+    const cur = get().bankAutomations.find((x) => x.id === id);
+    if (!cur) return;
+    const nextEnabled = !cur.enabled;
     set((state) => ({
-      bankAutomations: [...state.bankAutomations, { ...b, id: `bank_${Date.now()}` }],
-    })),
-  toggleBankAutomation: (id) =>
-    set((state) => ({
-      bankAutomations: state.bankAutomations.map((b) => b.id === id ? { ...b, enabled: !b.enabled } : b),
-    })),
-  removeBankAutomation: (id) =>
-    set((state) => ({ bankAutomations: state.bankAutomations.filter((b) => b.id !== id) })),
+      bankAutomations: state.bankAutomations.map((row) =>
+        row.id === id ? { ...row, enabled: nextEnabled } : row,
+      ),
+    }));
+    const apiId = parseUserBankAppApiId(id);
+    if (apiId == null || !get().isAuthenticated) return;
+    try {
+      await patchUserBankApp(apiId, { enabled: nextEnabled });
+    } catch {
+      set((state) => ({
+        bankAutomations: state.bankAutomations.map((row) =>
+          row.id === id ? { ...row, enabled: cur.enabled } : row,
+        ),
+      }));
+    }
+  },
+  removeBankAutomation: async (id) => {
+    const apiId = parseUserBankAppApiId(id);
+    if (apiId != null && get().isAuthenticated) {
+      try {
+        await deleteUserBankApp(apiId);
+      } catch {
+        return;
+      }
+    }
+    set((state) => ({ bankAutomations: state.bankAutomations.filter((b) => b.id !== id) }));
+  },
+
+  pendingBankTransactions: [],
+  hydratePendingBankTransactions: async () => {
+    const uid = get().user?.uid ?? "local";
+    const rows = await loadPendingBankPrefs(uid);
+    set({ pendingBankTransactions: rows });
+  },
+  ingestNativePendingBankRows: (rows) => {
+    if (rows.length === 0) return;
+    const uid = get().user?.uid ?? "local";
+    const cur = get().pendingBankTransactions;
+    const seen = new Set(cur.map((r) => r.id));
+    const newRows = rows.filter((r) => !seen.has(r.id));
+    if (newRows.length === 0) return;
+    const merged = [...newRows, ...cur].slice(0, 80);
+    set({ pendingBankTransactions: merged });
+    void savePendingBankPrefs(uid, merged).catch(() => {});
+    // OS bildirimi Android’de BankNotificationListener içinde gösterilir (arka planda JS çalışmaz).
+  },
+  removePendingBankTransaction: (id) => {
+    const uid = get().user?.uid ?? "local";
+    set((state) => {
+      const next = state.pendingBankTransactions.filter((r) => r.id !== id);
+      void savePendingBankPrefs(uid, next).catch(() => {});
+      return { pendingBankTransactions: next };
+    });
+  },
 };
 });
