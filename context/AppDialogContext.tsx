@@ -206,7 +206,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
                     </Text>
                   </Pressable>
                 : payload?.kind === "confirm" ?
-                  <View style={styles.confirmColumn}>
+                  <View style={styles.confirmRow}>
                     <Pressable
                       onPress={() => finishConfirm(false)}
                       style={({ pressed }) => [
@@ -222,7 +222,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
                     >
                       <Text
                         style={[styles.confirmBtnLabelSecondary, { color: theme.secondaryBtnLabel }]}
-                        numberOfLines={3}
+                        numberOfLines={2}
                       >
                         {payload.cancelText}
                       </Text>
@@ -236,7 +236,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
                       ]}
                       accessibilityRole="button"
                     >
-                      <Text style={styles.confirmBtnLabelPrimary} numberOfLines={3}>
+                      <Text style={styles.confirmBtnLabelPrimary} numberOfLines={2}>
                         {payload.confirmText}
                       </Text>
                     </Pressable>
@@ -313,25 +313,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  /** Dar ekran / uzun çeviri: yan yana sıkışmayı önlemek için dikey */
-  confirmColumn: {
+  /** İptal (sol) + onay (sağ); eşit genişlik, standart mobil diyalog */
+  confirmRow: {
+    flexDirection: "row",
     width: "100%",
     marginTop: 8,
     alignSelf: "stretch",
+    gap: 10,
   },
   confirmBtn: {
-    width: "100%",
-    alignSelf: "stretch",
+    flex: 1,
+    minWidth: 0,
     borderRadius: 12,
     paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 48,
   },
   confirmBtnSecondary: {
     borderWidth: 1,
-    marginBottom: 10,
   },
   confirmBtnPrimary: {},
   confirmBtnLabelSecondary: {

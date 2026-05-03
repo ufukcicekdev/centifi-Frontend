@@ -456,3 +456,24 @@ export async function parseAudio(audioBase64: string, mimeType = "audio/m4a", la
   });
 }
 
+export type SpendingInsightsResponse = {
+  insight: string;
+  expense_count: number;
+  summary?: unknown;
+};
+
+/** Gemini: dönem + isteğe bağlı liste için harcama özetinden kısa tavsiye metni. */
+export async function fetchSpendingInsights(body: {
+  start_date: string;
+  end_date: string;
+  list_id?: number | null;
+  language: string;
+}) {
+  return apiFetch<SpendingInsightsResponse>("/api/ai/spending-insights/", {
+    method: "POST",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+

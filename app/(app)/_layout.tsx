@@ -9,9 +9,11 @@ export default function AppLayout() {
   useEffect(() => {
     router.prefetch("/(app)/settings");
     router.prefetch("/report" as any);
+    router.prefetch("/insights" as any);
     router.prefetch("/subscribe" as any);
     void import("./settings");
     void import("./report");
+    void import("./insights");
     void import("./subscribe");
   }, []);
 
@@ -37,6 +39,7 @@ export default function AppLayout() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="subscribe" />
       <Stack.Screen name="report" />
+      <Stack.Screen name="insights" />
       <Stack.Screen name="budgets" />
       <Stack.Screen
         name="budget/[categoryId]"

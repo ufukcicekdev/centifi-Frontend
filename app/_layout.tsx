@@ -1,9 +1,9 @@
 import "../global.css";
 import "../i18n";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
@@ -12,22 +12,29 @@ import BudgetAlertForegroundListener from "../components/BudgetAlertForegroundLi
 import BankPendingBridge from "../components/BankPendingBridge";
 import RevenueCatBridge from "../components/RevenueCatBridge";
 
+const BOOTSTRAP_PURPLE = "#6C63FF";
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
+  const isDark = useStore((s) => s.isDark);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const onboardingCompleted = useStore((s) => s.onboardingCompleted);
-  const hydrateFromBackend = useStore((s) => s.hydrateFromBackend);
-  const hydrateLanguage = useStore((s) => s.hydrateLanguage);
+  /** Until true, `isAuthenticated` is still the default — do not route or user briefly sees login. */
+  const [sessionResolved, setSessionResolved] = useState(false);
 
   useEffect(() => {
     void (async () => {
+      const { hydrateLanguage, hydrateFromBackend } = useStore.getState();
       await hydrateLanguage();
       await hydrateFromBackend();
+      setSessionResolved(true);
     })();
   }, []);
 
   useEffect(() => {
+    if (!sessionResolved) return;
+
     const inAuthGroup = segments[0] === "(auth)";
     const onOnboarding = segments[1] === "onboarding";
 
@@ -38,9 +45,29 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     } else if (isAuthenticated && onboardingCompleted && inAuthGroup) {
       router.replace("/(app)");
     }
-  }, [isAuthenticated, onboardingCompleted, segments]);
+  }, [sessionResolved, isAuthenticated, onboardingCompleted, segments, router]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {!sessionResolved ? (
+        <View
+          pointerEvents="auto"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              zIndex: 1000,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: isDark ? "#0f0f0f" : "#f8f8f8",
+            },
+          ]}
+        >
+          <ActivityIndicator size="large" color={BOOTSTRAP_PURPLE} />
+        </View>
+      ) : null}
+    </>
+  );
 }
 
 export default function RootLayout() {

@@ -1340,6 +1340,16 @@ export default function Settings() {
             onPress={() => router.push("/report" as any)}
             right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
           />
+          <SettingsRow
+            isDark={isDark}
+            icon="sparkles-outline"
+            iconTint={PURPLE}
+            title={t("settings.insightsMenu")}
+            subtitle={t("settings.insightsMenuSubtitle")}
+            dividerTop
+            onPress={() => router.push("/insights" as any)}
+            right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+          />
         </Card>
 
         {/* NOTIFICATIONS */}

@@ -15,7 +15,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store/useStore";
-import { expenseListIdForApi, sendExpenseReportEmail } from "../../lib/backend";
+import { expenseListIdForApi, fetchSpendingInsights } from "../../lib/backend";
 import { displayExpenseListName } from "../../lib/listDisplayName";
 import { formatApiErrorDetailBody, getApiErrorStatus, type ApiError } from "../../lib/api";
 import { useAppDialog } from "../../context/AppDialogContext";
@@ -41,7 +41,63 @@ function todayNoon(): Date {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12, 0, 0, 0);
 }
 
-export default function ReportScreen() {
+function stripMdBold(s: string): string {
+  return s.replace(/\*\*(.+?)\*\*/g, "$1");
+}
+
+function InsightMarkdownLines({
+  text,
+  textColor,
+  mutedColor,
+}: {
+  text: string;
+  textColor: string;
+  mutedColor: string;
+}) {
+  const lines = text.trim().split("\n");
+  return (
+    <View style={{ gap: 6 }}>
+      {lines.map((line, i) => {
+        const t = line.trim();
+        if (!t) {
+          return <View key={`e-${i}`} style={{ height: 2 }} />;
+        }
+        if (t.startsWith("## ")) {
+          return (
+            <Text
+              key={i}
+              style={{
+                color: textColor,
+                fontSize: 18,
+                fontWeight: "800",
+                marginTop: i === 0 ? 0 : 4,
+                letterSpacing: -0.2,
+              }}
+            >
+              {stripMdBold(t.slice(3))}
+            </Text>
+          );
+        }
+        if (t.startsWith("- ")) {
+          const body = stripMdBold(t.slice(2));
+          return (
+            <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", paddingRight: 4 }}>
+              <Text style={{ color: PURPLE, marginRight: 10, marginTop: 2, fontWeight: "700" }}>•</Text>
+              <Text style={{ color: textColor, flex: 1, fontSize: 15, lineHeight: 22 }}>{body}</Text>
+            </View>
+          );
+        }
+        return (
+          <Text key={i} style={{ color: mutedColor, fontSize: 13, lineHeight: 19 }}>
+            {stripMdBold(t)}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function InsightsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -49,13 +105,14 @@ export default function ReportScreen() {
   const isDark = useStore((s) => s.isDark);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const lists = useStore((s) => s.lists);
-  const user = useStore((s) => s.user);
+  const language = useStore((s) => s.language);
 
   const [endDate, setEndDate] = useState(() => todayNoon());
   const [startDate, setStartDate] = useState(() => startOfMonth(todayNoon()));
-  /** `null` = all lists; otherwise matches `ExpenseList.id` (string, e.g. `"12"`). */
   const [selectedListKey, setSelectedListKey] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [insight, setInsight] = useState<string | null>(null);
+  const [expenseCount, setExpenseCount] = useState<number | null>(null);
   const [picker, setPicker] = useState<null | "start" | "end">(null);
   const [iosTemp, setIosTemp] = useState<Date | null>(null);
 
@@ -88,6 +145,7 @@ export default function ReportScreen() {
         text: "#dee2f1",
         muted: "#bfc5d7",
         previewBg: "#121a2e",
+        resultBg: "#121a2e",
       };
     }
     return {
@@ -98,6 +156,7 @@ export default function ReportScreen() {
       text: "#111827",
       muted: "#5c6370",
       previewBg: "#eef1f8",
+      resultBg: "#f0f4fc",
     };
   }, [isDark]);
 
@@ -128,38 +187,39 @@ export default function ReportScreen() {
     else setEndDate(date);
   };
 
-  const handleSend = async () => {
-    if (!isAuthenticated || !user) {
-      showAlert(t("report.needSignInTitle"), t("report.needSignInBody"));
+  const handleAnalyze = async () => {
+    if (!isAuthenticated) {
+      showAlert(t("insights.needSignInTitle"), t("insights.needSignInBody"));
       return;
     }
     const start = localYmd(startDate);
     const end = localYmd(endDate);
     if (start > end) {
-      showAlert(t("report.invalidRangeTitle"), t("report.invalidRangeBody"));
+      showAlert(t("insights.invalidRangeTitle"), t("insights.invalidRangeBody"));
       return;
     }
-    setSending(true);
+    setLoading(true);
+    setInsight(null);
+    setExpenseCount(null);
     try {
       const apiListId =
         selectedListKey == null ? undefined : expenseListIdForApi(selectedListKey);
-      const res = await sendExpenseReportEmail({
+      const res = await fetchSpendingInsights({
         start_date: start,
         end_date: end,
         list_id: apiListId,
+        language,
       });
-      showAlert(
-        t("report.successTitle"),
-        t("report.successBody", { email: res.sent_to, count: res.expense_count }),
-      );
+      setInsight(res.insight);
+      setExpenseCount(res.expense_count);
     } catch (e: unknown) {
       const status = getApiErrorStatus(e);
       const details = e && typeof e === "object" && "details" in e ? (e as ApiError).details : undefined;
-      const msg = formatApiErrorDetailBody(details) ?? t("report.errorGeneric");
-      const title = status === 400 ? t("report.errorTitle") : t("common.error");
+      const msg = formatApiErrorDetailBody(details) ?? t("insights.errorGeneric");
+      const title = status === 503 ? t("insights.errorAiTitle") : t("common.error");
       showAlert(title, msg);
     } finally {
-      setSending(false);
+      setLoading(false);
     }
   };
 
@@ -193,7 +253,17 @@ export default function ReportScreen() {
     </View>
   );
 
-  const DateRow = ({ label, value, which, showDivider }: { label: string; value: Date; which: "start" | "end"; showDivider: boolean }) => (
+  const DateRow = ({
+    label,
+    value,
+    which,
+    showDivider,
+  }: {
+    label: string;
+    value: Date;
+    which: "start" | "end";
+    showDivider: boolean;
+  }) => (
     <Pressable
       onPress={() => openPicker(which)}
       accessibilityRole="button"
@@ -317,7 +387,7 @@ export default function ReportScreen() {
           <Ionicons name="chevron-back" size={24} color={tokens.muted} />
         </Pressable>
         <Text style={{ color: tokens.text, fontSize: 18, fontWeight: "800", letterSpacing: -0.3 }}>
-          {t("report.title")}
+          {t("insights.title")}
         </Text>
       </View>
 
@@ -354,13 +424,13 @@ export default function ReportScreen() {
               marginRight: 14,
             }}
           >
-            <Ionicons name="mail-outline" size={26} color={PURPLE} />
+            <Ionicons name="sparkles" size={26} color={PURPLE} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ color: tokens.text, fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
-              {t("report.heroTitle")}
+              {t("insights.heroTitle")}
             </Text>
-            <Text style={{ color: tokens.muted, fontSize: 14, lineHeight: 20 }}>{t("report.subtitle")}</Text>
+            <Text style={{ color: tokens.muted, fontSize: 14, lineHeight: 20 }}>{t("insights.subtitle")}</Text>
           </View>
         </View>
 
@@ -395,18 +465,12 @@ export default function ReportScreen() {
             padding: 16,
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: tokens.border,
-            marginBottom: 8,
+            marginBottom: 12,
           }}
         >
           <Text style={{ color: tokens.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.1, marginBottom: 10 }}>
             {t("report.previewTitle")}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-            <Ionicons name="person-outline" size={18} color={tokens.muted} style={{ marginRight: 8 }} />
-            <Text style={{ color: tokens.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
-              {user?.email ?? "—"}
-            </Text>
-          </View>
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
             <Ionicons name="calendar-outline" size={18} color={tokens.muted} style={{ marginRight: 8 }} />
             <Text style={{ color: tokens.text, fontSize: 14, fontWeight: "600" }}>
@@ -421,13 +485,11 @@ export default function ReportScreen() {
           </View>
         </View>
 
-        <View style={{ flex: 1, minHeight: 16 }} />
-
         <Pressable
-          onPress={() => void handleSend()}
-          disabled={sending}
+          onPress={() => void handleAnalyze()}
+          disabled={loading}
           android_ripple={{ color: "rgba(255,255,255,0.25)" }}
-          style={{ alignSelf: "stretch", opacity: sending ? 0.85 : 1 }}
+          style={{ alignSelf: "stretch", opacity: loading ? 0.85 : 1 }}
         >
           {({ pressed }) => (
             <View
@@ -446,26 +508,48 @@ export default function ReportScreen() {
                 shadowOpacity: 0.35,
                 shadowRadius: 14,
                 elevation: 10,
-                opacity: pressed && !sending ? 0.92 : 1,
+                opacity: pressed && !loading ? 0.92 : 1,
               }}
             >
-              {sending ? (
+              {loading ? (
                 <ActivityIndicator color={CTA_TEXT} />
               ) : (
                 <>
-                  <Ionicons name="send" size={20} color={CTA_TEXT} style={{ marginRight: 10 }} />
-                  <Text style={{ color: CTA_TEXT, fontSize: 17, fontWeight: "800" }}>{t("report.send")}</Text>
+                  <Ionicons name="sparkles" size={20} color={CTA_TEXT} style={{ marginRight: 10 }} />
+                  <Text style={{ color: CTA_TEXT, fontSize: 17, fontWeight: "800" }}>{t("insights.analyze")}</Text>
                 </>
               )}
             </View>
           )}
         </Pressable>
         <Text style={{ color: tokens.muted, fontSize: 12, textAlign: "center", marginTop: 10, lineHeight: 17 }}>
-          {t("report.sendSubtext")}
+          {loading ? t("insights.analyzing") : t("insights.runHint")}
         </Text>
 
-        <Text style={{ color: tokens.muted, fontSize: 12, lineHeight: 18, marginTop: 22, opacity: 0.92 }}>
-          {t("report.footerNote")}
+        {insight != null && insight.length > 0 ? (
+          <View
+            style={{
+              marginTop: 22,
+              backgroundColor: tokens.resultBg,
+              borderRadius: 16,
+              padding: 18,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: tokens.border,
+            }}
+          >
+            <Text style={{ color: tokens.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.1, marginBottom: 12 }}>
+              {t("insights.resultTitle")}
+              {expenseCount != null ? ` · ${t("insights.rowCount", { count: expenseCount })}` : ""}
+            </Text>
+            <InsightMarkdownLines text={insight} textColor={tokens.text} mutedColor={tokens.muted} />
+            <Text style={{ color: tokens.muted, fontSize: 12, lineHeight: 17, marginTop: 16, opacity: 0.95 }}>
+              {t("insights.aiDisclaimer")}
+            </Text>
+          </View>
+        ) : null}
+
+        <Text style={{ color: tokens.muted, fontSize: 12, lineHeight: 18, marginTop: 20, opacity: 0.92 }}>
+          {t("insights.retryHint")}
         </Text>
       </ScrollView>
 
