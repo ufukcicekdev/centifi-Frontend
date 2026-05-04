@@ -90,7 +90,13 @@ export async function loginWithEmail(email: string, password: string) {
   return tokens;
 }
 
-export async function registerUser(params: { name: string; email: string; password: string }) {
+export async function registerUser(params: {
+  name: string;
+  email: string;
+  password: string;
+  language?: string;
+  is_dark_mode?: boolean;
+}) {
   const username = params.email; // simplest: username = email
   const [first_name, ...rest] = params.name.trim().split(/\s+/);
   const last_name = rest.join(" ");
@@ -104,6 +110,8 @@ export async function registerUser(params: { name: string; email: string; passwo
       password: params.password,
       first_name,
       last_name,
+      language: params.language ?? "en",
+      is_dark_mode: params.is_dark_mode ?? true,
     }),
   });
 
@@ -120,6 +128,7 @@ export async function socialAuth(params: {
   token: string;
   name?: string;
   email?: string;
+  language?: string;
 }) {
   const tokens = await apiFetch<AuthTokens>("/api/users/social-auth/", {
     method: "POST",
@@ -147,11 +156,25 @@ export async function requestPasswordReset(email: string) {
   });
 }
 
-export async function resetPasswordWithToken(body: { uid: string; token: string; new_password: string }) {
+export async function verifyPasswordResetCode(body: { email: string; code: string }) {
+  return apiFetch<{ detail: string; reset_token: string }>("/api/users/password/verify-code/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: body.email.trim(),
+      code: body.code.trim(),
+    }),
+  });
+}
+
+export async function completePasswordReset(body: { reset_token: string; new_password: string }) {
   return apiFetch<{ detail: string }>("/api/users/password/reset/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      reset_token: body.reset_token,
+      new_password: body.new_password,
+    }),
   });
 }
 

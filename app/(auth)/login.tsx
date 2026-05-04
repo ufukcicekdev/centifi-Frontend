@@ -172,7 +172,13 @@ export default function Login() {
       });
       const name = [credential.fullName?.givenName ?? "", credential.fullName?.familyName ?? ""]
         .filter(Boolean).join(" ");
-      await socialAuth({ provider: "apple", token: credential.identityToken ?? "", name, email: credential.email ?? "" });
+      await socialAuth({
+        provider: "apple",
+        token: credential.identityToken ?? "",
+        name,
+        email: credential.email ?? "",
+        language: useStore.getState().language,
+      });
       const result = await useStore.getState().hydrateFromBackend();
       if (result === "unreachable") {
         const tokensKept = await loadTokens();

@@ -50,7 +50,7 @@ export default function GoogleSignInButton(props: Props) {
     (async () => {
       setBusy(true);
       try {
-        await socialAuth({ provider: "google", token: idToken });
+        await socialAuth({ provider: "google", token: idToken, language: useStore.getState().language });
         const result = await useStore.getState().hydrateFromBackend();
         if (result === "unreachable") {
           const tokensKept = await loadTokens();

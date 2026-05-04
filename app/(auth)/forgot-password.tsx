@@ -44,7 +44,7 @@ export default function ForgotPasswordScreen() {
     try {
       const res = await requestPasswordReset(e);
       showAlert(t("auth.forgotPasswordSentTitle"), res.detail || t("auth.forgotPasswordSentBody"));
-      router.back();
+      router.push({ pathname: "/(auth)/reset-password", params: { email: e } });
     } catch (err: unknown) {
       const status = getApiErrorStatus(err);
       const details = err && typeof err === "object" && "details" in err ? (err as ApiError).details : undefined;

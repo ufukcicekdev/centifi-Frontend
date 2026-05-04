@@ -38,6 +38,7 @@ import { mapCategoryBudgetsFromApi } from "../lib/budgetApiMap";
 import { loadEnabledCategoryIds, clearEnabledCategoryIds, saveEnabledCategoryIds } from "../lib/categoryPrefs";
 import { loadBudgetPrefs, saveBudgetPrefs } from "../lib/budgetPrefs";
 import { loadDisplayCurrency, saveDisplayCurrency } from "../lib/currencyPrefs";
+import { getDeviceAppLanguage } from "../lib/deviceLanguage";
 import { loadLanguage, saveLanguage } from "../lib/languagePrefs";
 import type { PendingBankTransaction } from "../lib/pendingBankTypes";
 import { loadPendingBankPrefs, savePendingBankPrefs } from "../lib/pendingBankPrefs";
@@ -277,6 +278,14 @@ export const useStore = create<AppState>((set, get) => {
       const uid = String(me.id);
       const savedCats = await loadEnabledCategoryIds(uid).catch(() => null);
 
+      const savedPref = await loadLanguage();
+      const deviceLng = getDeviceAppLanguage() as Language;
+      const serverRaw = String(me.language || "en")
+        .toLowerCase()
+        .split("-")[0];
+      const serverLng = (["en", "tr", "de", "fr", "es"].includes(serverRaw) ? serverRaw : "en") as Language;
+      const resolvedLang: Language = (savedPref ?? deviceLng ?? serverLng) as Language;
+
       const mbRaw = parseFloat(String(me.monthly_budget ?? "0"));
       const monthlyBudget = Number.isFinite(mbRaw) ? mbRaw : MONTHLY_BUDGET;
 
@@ -299,7 +308,7 @@ export const useStore = create<AppState>((set, get) => {
         isDark: !!me.is_dark_mode,
         notificationsEnabled: !!me.notifications_enabled,
         monthlyBudget,
-        language: (me.language as Language) ?? "en",
+        language: resolvedLang,
         onboardingCompleted: !!me.onboarding_completed,
         isPro: !!me.is_pro,
         proEntitlementExpiresAt: me.pro_entitlement_expires_at ?? null,
@@ -361,11 +370,15 @@ export const useStore = create<AppState>((set, get) => {
 
       set(patch);
       try {
-        const lng = (me.language as Language) ?? "en";
-        i18n.changeLanguage(lng);
-        void saveLanguage(lng);
+        await i18n.changeLanguage(resolvedLang);
       } catch {
         /* ignore bad locale from API */
+      }
+      if (!savedPref) {
+        void saveLanguage(resolvedLang);
+      }
+      if (resolvedLang !== serverLng) {
+        void updateMe({ language: resolvedLang }).catch(() => {});
       }
       queueBudgetThresholdCheck(get);
       void get().hydratePendingBankTransactions().catch(() => {});
@@ -535,7 +548,7 @@ export const useStore = create<AppState>((set, get) => {
   isDark: true,
   toggleTheme: () => set((state) => ({ isDark: !state.isDark })),
 
-  language: "en",
+  language: getDeviceAppLanguage() as Language,
   setLanguage: (lang) => {
     i18n.changeLanguage(lang);
     set({ language: lang });
@@ -546,13 +559,14 @@ export const useStore = create<AppState>((set, get) => {
   },
   hydrateLanguage: async () => {
     const saved = await loadLanguage();
-    if (!saved) return;
+    const device = getDeviceAppLanguage() as Language;
+    const resolved = (saved ?? device) as Language;
     try {
-      await i18n.changeLanguage(saved);
+      await i18n.changeLanguage(resolved);
     } catch {
       /* ignore */
     }
-    set({ language: saved });
+    set({ language: resolved });
   },
 
   displayCurrency: "USD",

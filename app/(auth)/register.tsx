@@ -47,7 +47,8 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await registerUser({ name, email, password });
+      const { language, isDark } = useStore.getState();
+      await registerUser({ name, email, password, language, is_dark_mode: isDark });
       const result = await useStore.getState().hydrateFromBackend();
       if (result === "unreachable") {
         const tokensKept = await loadTokens();
@@ -105,20 +106,42 @@ export default function Register() {
             <View style={{ marginBottom: 28 }}>
               <CentifiLogo size={60} showName nameColor={textColor} />
             </View>
-            <Text style={{ color: textColor, fontSize: 30, fontWeight: "800", letterSpacing: -0.8, marginBottom: 8 }}>Create account</Text>
-            <Text style={{ color: mutedColor, fontSize: 16 }}>Start tracking your expenses</Text>
+            <Text style={{ color: textColor, fontSize: 30, fontWeight: "800", letterSpacing: -0.8, marginBottom: 8 }}>
+              {t("auth.registerTitle")}
+            </Text>
+            <Text style={{ color: mutedColor, fontSize: 16 }}>{t("auth.registerSubtitle")}</Text>
           </View>
 
           <View style={{ backgroundColor: cardBg, borderRadius: 20, borderWidth: 1, borderColor, padding: 20, marginBottom: 16 }}>
-            <Field label="Full Name" value={name} onChange={setName} placeholder="Alex Johnson" icon="person-outline" />
-            <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" icon="mail-outline" keyboard="email-address" />
-            <Field label="Password" value={password} onChange={setPassword} placeholder="Min. 6 characters" icon="lock-closed-outline" secure />
+            <Field
+              label={t("auth.registerFullName")}
+              value={name}
+              onChange={setName}
+              placeholder={t("auth.registerPlaceholderName")}
+              icon="person-outline"
+            />
+            <Field
+              label={t("auth.registerEmail")}
+              value={email}
+              onChange={setEmail}
+              placeholder={t("auth.registerPlaceholderEmail")}
+              icon="mail-outline"
+              keyboard="email-address"
+            />
+            <Field
+              label={t("auth.registerPassword")}
+              value={password}
+              onChange={setPassword}
+              placeholder={t("auth.registerPlaceholderPassword")}
+              icon="lock-closed-outline"
+              secure
+            />
           </View>
 
           {/* Budget hint */}
           <View style={{ backgroundColor: "#6C63FF15", borderRadius: 14, padding: 14, marginBottom: 24, flexDirection: "row", alignItems: "center", gap: 10 }}>
             <Ionicons name="information-circle-outline" size={18} color="#6C63FF" />
-            <Text style={{ color: "#6C63FF", fontSize: 13, flex: 1, lineHeight: 18 }}>You can set your monthly budget after signing up.</Text>
+            <Text style={{ color: "#6C63FF", fontSize: 13, flex: 1, lineHeight: 18 }}>{t("auth.registerBudgetHint")}</Text>
           </View>
 
           <Pressable onPress={handleRegister} disabled={loading}
@@ -129,13 +152,13 @@ export default function Register() {
               shadowOpacity: 0.4, shadowRadius: 16, elevation: 10, marginBottom: 28,
             })}>
             {loading ? <ActivityIndicator color="#fff" /> : (
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Create Account</Text>
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>{t("auth.registerSubmit")}</Text>
             )}
           </Pressable>
 
           <Pressable onPress={() => router.back()} style={{ flexDirection: "row", justifyContent: "center", gap: 4 }}>
-            <Text style={{ color: mutedColor, fontSize: 14 }}>Already have an account?</Text>
-            <Text style={{ color: "#6C63FF", fontSize: 14, fontWeight: "600" }}>Sign In</Text>
+            <Text style={{ color: mutedColor, fontSize: 14 }}>{t("auth.registerHasAccount")}</Text>
+            <Text style={{ color: "#6C63FF", fontSize: 14, fontWeight: "600" }}>{t("auth.registerSignIn")}</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
