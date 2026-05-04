@@ -41,6 +41,186 @@ function todayNoon(): Date {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12, 0, 0, 0);
 }
 
+type ReportTokens = {
+  bg: string;
+  card: string;
+  cardHigh: string;
+  border: string;
+  text: string;
+  muted: string;
+  previewBg: string;
+};
+
+/** Module-level: defining rows inside ``ReportScreen`` recreated the component type every render and broke radio icon updates on some Android builds. */
+function ReportCard({
+  title,
+  children,
+  tokens,
+}: {
+  title: string;
+  children: React.ReactNode;
+  tokens: ReportTokens;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: tokens.card,
+        borderRadius: 20,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: tokens.border,
+        paddingVertical: 4,
+        marginBottom: 16,
+        overflow: "hidden",
+      }}
+    >
+      <Text
+        style={{
+          color: tokens.muted,
+          fontSize: 11,
+          fontWeight: "800",
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+          paddingHorizontal: 18,
+          paddingTop: 14,
+          paddingBottom: 10,
+        }}
+      >
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+function ReportDateRow({
+  label,
+  value,
+  showDivider,
+  onPress,
+  tokens,
+}: {
+  label: string;
+  value: Date;
+  showDivider: boolean;
+  onPress: () => void;
+  tokens: ReportTokens;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      android_ripple={{ color: `${PURPLE}33` }}
+      style={{ alignSelf: "stretch" }}
+    >
+      {({ pressed }) => (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            width: "100%",
+            minHeight: ROW_H,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: pressed ? tokens.cardHigh : "transparent",
+            borderTopWidth: showDivider ? StyleSheet.hairlineWidth : 0,
+            borderTopColor: tokens.border,
+          }}
+        >
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: `${PURPLE}22`,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 12,
+              flexShrink: 0,
+            }}
+          >
+            <Ionicons name="calendar-outline" size={22} color={PURPLE} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+            <Text style={{ color: tokens.muted, fontSize: 12, fontWeight: "600", marginBottom: 2 }}>{label}</Text>
+            <Text style={{ color: tokens.text, fontSize: 17, fontWeight: "700" }}>{localYmd(value)}</Text>
+          </View>
+          <View
+            style={{
+              width: 28,
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: "stretch",
+              flexShrink: 0,
+            }}
+          >
+            <Ionicons name="chevron-forward" size={22} color={tokens.muted} />
+          </View>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function ReportListRow({
+  rowKey,
+  label,
+  selected,
+  onPress,
+  tokens,
+}: {
+  rowKey: string;
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  tokens: ReportTokens;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      android_ripple={{ color: `${PURPLE}33` }}
+      style={{ alignSelf: "stretch" }}
+    >
+      {({ pressed }) => (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            width: "100%",
+            minHeight: ROW_H,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: pressed ? tokens.cardHigh : selected ? `${PURPLE}14` : "transparent",
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: tokens.border,
+          }}
+        >
+          <View style={{ width: 28, alignItems: "center", justifyContent: "center", marginRight: 12, flexShrink: 0 }}>
+            <Ionicons
+              key={`${rowKey}-sel-${selected ? 1 : 0}`}
+              name={selected ? "radio-button-on" : "radio-button-off"}
+              size={24}
+              color={selected ? PURPLE : tokens.muted}
+            />
+          </View>
+          <Text
+            style={{
+              color: tokens.text,
+              fontSize: 16,
+              fontWeight: selected ? "700" : "500",
+              flex: 1,
+              flexShrink: 1,
+            }}
+          >
+            {label}
+          </Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 export default function ReportScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -67,13 +247,15 @@ export default function ReportScreen() {
     }, [router]),
   );
 
-  const selectableLists = useMemo(
-    () => lists.filter((l) => /^\d+$/.test(String(l.id).trim())),
-    [lists],
-  );
+  const selectableLists = useMemo(() => {
+    return lists.filter((l) => {
+      const id = String(l.id).trim();
+      return /^\d+$/.test(id) || id === "private";
+    });
+  }, [lists]);
 
   const listNamePreview = useMemo(() => {
-    if (selectedListKey == null) return t("report.allLists");
+    if (selectedListKey === null) return t("report.allLists");
     const row = lists.find((l) => String(l.id).trim() === selectedListKey);
     return row ? displayExpenseListName(row.name, t) : t("report.allLists");
   }, [selectedListKey, lists, t]);
@@ -142,7 +324,7 @@ export default function ReportScreen() {
     setSending(true);
     try {
       const apiListId =
-        selectedListKey == null ? undefined : expenseListIdForApi(selectedListKey);
+        selectedListKey === null ? undefined : expenseListIdForApi(selectedListKey);
       const res = await sendExpenseReportEmail({
         start_date: start,
         end_date: end,
@@ -162,136 +344,6 @@ export default function ReportScreen() {
       setSending(false);
     }
   };
-
-  const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <View
-      style={{
-        backgroundColor: tokens.card,
-        borderRadius: 20,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: tokens.border,
-        paddingVertical: 4,
-        marginBottom: 16,
-        overflow: "hidden",
-      }}
-    >
-      <Text
-        style={{
-          color: tokens.muted,
-          fontSize: 11,
-          fontWeight: "800",
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          paddingHorizontal: 18,
-          paddingTop: 14,
-          paddingBottom: 10,
-        }}
-      >
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
-
-  const DateRow = ({ label, value, which, showDivider }: { label: string; value: Date; which: "start" | "end"; showDivider: boolean }) => (
-    <Pressable
-      onPress={() => openPicker(which)}
-      accessibilityRole="button"
-      android_ripple={{ color: `${PURPLE}33` }}
-      style={{ alignSelf: "stretch" }}
-    >
-      {({ pressed }) => (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            width: "100%",
-            minHeight: ROW_H,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            backgroundColor: pressed ? tokens.cardHigh : "transparent",
-            borderTopWidth: showDivider ? StyleSheet.hairlineWidth : 0,
-            borderTopColor: tokens.border,
-          }}
-        >
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: `${PURPLE}22`,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 12,
-              flexShrink: 0,
-            }}
-          >
-            <Ionicons name="calendar-outline" size={22} color={PURPLE} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-            <Text style={{ color: tokens.muted, fontSize: 12, fontWeight: "600", marginBottom: 2 }}>{label}</Text>
-            <Text style={{ color: tokens.text, fontSize: 17, fontWeight: "700" }}>{localYmd(value)}</Text>
-          </View>
-          <View
-            style={{
-              width: 28,
-              alignItems: "center",
-              justifyContent: "center",
-              alignSelf: "stretch",
-              flexShrink: 0,
-            }}
-          >
-            <Ionicons name="chevron-forward" size={22} color={tokens.muted} />
-          </View>
-        </View>
-      )}
-    </Pressable>
-  );
-
-  const ListRow = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      android_ripple={{ color: `${PURPLE}33` }}
-      style={{ alignSelf: "stretch" }}
-    >
-      {({ pressed }) => (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            width: "100%",
-            minHeight: ROW_H,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            backgroundColor: pressed ? tokens.cardHigh : selected ? `${PURPLE}14` : "transparent",
-            borderTopWidth: StyleSheet.hairlineWidth,
-            borderTopColor: tokens.border,
-          }}
-        >
-          <View style={{ width: 28, alignItems: "center", justifyContent: "center", marginRight: 12, flexShrink: 0 }}>
-            <Ionicons
-              name={selected ? "radio-button-on" : "radio-button-off"}
-              size={24}
-              color={selected ? PURPLE : tokens.muted}
-            />
-          </View>
-          <Text
-            style={{
-              color: tokens.text,
-              fontSize: 16,
-              fontWeight: selected ? "700" : "500",
-              flex: 1,
-              flexShrink: 1,
-            }}
-          >
-            {label}
-          </Text>
-        </View>
-      )}
-    </Pressable>
-  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: tokens.bg }} edges={["top", "left", "right", "bottom"]}>
@@ -364,29 +416,45 @@ export default function ReportScreen() {
           </View>
         </View>
 
-        <Card title={t("report.cardPeriod")}>
-          <DateRow label={t("report.startDate")} value={startDate} which="start" showDivider={false} />
-          <DateRow label={t("report.endDate")} value={endDate} which="end" showDivider />
-        </Card>
+        <ReportCard title={t("report.cardPeriod")} tokens={tokens}>
+          <ReportDateRow
+            label={t("report.startDate")}
+            value={startDate}
+            showDivider={false}
+            onPress={() => openPicker("start")}
+            tokens={tokens}
+          />
+          <ReportDateRow
+            label={t("report.endDate")}
+            value={endDate}
+            showDivider
+            onPress={() => openPicker("end")}
+            tokens={tokens}
+          />
+        </ReportCard>
 
-        <Card title={t("report.cardList")}>
-          <ListRow
+        <ReportCard title={t("report.cardList")} tokens={tokens}>
+          <ReportListRow
+            rowKey="list-all"
             label={t("report.allLists")}
-            selected={selectedListKey == null}
+            selected={selectedListKey === null}
             onPress={() => setSelectedListKey(null)}
+            tokens={tokens}
           />
           {selectableLists.map((l) => {
             const id = String(l.id).trim();
             return (
-              <ListRow
+              <ReportListRow
                 key={id}
+                rowKey={`list-${id}`}
                 label={displayExpenseListName(l.name, t)}
                 selected={selectedListKey === id}
                 onPress={() => setSelectedListKey(id)}
+                tokens={tokens}
               />
             );
           })}
-        </Card>
+        </ReportCard>
 
         <View
           style={{

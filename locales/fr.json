@@ -105,7 +105,9 @@
   "categoryDetail": {
     "notFound": "Catégorie introuvable.",
     "emptyPeriod": "Aucune transaction dans cette catégorie pour cette période.",
-    "showInList": "Afficher dans la liste"
+    "showInList": "Afficher dans la liste",
+    "totalCaption": "Total",
+    "clearCategoryFilter": "Fermer la catégorie"
   },
   "auth": {
     "missingFieldsTitle": "Champs manquants",
@@ -135,10 +137,32 @@
     "googleEnvMissing": "{{missing}} doit être défini dans .env (redémarrer Expo).",
     "googleSignInNotConfiguredBody": "La configuration n’a pas pu être chargée. Vérifiez EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID et les ID clients plateforme.",
     "googleProfileLoadFailedShort": "Impossible de charger le profil. Vérifiez EXPO_PUBLIC_API_BASE_URL et le backend.",
-    "googleSetupTitle": "Configuration Google"
+    "googleSetupTitle": "Configuration Google",
+    "forgotPasswordTitle": "Mot de passe oublié",
+    "forgotPasswordSubtitle": "Saisissez l’e-mail du compte. S’il existe, nous enverrons des instructions.",
+    "forgotPasswordSubmit": "Envoyer le lien",
+    "forgotPasswordSentTitle": "Vérifiez votre e-mail",
+    "forgotPasswordSentBody": "Si un compte existe pour cette adresse, un message avec un lien a été envoyé.",
+    "resetPasswordTitle": "Nouveau mot de passe",
+    "resetPasswordSubtitle": "Choisissez un nouveau mot de passe.",
+    "resetPasswordNewLabel": "Nouveau mot de passe",
+    "resetPasswordSubmit": "Enregistrer",
+    "resetPasswordMissingParams": "Lien invalide ou incomplet. Demandez-en un nouveau depuis la connexion.",
+    "resetPasswordSuccessTitle": "Mot de passe mis à jour",
+    "resetPasswordSuccessBody": "Vous pouvez vous connecter avec votre nouveau mot de passe.",
+    "changePasswordTitle": "Changer le mot de passe",
+    "changePasswordSetSubtitle": "Créez un mot de passe pour vous connecter par e-mail.",
+    "changePasswordCurrentLabel": "Mot de passe actuel",
+    "changePasswordNewLabel": "Nouveau mot de passe",
+    "changePasswordSubmit": "Mettre à jour",
+    "changePasswordSuccessTitle": "Enregistré",
+    "changePasswordSuccessBody": "Votre mot de passe a été mis à jour."
   },
   "settings": {
     "title": "Paramètres",
+    "changePassword": "Mot de passe",
+    "changePasswordSubtitle": "Modifier le mot de passe de connexion",
+    "changePasswordSubtitleSet": "Définir un mot de passe pour la connexion par e-mail",
     "appearance": "Apparence",
     "darkMode": "Mode sombre",
     "lightMode": "Mode clair",

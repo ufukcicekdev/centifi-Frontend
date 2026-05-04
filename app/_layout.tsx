@@ -37,12 +37,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = segments[0] === "(auth)";
     const onOnboarding = segments[1] === "onboarding";
+    const onPasswordReset = segments.includes("reset-password");
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
     } else if (isAuthenticated && !onboardingCompleted && !onOnboarding) {
       router.replace("/(auth)/onboarding");
-    } else if (isAuthenticated && onboardingCompleted && inAuthGroup) {
+    } else if (isAuthenticated && onboardingCompleted && inAuthGroup && !onPasswordReset) {
       router.replace("/(app)");
     }
   }, [sessionResolved, isAuthenticated, onboardingCompleted, segments, router]);

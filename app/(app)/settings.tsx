@@ -906,6 +906,17 @@ export default function Settings() {
             onPress={() => setShowProfileModal(true)}
             right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
           />
+          {isAuthenticated ? (
+            <SettingsRow
+              isDark={isDark}
+              icon="key-outline"
+              title={t("settings.changePassword")}
+              subtitle={user?.hasPassword ? t("settings.changePasswordSubtitle") : t("settings.changePasswordSubtitleSet")}
+              dividerTop
+              onPress={() => router.push("/(app)/change-password")}
+              right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+            />
+          ) : null}
           <SettingsRow
             isDark={isDark}
             icon="document-text-outline"

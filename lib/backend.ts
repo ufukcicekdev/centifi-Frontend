@@ -7,6 +7,8 @@ export type BackendUser = {
   email: string;
   first_name: string;
   last_name: string;
+  /** False for Apple/Google-only accounts until they set a password. */
+  has_password?: boolean;
   monthly_budget: string;
   language: string;
   /** ISO 4217 — preferred display currency for UI / budgets */
@@ -134,6 +136,31 @@ export async function updateMe(patch: Partial<BackendUser>) {
     auth: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
+  });
+}
+
+export async function requestPasswordReset(email: string) {
+  return apiFetch<{ detail: string }>("/api/users/password/forgot/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim() }),
+  });
+}
+
+export async function resetPasswordWithToken(body: { uid: string; token: string; new_password: string }) {
+  return apiFetch<{ detail: string }>("/api/users/password/reset/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function changePassword(body: { old_password?: string; new_password: string }) {
+  return apiFetch<{ detail: string }>("/api/users/password/change/", {
+    method: "POST",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 

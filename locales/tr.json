@@ -105,7 +105,9 @@
   "categoryDetail": {
     "notFound": "Kategori bulunamadı.",
     "emptyPeriod": "Bu dönemde bu kategoride işlem yok.",
-    "showInList": "Listede göster"
+    "showInList": "Listede göster",
+    "totalCaption": "Toplam",
+    "clearCategoryFilter": "Kategoriyi kapat"
   },
   "auth": {
     "missingFieldsTitle": "Eksik bilgi",
@@ -135,10 +137,32 @@
     "googleEnvMissing": "{{missing}} .env içinde tanımlı olmalı (Expo’yu yeniden başlatın).",
     "googleSignInNotConfiguredBody": "Yapılandırma yüklenemedi. EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ve platform client id’lerini kontrol edin.",
     "googleProfileLoadFailedShort": "Profil yüklenemedi. EXPO_PUBLIC_API_BASE_URL ve backend adresini kontrol edin.",
-    "googleSetupTitle": "Google yapılandırması"
+    "googleSetupTitle": "Google yapılandırması",
+    "forgotPasswordTitle": "Şifremi unuttum",
+    "forgotPasswordSubtitle": "Hesabınızdaki e-posta adresini girin. Kayıtlıysa sıfırlama bağlantısı gönderilir.",
+    "forgotPasswordSubmit": "Sıfırlama bağlantısı gönder",
+    "forgotPasswordSentTitle": "E-postanızı kontrol edin",
+    "forgotPasswordSentBody": "Bu adrese ait bir hesap varsa, yeni şifre belirlemeniz için bir bağlantı gönderdik.",
+    "resetPasswordTitle": "Yeni şifre",
+    "resetPasswordSubtitle": "Hesabınız için yeni bir şifre seçin.",
+    "resetPasswordNewLabel": "Yeni şifre",
+    "resetPasswordSubmit": "Şifreyi kaydet",
+    "resetPasswordMissingParams": "Bu sıfırlama bağlantısı geçersiz veya eksik. Giriş ekranından yeniden isteyin.",
+    "resetPasswordSuccessTitle": "Şifre güncellendi",
+    "resetPasswordSuccessBody": "Yeni şifrenizle giriş yapabilirsiniz.",
+    "changePasswordTitle": "Şifre değiştir",
+    "changePasswordSetSubtitle": "E-posta ile giriş için bir şifre oluşturun.",
+    "changePasswordCurrentLabel": "Mevcut şifre",
+    "changePasswordNewLabel": "Yeni şifre",
+    "changePasswordSubmit": "Şifreyi güncelle",
+    "changePasswordSuccessTitle": "Kaydedildi",
+    "changePasswordSuccessBody": "Şifreniz güncellendi."
   },
   "settings": {
     "title": "Ayarlar",
+    "changePassword": "Şifre",
+    "changePasswordSubtitle": "Giriş şifrenizi değiştirin",
+    "changePasswordSubtitleSet": "E-posta ile giriş için şifre belirleyin",
     "appearance": "Görünüm",
     "darkMode": "Koyu Mod",
     "lightMode": "Açık Mod",

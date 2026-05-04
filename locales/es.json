@@ -105,7 +105,9 @@
   "categoryDetail": {
     "notFound": "Categoría no encontrada.",
     "emptyPeriod": "No hay transacciones en esta categoría en este periodo.",
-    "showInList": "Mostrar en la lista"
+    "showInList": "Mostrar en la lista",
+    "totalCaption": "Total",
+    "clearCategoryFilter": "Cerrar categoría"
   },
   "auth": {
     "missingFieldsTitle": "Faltan datos",
@@ -135,10 +137,32 @@
     "googleEnvMissing": "{{missing}} debe estar en .env (reinicia Expo).",
     "googleSignInNotConfiguredBody": "No se pudo cargar la configuración. Revisa EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID y los IDs de cliente por plataforma.",
     "googleProfileLoadFailedShort": "No se pudo cargar el perfil. Revisa EXPO_PUBLIC_API_BASE_URL y el backend.",
-    "googleSetupTitle": "Configuración de Google"
+    "googleSetupTitle": "Configuración de Google",
+    "forgotPasswordTitle": "Olvidé mi contraseña",
+    "forgotPasswordSubtitle": "Introduce el correo de tu cuenta. Si existe, enviaremos instrucciones.",
+    "forgotPasswordSubmit": "Enviar enlace",
+    "forgotPasswordSentTitle": "Revisa tu correo",
+    "forgotPasswordSentBody": "Si existe una cuenta con esa dirección, enviamos un mensaje con un enlace.",
+    "resetPasswordTitle": "Nueva contraseña",
+    "resetPasswordSubtitle": "Elige una nueva contraseña.",
+    "resetPasswordNewLabel": "Nueva contraseña",
+    "resetPasswordSubmit": "Guardar contraseña",
+    "resetPasswordMissingParams": "Enlace inválido o incompleto. Solicita uno nuevo en el inicio de sesión.",
+    "resetPasswordSuccessTitle": "Contraseña actualizada",
+    "resetPasswordSuccessBody": "Puedes iniciar sesión con tu nueva contraseña.",
+    "changePasswordTitle": "Cambiar contraseña",
+    "changePasswordSetSubtitle": "Crea una contraseña para iniciar sesión con correo.",
+    "changePasswordCurrentLabel": "Contraseña actual",
+    "changePasswordNewLabel": "Nueva contraseña",
+    "changePasswordSubmit": "Actualizar contraseña",
+    "changePasswordSuccessTitle": "Guardado",
+    "changePasswordSuccessBody": "Tu contraseña se ha actualizado."
   },
   "settings": {
     "title": "Ajustes",
+    "changePassword": "Contraseña",
+    "changePasswordSubtitle": "Cambia tu contraseña de acceso",
+    "changePasswordSubtitleSet": "Define una contraseña para entrar con correo",
     "appearance": "Apariencia",
     "darkMode": "Modo oscuro",
     "lightMode": "Modo claro",

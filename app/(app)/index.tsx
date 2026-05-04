@@ -105,13 +105,6 @@ export default function Dashboard() {
   const { isRecording, startRecording, stopRecording } = useVoiceRecorder();
   const keyboardInset = useKeyboardInset();
 
-  /** Ayarlardan dönünce aynı throttle yüzünden ilk dokunuş yutulmasın */
-  useFocusEffect(
-    useCallback(() => {
-      clearRouterPushCooldown();
-    }, []),
-  );
-
   /** Yerel işlem listesi araması (AI yok) */
   const [transactionSearch, setTransactionSearch] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -130,6 +123,21 @@ export default function Dashboard() {
   const [txCategoryFilter, setTxCategoryFilter] = useState<string | null>(null);
   /** Üstteki Harcama / Gelir kutularından liste + grafik filtresi */
   const [txFlowFilter, setTxFlowFilter] = useState<TxFlowFilter>("all");
+
+  /** Ayarlardan dönünce throttle sıfırlama; ana sayfaya dönünce kategori liste filtresi temizlensin. */
+  useFocusEffect(
+    useCallback(() => {
+      clearRouterPushCooldown();
+      setTxCategoryFilter(null);
+    }, []),
+  );
+
+  const openCategoryDetail = useCallback(
+    (id: string | null) => {
+      if (id) throttledPush({ pathname: "/category/[id]", params: { id } });
+    },
+    [throttledPush],
+  );
 
   const bg = isDark ? "#0f0f0f" : "#f5f5f5";
   const cardBg = isDark ? "#1a1a1a" : "#fff";
@@ -535,10 +543,10 @@ export default function Dashboard() {
         </Text>
         <CategorySpendScroller
           categories={homeCats}
-          expenses={displayFiltered}
-          selectedCategoryId={txCategoryFilter}
-          onSelectCategory={setTxCategoryFilter}
-          onLongPressCategory={(id) => router.push({ pathname: "/category/[id]", params: { id } })}
+          expenses={flowFilteredExpenses}
+          selectedCategoryId={null}
+          onSelectCategory={openCategoryDetail}
+          onLongPressCategory={openCategoryDetail}
           isDark={isDark}
           currencySymbol={currencySymbol}
         />

@@ -50,6 +50,8 @@ export interface AuthUser {
   name: string;
   email: string;
   photo: string | null;
+  /** From ``/me`` — false for social-only accounts. */
+  hasPassword?: boolean;
 }
 
 /** Stable helper — use with useMemo in UI (avoid useStore(() => categoriesForHome()) infinite loops). */
@@ -286,7 +288,13 @@ export const useStore = create<AppState>((set, get) => {
 
       const patch: Partial<AppState> = {
         isAuthenticated: true,
-        user: { uid, name: displayName, email: me.email, photo: null },
+        user: {
+          uid,
+          name: displayName,
+          email: me.email,
+          photo: null,
+          hasPassword: !!me.has_password,
+        },
         userName: (displayName.split(" ")[0] ?? "User").trim() || "User",
         isDark: !!me.is_dark_mode,
         notificationsEnabled: !!me.notifications_enabled,

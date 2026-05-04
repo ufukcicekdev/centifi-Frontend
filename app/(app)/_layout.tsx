@@ -15,6 +15,7 @@ export default function AppLayout() {
     void import("./report");
     void import("./insights");
     void import("./subscribe");
+    void import("./change-password");
   }, []);
 
   return (
@@ -37,6 +38,7 @@ export default function AppLayout() {
       />
       <Stack.Screen name="processing" options={{ animation: "slide_from_bottom" }} />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="change-password" />
       <Stack.Screen name="subscribe" />
       <Stack.Screen name="report" />
       <Stack.Screen name="insights" />

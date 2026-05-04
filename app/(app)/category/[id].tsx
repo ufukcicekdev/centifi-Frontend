@@ -100,39 +100,29 @@ export default function CategoryDetailScreen() {
   const meta = getCategoryMeta(categoryId, customCategories, categoryDisplayOverrides);
   const existsOnHome = allowedIds.has(categoryId);
 
-  const baseFiltered = useMemo(() => {
+  /** Seçili ay + liste + bu kategori (gelir ve harcama birlikte). */
+  const inCategoryScope = useMemo(() => {
     let result = filterByPeriod(expenses, periodFilter);
     result = result.filter((e) => (!e.listId || e.listId === activeListId) && e.category === categoryId);
     return result;
   }, [expenses, periodFilter, activeListId, categoryId]);
 
   const filtered = useMemo(() => {
-    if (scopeFlow === "expense") return baseFiltered.filter((e) => !e.isIncome);
-    if (scopeFlow === "income") return baseFiltered.filter((e) => !!e.isIncome);
-    return baseFiltered;
-  }, [baseFiltered, scopeFlow]);
+    if (scopeFlow === "expense") return inCategoryScope.filter((e) => !e.isIncome);
+    if (scopeFlow === "income") return inCategoryScope.filter((e) => !!e.isIncome);
+    return inCategoryScope;
+  }, [inCategoryScope, scopeFlow]);
 
   const expenseSum = useMemo(
-    () => filtered.filter((e) => !e.isIncome).reduce((s, e) => s + e.amount, 0),
-    [filtered],
+    () => inCategoryScope.filter((e) => !e.isIncome).reduce((s, e) => s + e.amount, 0),
+    [inCategoryScope],
   );
   const incomeSum = useMemo(
-    () => filtered.filter((e) => e.isIncome).reduce((s, e) => s + e.amount, 0),
-    [filtered],
+    () => inCategoryScope.filter((e) => e.isIncome).reduce((s, e) => s + e.amount, 0),
+    [inCategoryScope],
   );
   const net = incomeSum - expenseSum;
-
-  const displayAmount = useMemo(() => {
-    if (scopeFlow === "all") return Math.abs(net);
-    if (scopeFlow === "expense") return expenseSum;
-    return incomeSum;
-  }, [scopeFlow, net, expenseSum, incomeSum]);
-
-  const highlightIncome = useMemo(() => {
-    if (scopeFlow === "income") return true;
-    if (scopeFlow === "expense") return false;
-    return net >= 0;
-  }, [scopeFlow, net]);
+  const netAccent = net >= 0 ? INCOME_GREEN : CORAL;
 
   const grouped = useMemo(() => groupByDate(filtered), [filtered]);
 
@@ -141,9 +131,7 @@ export default function CategoryDetailScreen() {
 
   const fmt = (n: number) => formatAmountDigits(n, lang);
   const currencySuffix = currencySymbolFor(displayCurrency, lang);
-  const amtColor = highlightIncome ? INCOME_GREEN : CORAL;
-  const stepperBg = isDark ? "#2c2c2e" : "#e8e8ec";
-  const segPad = { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 } as const;
+  const chipBg = isDark ? "#2a2a2e" : "#ececf2";
 
   if (!categoryId || !existsOnHome) {
     return (
@@ -181,16 +169,88 @@ export default function CategoryDetailScreen() {
             paddingBottom: 130,
           }}
         >
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: 14 }}>
+            <Text style={{ color: mutedColor, fontSize: 13, marginBottom: -4 }}>{t("categoryDetail.totalCaption")}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: netAccent,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 10,
+                }}
+              >
+                <Ionicons name={net >= 0 ? "add" : "remove"} size={18} color={net >= 0 ? "#0f0f0f" : "#fff"} />
+              </View>
+              <Text style={{ color: netAccent, fontSize: 40, fontWeight: "800", letterSpacing: -0.5 }} numberOfLines={1}>
+                {fmt(net)}
+              </Text>
+              <Text style={{ color: textColor, fontSize: 22, fontWeight: "700", marginLeft: 6 }}>{currencySuffix}</Text>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  paddingHorizontal: 12,
+                  borderRadius: 18,
+                  backgroundColor: isDark ? "#252528" : "#ececf0",
+                }}
+              >
+                <Text style={{ color: mutedColor, fontSize: 11, marginBottom: 4 }}>{t("dashboard.spendingTileLabel")}</Text>
+                <Text style={{ color: textColor, fontSize: 15, fontWeight: "700" }}>
+                  − {fmt(expenseSum)} {currencySuffix}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  paddingHorizontal: 12,
+                  borderRadius: 18,
+                  backgroundColor: isDark ? "#252528" : "#ececf0",
+                }}
+              >
+                <Text style={{ color: mutedColor, fontSize: 11, marginBottom: 4 }}>{t("dashboard.incomeTileLabel")}</Text>
+                <Text
+                  style={{
+                    color: incomeSum > 0 ? INCOME_GREEN : mutedColor,
+                    fontSize: 15,
+                    fontWeight: "700",
+                  }}
+                >
+                  + {fmt(incomeSum)} {currencySuffix}
+                </Text>
+              </View>
+            </View>
+
             <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+              <Pressable
+                onPress={() => router.back()}
+                accessibilityRole="button"
+                accessibilityLabel={t("categoryDetail.clearCategoryFilter")}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: chipBg,
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                }}
+              >
+                <Text style={{ color: mutedColor, fontSize: 15, fontWeight: "700" }}>×</Text>
+                <Text style={{ fontSize: 16 }}>{meta.emoji}</Text>
+                <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
+                  {meta.name}
+                </Text>
+              </Pressable>
               <Pressable onPress={() => setMonthModalOpen(true)} style={pillStyle}>
                 <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>{periodLabel}</Text>
-                <Ionicons name="chevron-down" size={14} color={mutedColor} />
-              </Pressable>
-              <Pressable onPress={() => setScopeModalOpen(true)} style={pillStyle}>
-                <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
-                  {scopeLabels[scopeFlow]}
-                </Text>
                 <Ionicons name="chevron-down" size={14} color={mutedColor} />
               </Pressable>
               <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
@@ -202,89 +262,9 @@ export default function CategoryDetailScreen() {
               </Pressable>
             </View>
 
-            <Text style={{ color: textColor, fontSize: 28, fontWeight: "700", paddingVertical: 6 }}>
-              {meta.name}
-            </Text>
-
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: stepperBg,
-                borderRadius: 16,
-                paddingVertical: 8,
-                paddingHorizontal: 8,
-                gap: 6,
-              }}
-            >
-              <Pressable
-                onPress={() => setScopeFlow("expense")}
-                accessibilityRole="button"
-                style={{
-                  ...segPad,
-                  backgroundColor: !highlightIncome ? (isDark ? "#3a2528" : "#ffe8e8") : "transparent",
-                  borderWidth: !highlightIncome ? 1.5 : 0,
-                  borderColor: !highlightIncome ? CORAL : "transparent",
-                }}
-              >
-                <Text style={{ color: CORAL, fontSize: 22, fontWeight: "700", textAlign: "center" }}>−</Text>
-              </Pressable>
-              <Text
-                style={{
-                  flex: 1,
-                  color: amtColor,
-                  fontSize: 32,
-                  fontWeight: "700",
-                  textAlign: "center",
-                  paddingVertical: 6,
-                  minWidth: 80,
-                }}
-              >
-                {fmt(displayAmount)}
-              </Text>
-              <Text style={{ color: mutedColor, fontSize: 17, fontWeight: "600" }}>{currencySuffix}</Text>
-              <Pressable
-                onPress={() => setScopeFlow("income")}
-                accessibilityRole="button"
-                style={{
-                  ...segPad,
-                  backgroundColor: highlightIncome ? (isDark ? "#1e3329" : "#e8faf3") : "transparent",
-                  borderWidth: highlightIncome ? 1.5 : 0,
-                  borderColor: highlightIncome ? INCOME_GREEN : "transparent",
-                }}
-              >
-                <Text
-                  style={{
-                    color: highlightIncome ? INCOME_GREEN : mutedColor,
-                    fontSize: 22,
-                    fontWeight: "700",
-                    textAlign: "center",
-                  }}
-                >
-                  +
-                </Text>
-              </Pressable>
-            </View>
-
-            <Pressable
-              onPress={() => throttledPush("/(app)/settings")}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                alignSelf: "flex-start",
-                gap: 10,
-                paddingHorizontal: 18,
-                paddingVertical: 12,
-                borderRadius: 22,
-                marginTop: 4,
-                borderWidth: 1,
-                borderColor: isDark ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.18)",
-                backgroundColor: "transparent",
-              }}
-            >
-              <Text style={{ fontSize: 22 }}>{meta.emoji}</Text>
-              <Text style={{ color: textColor, fontSize: 15, fontWeight: "600" }}>{meta.name}</Text>
-              <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+            <Pressable onPress={() => setScopeModalOpen(true)} style={[pillStyle, { alignSelf: "flex-start" }]}>
+              <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>{scopeLabels[scopeFlow]}</Text>
+              <Ionicons name="chevron-down" size={14} color={mutedColor} />
             </Pressable>
           </View>
 

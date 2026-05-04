@@ -374,8 +374,12 @@ export default function Login() {
                   </Pressable>
                 </View>
 
-                <Pressable style={{ alignSelf: "flex-end", marginBottom: 20 }} hitSlop={8}>
-                  <Text style={{ color: PRIMARY, fontSize: 13, fontWeight: "600" }}>Forgot password?</Text>
+                <Pressable
+                  onPress={() => router.push("/(auth)/forgot-password")}
+                  style={{ alignSelf: "flex-end", marginBottom: 20 }}
+                  hitSlop={8}
+                >
+                  <Text style={{ color: PRIMARY, fontSize: 13, fontWeight: "600" }}>{t("auth.forgotPasswordTitle")}</Text>
                 </Pressable>
 
                 <Pressable

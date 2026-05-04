@@ -105,7 +105,9 @@
   "categoryDetail": {
     "notFound": "Kategorie nicht gefunden.",
     "emptyPeriod": "Keine Buchungen in dieser Kategorie für diesen Zeitraum.",
-    "showInList": "In Liste anzeigen"
+    "showInList": "In Liste anzeigen",
+    "totalCaption": "Gesamt",
+    "clearCategoryFilter": "Kategorie schließen"
   },
   "auth": {
     "missingFieldsTitle": "Felder fehlen",
@@ -135,10 +137,32 @@
     "googleEnvMissing": "{{missing}} muss in .env gesetzt sein (Expo neu starten).",
     "googleSignInNotConfiguredBody": "Konfiguration konnte nicht geladen werden. Prüfen Sie EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID und die Plattform-Client-IDs.",
     "googleProfileLoadFailedShort": "Profil konnte nicht geladen werden. Prüfen Sie EXPO_PUBLIC_API_BASE_URL und das Backend.",
-    "googleSetupTitle": "Google-Einrichtung"
+    "googleSetupTitle": "Google-Einrichtung",
+    "forgotPasswordTitle": "Passwort vergessen",
+    "forgotPasswordSubtitle": "Geben Sie die E-Mail Ihres Kontos ein. Wenn sie existiert, senden wir Anweisungen.",
+    "forgotPasswordSubmit": "Link senden",
+    "forgotPasswordSentTitle": "E-Mail prüfen",
+    "forgotPasswordSentBody": "Wenn ein Konto mit dieser Adresse existiert, haben wir eine Nachricht mit einem Link gesendet.",
+    "resetPasswordTitle": "Neues Passwort",
+    "resetPasswordSubtitle": "Wählen Sie ein neues Passwort.",
+    "resetPasswordNewLabel": "Neues Passwort",
+    "resetPasswordSubmit": "Passwort speichern",
+    "resetPasswordMissingParams": "Ungültiger oder unvollständiger Link. Fordern Sie ihn auf dem Login-Bildschirm erneut an.",
+    "resetPasswordSuccessTitle": "Passwort aktualisiert",
+    "resetPasswordSuccessBody": "Sie können sich mit dem neuen Passwort anmelden.",
+    "changePasswordTitle": "Passwort ändern",
+    "changePasswordSetSubtitle": "Legen Sie ein Passwort fest, um sich per E-Mail anzumelden.",
+    "changePasswordCurrentLabel": "Aktuelles Passwort",
+    "changePasswordNewLabel": "Neues Passwort",
+    "changePasswordSubmit": "Passwort aktualisieren",
+    "changePasswordSuccessTitle": "Gespeichert",
+    "changePasswordSuccessBody": "Ihr Passwort wurde aktualisiert."
   },
   "settings": {
     "title": "Einstellungen",
+    "changePassword": "Passwort",
+    "changePasswordSubtitle": "Anmeldepasswort ändern",
+    "changePasswordSubtitleSet": "Passwort für E-Mail-Anmeldung festlegen",
     "appearance": "Darstellung",
     "darkMode": "Dunkelmodus",
     "lightMode": "Hellmodus",
