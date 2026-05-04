@@ -7,6 +7,7 @@ import {
   ScrollView,
   Animated,
   Platform,
+  Keyboard,
   TextInput,
   StyleSheet,
   ActivityIndicator,
@@ -235,29 +236,24 @@ export default function Dashboard() {
 
   const openSearchBar = useCallback(() => {
     setFabMenuOpen(false);
+    searchAnim.setValue(0);
     setShowSearchBar(true);
     Animated.spring(searchAnim, {
       toValue: 1,
       useNativeDriver: true,
-      tension: 80,
-      friction: 10,
+      tension: 120,
+      friction: 14,
     }).start();
-    setTimeout(() => searchInputRef.current?.focus(), 120);
+    setTimeout(() => searchInputRef.current?.focus(), 80);
   }, [searchAnim]);
 
+  /** Kapanışta layout’u animasyon sonuna bağlama — kategori şeridi / padding / toplamlar hemen dönsün (akıcılık). */
   const closeSearchBar = useCallback(() => {
     setFabMenuOpen(false);
-    Animated.spring(searchAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 80,
-      friction: 10,
-    }).start(({ finished }) => {
-      if (finished) {
-        setShowSearchBar(false);
-        setTransactionSearch("");
-      }
-    });
+    Keyboard.dismiss();
+    searchAnim.setValue(0);
+    setTransactionSearch("");
+    setShowSearchBar(false);
   }, [searchAnim]);
 
   const toggleSearchBar = useCallback(() => {

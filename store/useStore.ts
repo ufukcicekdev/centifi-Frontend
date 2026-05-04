@@ -583,7 +583,13 @@ export const useStore = create<AppState>((set, get) => {
   setDisplayCurrency: (code) => {
     const u = String(code).toUpperCase().trim();
     if (!/^[A-Z]{3}$/.test(u)) return;
-    set({ displayCurrency: u });
+    set((state) => {
+      if (state.displayCurrency === u) return state;
+      return {
+        displayCurrency: u,
+        expenses: state.expenses.map((e) => ({ ...e, currency: u })),
+      };
+    });
     void saveDisplayCurrency(u);
     if (get().isAuthenticated) {
       void updateMe({ display_currency: u }).catch(() => {});
