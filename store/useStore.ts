@@ -366,10 +366,16 @@ export const useStore = create<AppState>((set, get) => {
         patch.customCategories = catsResp.results.map(mapUserCustomCategoryDto);
       }
 
-      patch.bankAutomations = [
-        ...PRESET_BANK_AUTOMATIONS,
-        ...(banksResp?.results ?? []).map(mapUserBankAppDto),
-      ];
+      {
+        const merged = [...PRESET_BANK_AUTOMATIONS];
+        for (const dto of banksResp?.results ?? []) {
+          const row = mapUserBankAppDto(dto);
+          const idx = merged.findIndex((x) => x.packageName === row.packageName);
+          if (idx >= 0) merged[idx] = row;
+          else merged.push(row);
+        }
+        patch.bankAutomations = merged;
+      }
 
       set(patch);
       try {
@@ -779,7 +785,47 @@ export const useStore = create<AppState>((set, get) => {
       ),
     }));
     const apiId = parseUserBankAppApiId(id);
-    if (apiId == null || !get().isAuthenticated) return;
+    if (!get().isAuthenticated) return;
+
+    // Preset rows (e.g. Google Wallet / Play) have non-API ids; persist by creating a user row on first enable.
+    if (apiId == null) {
+      if (!nextEnabled) return;
+      try {
+        const dto = await createUserBankApp({
+          name: cur.name,
+          emoji: cur.emoji,
+          store_url: cur.storeUrl,
+          package_name: cur.packageName,
+          enabled: true,
+          ...(cur.iconUrl?.trim() ? { icon_url: cur.iconUrl.trim() } : {}),
+        });
+        const row = mapUserBankAppDto(dto);
+        set((state) => ({
+          bankAutomations: state.bankAutomations.map((b) => (b.id === id ? row : b)),
+        }));
+        return;
+      } catch {
+        // If already exists (unique package), find it and patch.
+        try {
+          const list = await listUserBankApps();
+          const hit = list.results?.find((x) => x.package_name === cur.packageName);
+          if (!hit) return;
+          await patchUserBankApp(hit.id, { enabled: true });
+          const row = mapUserBankAppDto({ ...hit, enabled: true } as any);
+          set((state) => ({
+            bankAutomations: state.bankAutomations.map((b) => (b.id === id ? row : b)),
+          }));
+        } catch {
+          set((state) => ({
+            bankAutomations: state.bankAutomations.map((row) =>
+              row.id === id ? { ...row, enabled: cur.enabled } : row,
+            ),
+          }));
+        }
+        return;
+      }
+    }
+
     try {
       await patchUserBankApp(apiId, { enabled: nextEnabled });
     } catch {

@@ -866,7 +866,8 @@ export default function Settings() {
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        /** Android: `adjustResize` already handles keyboard; this wrapper can cause scroll jitter. */
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
       <View
@@ -896,9 +897,12 @@ export default function Settings() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: 48 }}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
+        /** Android: auto keyboard insets can cause “shaky” layout while scrolling. */
+        contentContainerStyle={{
+          paddingHorizontal: GUTTER,
+          paddingBottom: 24 + Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0),
+        }}
       >
 
         {/* ACCOUNT */}
