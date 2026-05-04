@@ -3,7 +3,7 @@ import "../i18n";
 import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, AppState, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
@@ -86,6 +86,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     void useStore.getState().hydrateDisplayCurrency();
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") {
+        void useStore.getState().syncNotificationsWithOsPermission();
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   return (

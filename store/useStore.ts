@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { Platform } from "react-native";
 import {
   Expense, MOCK_EXPENSES, MONTHLY_BUDGET,
   CustomCategory, BUILTIN_CATEGORIES,
@@ -144,6 +145,8 @@ interface AppState {
   // Notifications
   notificationsEnabled: boolean;
   setNotificationsEnabled: (v: boolean) => void;
+  /** OS bildirim izni yoksa anahtarı kapatır ve sunucuya yansıtır — anahtar ile gerçek durum uyumlu kalsın. */
+  syncNotificationsWithOsPermission: () => Promise<void>;
 
   // Custom categories
   customCategories: CustomCategory[];
@@ -382,6 +385,7 @@ export const useStore = create<AppState>((set, get) => {
       }
       queueBudgetThresholdCheck(get);
       void get().hydratePendingBankTransactions().catch(() => {});
+      void get().syncNotificationsWithOsPermission();
       return "ok";
     } catch (e: unknown) {
       const status = getApiErrorStatus(e);
@@ -595,6 +599,23 @@ export const useStore = create<AppState>((set, get) => {
     }
     if (v) {
       queueBudgetThresholdCheck(get);
+    }
+  },
+
+  syncNotificationsWithOsPermission: async () => {
+    if (Platform.OS === "web") return;
+    let denied = false;
+    try {
+      const { isOsNotificationPermissionExplicitlyDenied } = await import("../lib/localNotifications");
+      denied = await isOsNotificationPermissionExplicitlyDenied();
+    } catch {
+      return;
+    }
+    if (!denied) return;
+    if (!get().notificationsEnabled) return;
+    set({ notificationsEnabled: false });
+    if (get().isAuthenticated) {
+      void updateMe({ notifications_enabled: false }).catch(() => {});
     }
   },
 

@@ -560,7 +560,14 @@ export default function Settings() {
     }, []),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      void useStore.getState().syncNotificationsWithOsPermission();
+    }, []),
+  );
+
   const [bankListenerOn, setBankListenerOn] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;

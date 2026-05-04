@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -32,7 +33,7 @@ internal object BankPendingSystemNotification {
     nm.createNotificationChannel(ch)
   }
 
-  fun maybeShow(context: Context, bankTitle: String, bankBody: String) {
+  fun maybeShow(context: Context, bankTitle: String, bankBody: String, pendingId: String) {
     if (!BankNotifPrefs.systemNotificationEnabled(context)) return
     val nm = NotificationManagerCompat.from(context)
     if (!nm.areNotificationsEnabled()) return
@@ -40,9 +41,17 @@ internal object BankPendingSystemNotification {
     val ctx = context.applicationContext
     ensureChannel(ctx)
 
-    val intent = Intent(ctx, MainActivity::class.java).apply {
-      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-    }
+    // Deep link — JS (expo-router) bekleyen satıra /add ile gider; tek MainActivity açmaktan farklı.
+    val deepLink =
+      Uri.Builder()
+        .scheme("centifi")
+        .authority("bank-pending")
+        .appendQueryParameter("id", pendingId)
+        .build()
+    val intent =
+      Intent(Intent.ACTION_VIEW, deepLink, ctx, MainActivity::class.java).apply {
+        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      }
     val piFlags =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -50,7 +59,8 @@ internal object BankPendingSystemNotification {
         @Suppress("DEPRECATION")
         PendingIntent.FLAG_UPDATE_CURRENT
       }
-    val pendingIntent = PendingIntent.getActivity(ctx, 0, intent, piFlags)
+    val requestCode = pendingId.hashCode() and 0x7fff_ffff
+    val pendingIntent = PendingIntent.getActivity(ctx, requestCode, intent, piFlags)
 
     val appName = ctx.getString(R.string.app_name)
     val combined = buildString {

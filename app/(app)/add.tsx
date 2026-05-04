@@ -166,6 +166,7 @@ export default function AddExpense() {
     displayCurrency,
     addCategory,
     categoryDisplayOverrides,
+    pendingBankTransactions,
   } = useStore();
 
   const activeList = lists.find((l) => l.id === activeListId);
@@ -204,6 +205,17 @@ export default function AddExpense() {
     if (!pre) return;
     setDescription((d) => (d.trim() ? d : pre));
   }, [bankPrefillParam]);
+
+  /** Bildirim deep link’i yalnızca pendingId taşıyorsa metni kuyruktan doldur (dashboard ile aynı). */
+  useEffect(() => {
+    if (!pendingIdParam) return;
+    if (bankPrefillParam?.trim()) return;
+    const row = pendingBankTransactions.find((p) => p.id === pendingIdParam);
+    if (!row) return;
+    const desc = [row.title, row.body].filter(Boolean).join(" · ").slice(0, 450);
+    if (!desc) return;
+    setDescription((d) => (d.trim() ? d : desc));
+  }, [pendingIdParam, bankPrefillParam, pendingBankTransactions]);
 
   const lang = language as Language;
   const recLabels = REC_LABELS[lang];

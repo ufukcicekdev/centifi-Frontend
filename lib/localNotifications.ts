@@ -70,6 +70,19 @@ export async function ensureLocalNotificationPermissions(): Promise<boolean> {
   return isPermissionGranted(req);
 }
 
+/**
+ * Kullanıcı izni reddetti / kapattı — henüz sorulmadıysa (`undetermined`) false döner;
+ * uygulama içi anahtarı buna göre kapatmayız.
+ */
+export async function isOsNotificationPermissionExplicitlyDenied(): Promise<boolean> {
+  if (Platform.OS === "web") return false;
+  ensureHandler();
+  const p = await Notifications.getPermissionsAsync();
+  if (isPermissionGranted(p)) return false;
+  const s = String((p as { status?: string }).status ?? "").toLowerCase();
+  return s === "denied" || s === "blocked";
+}
+
 function isPermissionGranted(p: unknown): boolean {
   const o = p as { granted?: boolean; status?: string };
   if (typeof o.granted === "boolean") return o.granted;

@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
 import i18n from "../i18n";
+import Button from "../components/ui/Button";
 
 const PURPLE = "#6C63FF";
 const DESTRUCTIVE = "#FF453A";
@@ -187,61 +188,50 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
                   </ScrollView>
                 : null}
 
-                {payload?.kind === "alert" ?
-                  <Pressable
+                {payload?.kind === "alert" ? (
+                  <Button
+                    title={String(i18n.t("common.ok"))}
                     onPress={hideAlert}
-                    style={({ pressed }) => [
-                      styles.singleButton,
-                      {
-                        backgroundColor: theme.secondaryBtnBg,
-                        borderColor: theme.secondaryBtnBorder,
-                        opacity: pressed ? 0.88 : 1,
-                      },
-                    ]}
-                    accessibilityRole="button"
+                    variant="secondary"
+                    fullWidth
+                    size="md"
+                    style={{
+                      backgroundColor: theme.secondaryBtnBg,
+                      borderColor: theme.secondaryBtnBorder,
+                      borderWidth: 1,
+                    }}
+                    labelStyle={{ color: theme.secondaryBtnLabel, fontWeight: "800" }}
                     accessibilityLabel={String(i18n.t("common.ok"))}
-                  >
-                    <Text style={[styles.singleButtonLabel, { color: theme.secondaryBtnLabel }]}>
-                      {String(i18n.t("common.ok"))}
-                    </Text>
-                  </Pressable>
-                : payload?.kind === "confirm" ?
+                  />
+                ) : payload?.kind === "confirm" ? (
                   <View style={styles.confirmRow}>
-                    <Pressable
-                      onPress={() => finishConfirm(false)}
-                      style={({ pressed }) => [
-                        styles.confirmBtn,
-                        styles.confirmBtnSecondary,
-                        {
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        title={payload.cancelText}
+                        onPress={() => finishConfirm(false)}
+                        variant="secondary"
+                        size="md"
+                        fullWidth
+                        style={{
                           backgroundColor: theme.secondaryBtnBg,
                           borderColor: theme.secondaryBtnBorder,
-                          opacity: pressed ? 0.88 : 1,
-                        },
-                      ]}
-                      accessibilityRole="button"
-                    >
-                      <Text
-                        style={[styles.confirmBtnLabelSecondary, { color: theme.secondaryBtnLabel }]}
-                        numberOfLines={2}
-                      >
-                        {payload.cancelText}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => finishConfirm(true)}
-                      style={({ pressed }) => [
-                        styles.confirmBtn,
-                        styles.confirmBtnPrimary,
-                        { backgroundColor: confirmBg, opacity: pressed ? 0.9 : 1 },
-                      ]}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.confirmBtnLabelPrimary} numberOfLines={2}>
-                        {payload.confirmText}
-                      </Text>
-                    </Pressable>
+                          borderWidth: 1,
+                        }}
+                        labelStyle={{ color: theme.secondaryBtnLabel, fontWeight: "800" }}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        title={payload.confirmText}
+                        onPress={() => finishConfirm(true)}
+                        variant={payload.destructive ? "destructive" : "primary"}
+                        size="md"
+                        fullWidth
+                        style={{ backgroundColor: confirmBg }}
+                      />
+                    </View>
                   </View>
-                : null}
+                ) : null}
               </View>
             </View>
           </View>

@@ -71,7 +71,8 @@ function emitBudgetAlertOrSchedule(
       title: payload.title,
       body: payload.body,
     });
-    return Promise.resolve();
+    // Ön plandayken de yerel bildirim zamanla: gölge / bildirim geçmişi ve izin kontrolü için.
+    // (Yalnızca diyalog kullanılırsa sistem “Bildirimler” ekranında hiçbir şey görünmez.)
   }
   return presentLocalNotificationIfEnabled(notificationsEnabled, payload);
 }

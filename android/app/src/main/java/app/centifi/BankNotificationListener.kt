@@ -36,7 +36,7 @@ class BankNotificationListener : NotificationListenerService() {
         put("createdAtMs", now)
       }
     if (BankNotifPrefs.appendToQueue(ctx, json)) {
-      BankPendingSystemNotification.maybeShow(ctx, title, body)
+      BankPendingSystemNotification.maybeShow(ctx, title, body, id)
     }
   }
 }

@@ -24,6 +24,7 @@ import { useAppDialog } from "../../context/AppDialogContext";
 import { isValidEmail } from "../../lib/isValidEmail";
 import CentifiLogo from "../../components/CentifiLogo";
 import GoogleSignInButton from "../../components/GoogleSignInButton";
+import Button from "../../components/ui/Button";
 import Svg, { Path } from "react-native-svg";
 
 // Design tokens (dark-only, matching HTML)
@@ -388,36 +389,25 @@ export default function Login() {
                   <Text style={{ color: PRIMARY, fontSize: 13, fontWeight: "600" }}>{t("auth.forgotPasswordTitle")}</Text>
                 </Pressable>
 
-                <Pressable
+                <Button
+                  title="Sign In"
                   onPress={handleEmailLogin}
-                  disabled={loading}
-                  style={({ pressed }) => ({
-                    width: "100%",
-                    minHeight: SOCIAL_BTN_HEIGHT,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 14,
-                    paddingVertical: 14,
-                    paddingHorizontal: 20,
+                  loading={loading}
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  right={<Ionicons name="arrow-forward" size={18} color={CTA_TEXT} />}
+                  style={{
                     backgroundColor: CTA_FILL,
                     shadowColor: CTA_FILL,
                     shadowOffset: { width: 0, height: 6 },
                     shadowOpacity: 0.35,
                     shadowRadius: 12,
                     elevation: 8,
-                    opacity: pressed || loading ? 0.88 : 1,
-                  })}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={CTA_TEXT} />
-                  ) : (
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={{ color: CTA_TEXT, fontSize: 16, fontWeight: "800" }}>Sign In</Text>
-                      <Ionicons name="arrow-forward" size={18} color={CTA_TEXT} style={{ marginLeft: 10 }} />
-                    </View>
-                  )}
-                </Pressable>
+                    borderWidth: 0,
+                  }}
+                  labelStyle={{ color: CTA_TEXT, fontSize: 16, fontWeight: "800" }}
+                />
               </View>
             </>
           )}
