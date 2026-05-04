@@ -90,20 +90,48 @@ export function formatDayNetTotal(total: number, lang: Language, currency: strin
   return formatMoneyAmount(0, lang, cur);
 }
 
-export function groupByDate(expenses: Expense[]): { label: string; items: Expense[]; total: number }[] {
+function localYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseYmdAtNoon(ymd: string): Date {
+  const [y, mo, day] = ymd.split("-").map((x) => parseInt(x, 10));
+  return new Date(y || 1970, (mo || 1) - 1, day || 1, 12, 0, 0, 0);
+}
+
+export type GroupByDateLabels = {
+  lang: Language;
+  today: string;
+  yesterday: string;
+};
+
+export function groupByDate(
+  expenses: Expense[],
+  labels: GroupByDateLabels,
+): { label: string; items: Expense[]; total: number }[] {
   const map = new Map<string, Expense[]>();
   expenses.forEach((e) => {
     const list = map.get(e.date) ?? [];
     list.push(e);
     map.set(e.date, list);
   });
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const now = new Date();
+  const todayStr = localYmd(now);
+  const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yesterdayStr = localYmd(yd);
+  const locale = LOCALE_MAP[labels.lang];
   return Array.from(map.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([date, items]) => {
-      const label = date === today ? "Today" : date === yesterday ? "Yesterday"
-        : new Date(date).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+      const label =
+        date === todayStr
+          ? labels.today
+          : date === yesterdayStr
+            ? labels.yesterday
+            : new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" }).format(parseYmdAtNoon(date));
       return {
         label,
         items,

@@ -22,7 +22,7 @@ import MonthPickerModal from "../../../components/MonthPickerModal";
 import ExpenseTxRow from "../../../components/ExpenseTxRow";
 import { getCategoryMeta } from "../../../constants/mockData";
 import type { Language } from "../../../i18n";
-import { useThrottledRouter } from "../../../hooks/useThrottledRouter";
+import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useTranslation } from "react-i18next";
 import { displayExpenseListName } from "../../../lib/listDisplayName";
 import { currencySymbolFor, formatAmountDigits } from "../../../lib/formatMoney";
@@ -124,7 +124,15 @@ export default function CategoryDetailScreen() {
   const net = incomeSum - expenseSum;
   const netAccent = net >= 0 ? INCOME_GREEN : CORAL;
 
-  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+  const grouped = useMemo(
+    () =>
+      groupByDate(filtered, {
+        lang,
+        today: t("common.today"),
+        yesterday: t("common.yesterday"),
+      }),
+    [filtered, lang, t],
+  );
 
   const activeList = lists.find((l) => l.id === activeListId);
   const periodLabel = formatPeriodPillLabel(periodFilter, language);
@@ -348,7 +356,7 @@ export default function CategoryDetailScreen() {
           </Pressable>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
             <Pressable
-              onPress={() => throttledPush("/(app)/settings")}
+              onPress={() => navigateToSettings(router)}
               style={{
                 width: 48,
                 height: 48,
@@ -397,7 +405,7 @@ export default function CategoryDetailScreen() {
         activeListId={activeListId}
         onSelectList={setActiveList}
         onAddList={addList}
-        onEditLists={() => throttledPush("/(app)/settings")}
+        onEditLists={() => navigateToSettings(router)}
         isDark={isDark}
         language={language}
       />

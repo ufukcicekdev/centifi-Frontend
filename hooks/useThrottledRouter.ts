@@ -1,6 +1,13 @@
 import { useRouter, type Href } from "expo-router";
 import { useCallback } from "react";
 
+/** Stack’te zaten varsa tekrar push etmez; throttle ile “tıklanmadı / iki kere açıldı” dengesizliğini önler. */
+export const SETTINGS_HREF = "/(app)/settings" as const;
+
+export function navigateToSettings(router: { navigate: (href: Href) => void }): void {
+  router.navigate(SETTINGS_HREF);
+}
+
 /**
  * Çift dokunuş / hızlı ardışık aynı hedef için `router.push` tekrarını önlemek için.
  * Referans hook içinde `useRef` ile tutulunca bileşen remount olduğunda (Strict Mode dahil)
@@ -26,7 +33,7 @@ export function clearRouterPushCooldown(): void {
 
 /**
  * Aynı `href`'e cooldown süresinde ikinci bir push yapılmaz (çift dokunuş / çift stack önlenir).
- * Settings için bypass kullanma: iki kez ayarlar sayfası açılmasına yol açıyordu.
+ * Ayarlar için `navigateToSettings(router)` kullan; `push` + throttle yavaş geçişte çift açılım / yutulan tıklama yapabiliyor.
  */
 export function useThrottledRouter(cooldownMs = 420) {
   const router = useRouter();

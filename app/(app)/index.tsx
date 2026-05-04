@@ -22,7 +22,11 @@ import * as ImagePicker from "expo-image-picker";
 import { buildCategoriesForHome, useStore } from "../../store/useStore";
 import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
-import { useThrottledRouter, clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
+import {
+  useThrottledRouter,
+  clearRouterPushCooldown,
+  navigateToSettings,
+} from "../../hooks/useThrottledRouter";
 import ReviewExpenseModal, { type ReviewParsingKind } from "../../components/ReviewExpenseModal";
 import ListsPickerModal from "../../components/ListsPickerModal";
 import ExpenseTxRow from "../../components/ExpenseTxRow";
@@ -50,6 +54,7 @@ import { displayExpenseListName } from "../../lib/listDisplayName";
 import { flushBudgetThresholdCheck } from "../../lib/budgetThresholdNotifications";
 import type { Language } from "../../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../../lib/formatMoney";
+import { getCategoryMeta } from "../../constants/mockData";
 
 const PURPLE = "#6C63FF";
 const CORAL = "#FF6B6B";
@@ -165,18 +170,36 @@ export default function Dashboard() {
   const searchNorm = transactionSearch.trim().toLowerCase();
   const displayFiltered = useMemo(() => {
     if (!searchNorm) return listFiltered;
-    return listFiltered.filter((e) => e.description.toLowerCase().includes(searchNorm));
-  }, [listFiltered, searchNorm]);
+    return listFiltered.filter((e) => {
+      if (e.description.toLowerCase().includes(searchNorm)) return true;
+      const meta = getCategoryMeta(e.category, customCategories, categoryDisplayOverrides);
+      const catBlob = `${meta.name} ${e.category}`.toLowerCase();
+      return catBlob.includes(searchNorm);
+    });
+  }, [listFiltered, searchNorm, customCategories, categoryDisplayOverrides]);
 
-  /** Üst özet: ay + liste + Harcama/Gelir kutuları. Kategori seçimi listeyi süzer; özetleri sıfırlamaz. */
+  /** Arama varken üst tutarlar süzülmüş listeyle uyumlu; arama yokken ay + liste + gelir/gider. Kategori şeridi aramada gizlenir. */
+  const totalsBasis = useMemo(
+    () => (searchNorm ? displayFiltered : flowFilteredExpenses),
+    [searchNorm, displayFiltered, flowFilteredExpenses],
+  );
+
   const { totalNet, totalExpenseOut, totalIncomeIn } = useMemo(() => {
-    const exp = flowFilteredExpenses.filter((e) => !e.isIncome).reduce((s, e) => s + e.amount, 0);
-    const inc = flowFilteredExpenses.filter((e) => e.isIncome).reduce((s, e) => s + e.amount, 0);
+    const exp = totalsBasis.filter((e) => !e.isIncome).reduce((s, e) => s + e.amount, 0);
+    const inc = totalsBasis.filter((e) => e.isIncome).reduce((s, e) => s + e.amount, 0);
     const net = inc - exp;
     return { totalNet: net, totalExpenseOut: exp, totalIncomeIn: inc };
-  }, [flowFilteredExpenses]);
+  }, [totalsBasis]);
 
-  const grouped = useMemo(() => groupByDate(displayFiltered), [displayFiltered]);
+  const grouped = useMemo(
+    () =>
+      groupByDate(displayFiltered, {
+        lang: language as Language,
+        today: t("common.today"),
+        yesterday: t("common.yesterday"),
+      }),
+    [displayFiltered, language, t],
+  );
 
   /** Seçili takvim ayında sıfır görünür satır var ama liste + filtre için başka tarihlerde işlem var → genelde üstteki “ay” filtresi. */
   const hintExpandPeriod = useMemo(() => {
@@ -374,6 +397,9 @@ export default function Dashboard() {
   const fabSearchPillBg = "#000000";
   const fabSearchPillIcon = "#FFFFFF";
 
+  /** Ayarlar satırı yüksekliği (ScrollView dışı sabit katmanla aynı — yapışkan başlıkta boşluk) */
+  const settingsHeaderReserve = 8 + 38 + 4;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
       <KeyboardAvoidingView
@@ -390,25 +416,16 @@ export default function Dashboard() {
         contentContainerStyle={{ paddingBottom: scrollBottomPad }}
         onMomentumScrollEnd={onMomentumScrollEndLoadMore}
       >
-        {/* Yapışkan: ayarlar + net tutar + harcama/gelir kutuları + tarih/liste filtreleri */}
+        {/* Yapışkan: net tutar + harcama/gelir kutuları + tarih/liste filtreleri (ayarlar ScrollView dışında, dokunma çakışması yok) */}
         <View
           style={{
             backgroundColor: bg,
             borderBottomWidth: StyleSheet.hairlineWidth,
             borderBottomColor: divider,
             paddingBottom: 12,
+            paddingTop: settingsHeaderReserve,
           }}
         >
-          <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
-            <Pressable
-              unstable_pressDelay={0}
-              onPress={() => throttledPush("/(app)/settings")}
-              style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }}
-            >
-              <Ionicons name="settings-outline" size={22} color={mutedColor} />
-            </Pressable>
-          </View>
-
           <View style={{ paddingHorizontal: 20 }}>
             <Text style={{ color: mutedColor, fontSize: 13, marginBottom: 2 }}>
               {t("dashboard.netBalanceCaption")}
@@ -534,22 +551,26 @@ export default function Dashboard() {
           </View>
         </View>
 
-        <Text style={{ color: mutedColor, fontSize: 12, paddingHorizontal: 20, marginBottom: 8 }}>
-          {txFlowFilter === "expense"
-            ? t("dashboard.txHintExpenseOnly")
-            : txFlowFilter === "income"
-              ? t("dashboard.txHintIncomeOnly")
-              : t("dashboard.txHintAll")}
-        </Text>
-        <CategorySpendScroller
-          categories={homeCats}
-          expenses={flowFilteredExpenses}
-          selectedCategoryId={null}
-          onSelectCategory={openCategoryDetail}
-          onLongPressCategory={openCategoryDetail}
-          isDark={isDark}
-          currencySymbol={currencySymbol}
-        />
+        {!searchNorm ? (
+          <>
+            <Text style={{ color: mutedColor, fontSize: 12, paddingHorizontal: 20, marginBottom: 8 }}>
+              {txFlowFilter === "expense"
+                ? t("dashboard.txHintExpenseOnly")
+                : txFlowFilter === "income"
+                  ? t("dashboard.txHintIncomeOnly")
+                  : t("dashboard.txHintAll")}
+            </Text>
+            <CategorySpendScroller
+              categories={homeCats}
+              expenses={flowFilteredExpenses}
+              selectedCategoryId={null}
+              onSelectCategory={openCategoryDetail}
+              onLongPressCategory={openCategoryDetail}
+              isDark={isDark}
+              currencySymbol={currencySymbol}
+            />
+          </>
+        ) : null}
 
         <PendingBankTransactionsStrip
           items={pendingBankTransactions}
@@ -664,6 +685,35 @@ export default function Dashboard() {
       </ScrollView>
 
       </KeyboardAvoidingView>
+
+      {/* Ayarlar: liste en altta iken yapışkan başlık + scroll katmanı Android'de dokunmayı yutabiliyordu. */}
+      {/* Absolute çocuklar SafeAreaView padding'ini saymaz; üst inset + eski 8px ile scroll içiyle hizalı. */}
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 200,
+          paddingTop: insets.top + 8,
+          paddingBottom: 4,
+          paddingHorizontal: 20,
+          flexDirection: "row",
+          justifyContent: "flex-end",
+          backgroundColor: bg,
+          ...(Platform.OS === "android" ? { elevation: 24 } : {}),
+        }}
+      >
+        <Pressable
+          unstable_pressDelay={0}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => navigateToSettings(router)}
+          style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }}
+        >
+          <Ionicons name="settings-outline" size={22} color={mutedColor} />
+        </Pressable>
+      </View>
 
       {/* Liste üzerinde yüzen alt kontroller (haracamaların üstünde); klavyede arama hapı yukarı */}
       <View
@@ -1021,7 +1071,7 @@ export default function Dashboard() {
         activeListId={activeListId}
         onSelectList={setActiveList}
         onAddList={addList}
-        onEditLists={() => throttledPush("/(app)/settings")}
+        onEditLists={() => navigateToSettings(router)}
         isDark={isDark}
         language={language}
       />

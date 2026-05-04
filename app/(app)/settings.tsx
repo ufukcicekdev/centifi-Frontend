@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
@@ -29,6 +30,7 @@ import {
   CustomCategory,
   getCategoryMeta,
   PRESET_BANK_APP_IDS,
+  PRESET_BANK_PACKAGES,
   type ExpenseList,
 } from "../../constants/mockData";
 import CategoryEditorModal from "../../components/CategoryEditorModal";
@@ -560,33 +562,29 @@ export default function Settings() {
     }, []),
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      void useStore.getState().syncNotificationsWithOsPermission();
-    }, []),
-  );
-
   const [bankListenerOn, setBankListenerOn] = useState(false);
 
+  /** Bildirim sync + banka listener sorgusu ilk kareyi geciktirmesin (liste/transition bittikten sonra). */
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      if (Platform.OS !== "android") {
-        return () => {
-          cancelled = true;
-        };
-      }
-      void (async () => {
-        try {
-          const { isBankNotificationListenerEnabled } = await import("../../lib/bankNotificationAndroid");
-          const on = await isBankNotificationListenerEnabled();
-          if (!cancelled) setBankListenerOn(on);
-        } catch {
-          if (!cancelled) setBankListenerOn(false);
-        }
-      })();
+      const handle = InteractionManager.runAfterInteractions(() => {
+        if (cancelled) return;
+        void useStore.getState().syncNotificationsWithOsPermission();
+        if (cancelled || Platform.OS !== "android") return;
+        void (async () => {
+          try {
+            const { isBankNotificationListenerEnabled } = await import("../../lib/bankNotificationAndroid");
+            const on = await isBankNotificationListenerEnabled();
+            if (!cancelled) setBankListenerOn(on);
+          } catch {
+            if (!cancelled) setBankListenerOn(false);
+          }
+        })();
+      });
       return () => {
         cancelled = true;
+        handle.cancel?.();
       };
     }, []),
   );
@@ -1301,7 +1299,8 @@ export default function Settings() {
                 </Pressable>
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                {!PRESET_BANK_APP_IDS.has(bank.id) ? (
+                {!PRESET_BANK_APP_IDS.has(bank.id) &&
+                !PRESET_BANK_PACKAGES.has(bank.packageName.trim()) ? (
                   <Pressable
                     hitSlop={10}
                     onPress={() => {
@@ -1418,7 +1417,8 @@ export default function Settings() {
       </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal visible={showLangModal} transparent animationType="slide" onRequestClose={() => setShowLangModal(false)}>
+      {showLangModal ? (
+      <Modal visible transparent animationType="slide" onRequestClose={() => setShowLangModal(false)}>
         <View style={{ flex: 1 }}>
           <Pressable
             style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.45)" }]}
@@ -1513,9 +1513,11 @@ export default function Settings() {
           </View>
         </View>
       </Modal>
+      ) : null}
 
+      {manageListOpen ? (
       <OnboardingCategoryGridModal
-        visible={manageListOpen}
+        visible
         categories={allCats}
         customCategoriesLookup={customCategories}
         onClose={() => setManageListOpen(false)}
@@ -1529,9 +1531,11 @@ export default function Settings() {
         isDark={isDark}
         labels={catManageLabels}
       />
+      ) : null}
 
+      {editCategoryId != null ? (
       <OnboardingCategoryEditModal
-        visible={editCategoryId != null}
+        visible
         categoryId={editCategoryId}
         initial={editingResolved}
         isBuiltin={!!editCategoryId && isBuiltinCategoryId(editCategoryId)}
@@ -1542,9 +1546,11 @@ export default function Settings() {
         isDark={isDark}
         labels={catEditLabels}
       />
+      ) : null}
 
+      {showCatModal ? (
       <CategoryEditorModal
-        visible={showCatModal}
+        visible
         existing={editingCat}
         onSave={async (data) => {
           if (editingCat) await updateCategory(editingCat.id, data);
@@ -1553,16 +1559,20 @@ export default function Settings() {
         onClose={closeAddCategoryModal}
         isDark={isDark}
       />
+      ) : null}
+      {showBankModal ? (
       <AddBankModal
-        visible={showBankModal}
+        visible
         onSave={(data) => addBankAutomation(data)}
         onClose={() => setShowBankModal(false)}
         isDark={isDark}
         isAuthenticated={isAuthenticated}
       />
+      ) : null}
 
+      {editingList != null ? (
       <Modal
-        visible={editingList != null}
+        visible
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
@@ -1680,9 +1690,11 @@ export default function Settings() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      ) : null}
 
+      {showProfileModal ? (
       <Modal
-        visible={showProfileModal}
+        visible
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowProfileModal(false)}
@@ -1862,9 +1874,11 @@ export default function Settings() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      ) : null}
 
+      {showPrivacyModal ? (
       <Modal
-        visible={showPrivacyModal}
+        visible
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowPrivacyModal(false)}
@@ -1893,9 +1907,11 @@ export default function Settings() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      ) : null}
 
+      {showAboutModal ? (
       <Modal
-        visible={showAboutModal}
+        visible
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAboutModal(false)}
@@ -1929,14 +1945,17 @@ export default function Settings() {
           </View>
         </SafeAreaView>
       </Modal>
+      ) : null}
 
+      {showCurrencyModal ? (
       <CurrencyPickerModal
-        visible={showCurrencyModal}
+        visible
         onClose={() => setShowCurrencyModal(false)}
         onSelect={(code) => setDisplayCurrency(code)}
         selectedCode={displayCurrency}
         isDark={isDark}
       />
+      ) : null}
     </SafeAreaView>
   );
 }

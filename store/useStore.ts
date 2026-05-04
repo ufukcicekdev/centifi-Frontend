@@ -4,7 +4,7 @@ import {
   Expense, MOCK_EXPENSES, MONTHLY_BUDGET,
   CustomCategory, BUILTIN_CATEGORIES,
   ExpenseList, DEFAULT_LISTS,
-  BankAutomation, PRESET_BANK_AUTOMATIONS,
+  BankAutomation, PRESET_BANK_AUTOMATIONS, PRESET_BANK_PACKAGES,
   type CategoryDisplayOverrides,
 } from "../constants/mockData";
 import type { CategoryBudgetEntry } from "../constants/budgetTypes";
@@ -837,6 +837,10 @@ export const useStore = create<AppState>((set, get) => {
     }
   },
   removeBankAutomation: async (id) => {
+    const row = get().bankAutomations.find((b) => b.id === id);
+    const pkg = row?.packageName?.trim() ?? "";
+    if (pkg && PRESET_BANK_PACKAGES.has(pkg)) return;
+
     const apiId = parseUserBankAppApiId(id);
     if (apiId != null && get().isAuthenticated) {
       try {

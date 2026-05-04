@@ -22,9 +22,10 @@ import ListsPickerModal from "../../../components/ListsPickerModal";
 import CategoryEditorModal from "../../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../../components/ExpenseAmountSignRow";
 import type { Language } from "../../../i18n";
-import { useThrottledRouter } from "../../../hooks/useThrottledRouter";
+import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../../context/AppDialogContext";
 import { displayExpenseListName } from "../../../lib/listDisplayName";
+import { saveBarPaddingBottom } from "../../../lib/saveBarPaddingBottom";
 import { currencySymbolFor } from "../../../lib/formatMoney";
 
 type RecurrenceId =
@@ -106,14 +107,18 @@ function parseYmdLocal(ymd: string): Date {
   return new Date(y || 1970, (m || 1) - 1, d || 1);
 }
 
-function formatDatePill(ymd: string, language: Language): string {
+function formatDatePill(
+  ymd: string,
+  language: Language,
+  rel: { today: string; yesterday: string },
+): string {
   const dt = parseYmdLocal(ymd);
   const now = new Date();
   const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const t1 = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
   const diffDays = Math.round((t0 - t1) / 86400000);
-  if (diffDays === 0) return language === "tr" ? "Bugün" : "Today";
-  if (diffDays === 1) return language === "tr" ? "Dün" : "Yesterday";
+  if (diffDays === 0) return rel.today;
+  if (diffDays === 1) return rel.yesterday;
   const locale =
     language === "tr"
       ? "tr-TR"
@@ -179,9 +184,12 @@ export default function ExpenseDetailScreen() {
     setDate(ex.date);
     setSelectedCategory(ex.category);
     setListId(ex.listId ?? fb);
-    setRecurrence("once");
+    const r = ex.recurrenceRule;
+    setRecurrence(
+      typeof r === "string" && (REC_IDS as readonly string[]).includes(r) ? (r as RecurrenceId) : "once",
+    );
     setIsIncome(!!ex.isIncome);
-  }, [expenseId]);
+  }, [expenseId, expense?.recurrenceRule, expense?.listId]);
 
   const lang = language as Language;
 
@@ -217,6 +225,7 @@ export default function ExpenseDetailScreen() {
   const recLabels = REC_LABELS[lang];
 
   const activeList = lists.find((l) => l.id === listId);
+  const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
 
   const bg = isDark ? "#000000" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#111";
@@ -325,7 +334,7 @@ export default function ExpenseDetailScreen() {
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingTop: 8,
-              paddingBottom: 120,
+              paddingBottom: 88 + saveBarBottomPad,
               flexGrow: 1,
               justifyContent: "center",
             }}
@@ -334,7 +343,10 @@ export default function ExpenseDetailScreen() {
               <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                 <Pressable onPress={() => setDateModalOpen(true)} style={pillStyle}>
                   <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
-                    {formatDatePill(date, lang)}
+                    {formatDatePill(date, lang, {
+                      today: t("common.today"),
+                      yesterday: t("common.yesterday"),
+                    })}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
@@ -406,7 +418,7 @@ export default function ExpenseDetailScreen() {
               bottom: 0,
               paddingHorizontal: 28,
               paddingTop: 12,
-              paddingBottom: Math.max(insets.bottom, 16),
+              paddingBottom: saveBarBottomPad,
               backgroundColor: bottomBarBg,
               borderTopWidth: StyleSheet.hairlineWidth,
               borderTopColor: isDark ? "#222" : "#e5e5e5",
@@ -486,7 +498,7 @@ export default function ExpenseDetailScreen() {
         onAddList={addList}
         onEditLists={() => {
           setListsModalOpen(false);
-          throttledPush("/(app)/settings");
+          navigateToSettings(router);
         }}
         isDark={isDark}
         language={lang}
@@ -543,7 +555,7 @@ export default function ExpenseDetailScreen() {
             backgroundColor: isDark ? "#1a1a1a" : "#fff",
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
-            paddingBottom: Math.max(insets.bottom, 20),
+            paddingBottom: saveBarBottomPad,
             paddingTop: 12,
             maxHeight: "55%",
           }}

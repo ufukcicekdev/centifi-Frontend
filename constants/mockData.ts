@@ -27,6 +27,10 @@ export interface Expense {
   isIncome?: boolean;
   listId?: string;
   receipt_url?: string;
+  /** Backend `recurring_expense_id` — tekrarlayan seriyle bağlantı */
+  recurringExpenseId?: number | null;
+  /** Seri varsa API `recurrence_rule` (ör. daily); yoksa yok / bir kez */
+  recurrenceRule?: string | null;
 }
 
 export interface ExpenseList {
@@ -128,6 +132,9 @@ export const PRESET_BANK_AUTOMATIONS: BankAutomation[] = [
 
 /** Ayarlarda silinemez hazır banka / cüzdan satırları */
 export const PRESET_BANK_APP_IDS = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.id));
+
+/** Backend ile birleşince `id` `ubank_*` olabilir; paket adı sabit kalır. */
+export const PRESET_BANK_PACKAGES = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.packageName));
 
 export const MONTHLY_BUDGET = 2000;
 

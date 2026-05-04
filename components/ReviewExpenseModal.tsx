@@ -23,6 +23,7 @@ import { currencySymbolFor } from "../lib/formatMoney";
 import type { Language } from "../i18n";
 import { buildCategoriesForHome, useStore } from "../store/useStore";
 import AddExpenseDatePickerModal from "./AddExpenseDatePickerModal";
+import { saveBarPaddingBottom } from "../lib/saveBarPaddingBottom";
 import CategoryEditorModal from "./CategoryEditorModal";
 import { useAppDialog } from "../context/AppDialogContext";
 
@@ -69,15 +70,19 @@ function localTodayAtNoon(): Date {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12, 0, 0, 0);
 }
 
-/** Add expense ekranı ile aynı “Bugün / 27 Eki” etiketi */
-function formatDatePill(ymd: string, language: Language, todayLabel: string): string {
+/** Add expense ekranı ile aynı “Bugün / Dün / 27 Eki” etiketi */
+function formatDatePill(
+  ymd: string,
+  language: Language,
+  rel: { today: string; yesterday: string },
+): string {
   const dt = parseYmdToLocal(ymd);
   const now = new Date();
-  const sameDay =
-    dt.getFullYear() === now.getFullYear() &&
-    dt.getMonth() === now.getMonth() &&
-    dt.getDate() === now.getDate();
-  if (sameDay) return todayLabel;
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const t1 = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+  const diffDays = Math.round((t0 - t1) / 86400000);
+  if (diffDays === 0) return rel.today;
+  if (diffDays === 1) return rel.yesterday;
   const locale =
     language === "tr"
       ? "tr-TR"
@@ -111,8 +116,8 @@ function parseAmountInput(raw: string): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
-/** Add ekranı ile aynı: sabit alt bar + ScrollView son boşluğu */
-const SCROLL_BOTTOM_PAD_WITH_SAVE_BAR = 120;
+/** Add ekranı ile aynı: sabit alt bar + ScrollView son boşluğu (saveBarPaddingBottom ayrıca eklenir) */
+const SCROLL_BOTTOM_PAD_WITH_SAVE_BAR_BASE = 100;
 
 export default function ReviewExpenseModal({
   visible,
@@ -325,8 +330,10 @@ export default function ReviewExpenseModal({
   const showForm = !parsing && !success && rows.length > 0;
   const emptyParsed = !parsing && !success && parsedExpenses != null && parsedExpenses.length === 0;
 
-  const scrollContentBottomPad =
-    showForm ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR + Math.min(80, Math.max(0, (rows.length - 1) * 28)) : 40;
+  const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
+  const scrollContentBottomPad = showForm
+    ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR_BASE + saveBarBottomPad + Math.min(80, Math.max(0, (rows.length - 1) * 28))
+    : 40;
 
   const parsingCopy = useMemo(() => {
     if (parsingKind === "voice") return t("review.parsingVoice");
@@ -343,7 +350,10 @@ export default function ReviewExpenseModal({
     return rows.length > 1 ? t("review.successMany") : t("review.successOne");
   }, [rows.length, t]);
 
-  const todayLabel = t("common.today");
+  const dateRelLabels = useMemo(
+    () => ({ today: t("common.today"), yesterday: t("common.yesterday") }),
+    [t],
+  );
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -511,7 +521,7 @@ export default function ReviewExpenseModal({
                         <View style={{ marginBottom: 12 }}>
                           <Pressable onPress={() => setDateModalRow(i)} style={pillStyle}>
                             <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
-                              {formatDatePill(toApiDateOnly(row.occurredAt), lang, todayLabel)}
+                              {formatDatePill(toApiDateOnly(row.occurredAt), lang, dateRelLabels)}
                             </Text>
                             <Ionicons name="chevron-down" size={14} color={mutedColor} />
                           </Pressable>
@@ -643,7 +653,7 @@ export default function ReviewExpenseModal({
                   bottom: 0,
                   paddingHorizontal: 20,
                   paddingTop: 12,
-                  paddingBottom: Math.max(insets.bottom, 16),
+                  paddingBottom: saveBarBottomPad,
                   backgroundColor: bottomBarBg,
                   borderTopWidth: StyleSheet.hairlineWidth,
                   borderTopColor: isDark ? "#222222" : "#e5e5e5",

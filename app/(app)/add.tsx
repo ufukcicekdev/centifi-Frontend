@@ -18,15 +18,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { buildCategoriesForHome, useStore } from "../../store/useStore";
 import { getCategoryMeta } from "../../constants/mockData";
-import { createExpense, expenseListIdForApi } from "../../lib/backend";
+import {
+  createExpense,
+  createRecurringExpense,
+  expenseListIdForApi,
+  mapExpenseDto,
+} from "../../lib/backend";
+import type { RecurrenceRule } from "../../lib/backend";
 import AddExpenseDatePickerModal from "../../components/AddExpenseDatePickerModal";
 import ListsPickerModal from "../../components/ListsPickerModal";
 import CategoryEditorModal from "../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../components/ExpenseAmountSignRow";
 import type { Language } from "../../i18n";
-import { useThrottledRouter } from "../../hooks/useThrottledRouter";
+import { useThrottledRouter, navigateToSettings } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { displayExpenseListName } from "../../lib/listDisplayName";
+import { saveBarPaddingBottom } from "../../lib/saveBarPaddingBottom";
 import { currencySymbolFor } from "../../lib/formatMoney";
 
 type RecurrenceId =
@@ -108,17 +115,18 @@ function parseYmdLocal(ymd: string): Date {
   return new Date(y || 1970, (m || 1) - 1, d || 1);
 }
 
-function formatDatePill(ymd: string, language: Language): string {
+function formatDatePill(
+  ymd: string,
+  language: Language,
+  rel: { today: string; yesterday: string },
+): string {
   const dt = parseYmdLocal(ymd);
   const now = new Date();
-  const sameDay =
-    dt.getFullYear() === now.getFullYear() &&
-    dt.getMonth() === now.getMonth() &&
-    dt.getDate() === now.getDate();
-  if (sameDay) {
-    if (language === "tr") return "Bugün";
-    return "Today";
-  }
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const t1 = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+  const diffDays = Math.round((t0 - t1) / 86400000);
+  if (diffDays === 0) return rel.today;
+  if (diffDays === 1) return rel.yesterday;
   const locale =
     language === "tr"
       ? "tr-TR"
@@ -170,6 +178,7 @@ export default function AddExpense() {
   } = useStore();
 
   const activeList = lists.find((l) => l.id === activeListId);
+  const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
 
   const homeCats = useMemo(() => {
     let cats = buildCategoriesForHome(enabledCategoryIds, customCategories, categoryDisplayOverrides);
@@ -241,28 +250,32 @@ export default function AddExpense() {
     setSaving(true);
     try {
       const list_id = expenseListIdForApi(activeListId);
-      const dto = await createExpense({
-        amount: num,
-        description: description.trim(),
-        category: selectedCategory,
-        date,
-        currency: displayCurrency,
-        is_income: isIncome,
-        ...(list_id != null ? { list_id } : {}),
-      });
-      addExpense(
-        {
-          id: String(dto.id),
+      if (recurrence !== "once") {
+        const rule = await createRecurringExpense({
+          amount: num,
+          description: description.trim(),
+          category: selectedCategory,
+          currency: displayCurrency,
+          is_income: isIncome,
+          recurrence_rule: recurrence as RecurrenceRule,
+          anchor_date: date,
+          ...(list_id != null ? { list_id } : {}),
+        });
+        if (rule.initial_expense) {
+          addExpense(mapExpenseDto(rule.initial_expense, activeListId), { deferBudgetCheckMs: 480 });
+        }
+      } else {
+        const dto = await createExpense({
           amount: num,
           description: description.trim(),
           category: selectedCategory,
           date,
-          currency: dto.currency ?? displayCurrency,
-          listId: activeListId,
-          isIncome: dto.is_income ?? isIncome,
-        },
-        { deferBudgetCheckMs: 480 },
-      );
+          currency: displayCurrency,
+          is_income: isIncome,
+          ...(list_id != null ? { list_id } : {}),
+        });
+        addExpense(mapExpenseDto(dto, activeListId), { deferBudgetCheckMs: 480 });
+      }
       if (pendingIdParam) removePendingBankTransaction(pendingIdParam);
       try {
         const { notificationAsync, NotificationFeedbackType } = await import("expo-haptics");
@@ -312,7 +325,7 @@ export default function AddExpense() {
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingTop: 8,
-              paddingBottom: 120,
+              paddingBottom: 88 + saveBarBottomPad,
               flexGrow: 1,
               minHeight: Math.max(420, winH - insets.top - Math.max(insets.bottom, 16) - 168),
               justifyContent: "center",
@@ -322,7 +335,10 @@ export default function AddExpense() {
               <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                 <Pressable onPress={() => setDateModalOpen(true)} style={pillStyle}>
                   <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
-                    {formatDatePill(date, lang)}
+                    {formatDatePill(date, lang, {
+                      today: t("common.today"),
+                      yesterday: t("common.yesterday"),
+                    })}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
@@ -435,7 +451,7 @@ export default function AddExpense() {
               bottom: 0,
               paddingHorizontal: 20,
               paddingTop: 12,
-              paddingBottom: Math.max(insets.bottom, 16),
+              paddingBottom: saveBarBottomPad,
               backgroundColor: bottomBarBg,
               borderTopWidth: StyleSheet.hairlineWidth,
               borderTopColor: isDark ? "#222" : "#e5e5e5",
@@ -498,7 +514,7 @@ export default function AddExpense() {
         onAddList={addList}
         onEditLists={() => {
           setListsModalOpen(false);
-          throttledPush("/(app)/settings");
+          navigateToSettings(router);
         }}
         isDark={isDark}
         language={lang}

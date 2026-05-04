@@ -40,6 +40,25 @@ export type ParseResult = {
   receipt_url?: string;
 };
 
+export type RecurrenceRule =
+  | "daily"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "bimonthly"
+  | "quarterly"
+  | "yearly";
+
+const RECURRENCE_RULE_VALUES: readonly RecurrenceRule[] = [
+  "daily",
+  "weekly",
+  "biweekly",
+  "monthly",
+  "bimonthly",
+  "quarterly",
+  "yearly",
+];
+
 export type ExpenseDto = {
   id: number;
   amount: string;
@@ -48,13 +67,35 @@ export type ExpenseDto = {
   date: string;
   currency: string;
   is_income?: boolean;
+  recurring_expense_id?: number | null;
+  recurrence_rule?: RecurrenceRule | null;
   created_at: string;
   updated_at: string;
   list_id?: number | null;
 };
 
+export type RecurringExpenseDto = {
+  id: number;
+  series_id: string;
+  amount: string;
+  description: string;
+  category: string;
+  currency: string;
+  is_income: boolean;
+  recurrence_rule: RecurrenceRule;
+  next_run_at: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  list_id?: number | null;
+  initial_expense?: ExpenseDto | null;
+};
+
 /** Maps API row to local Expense shape (callers supply fallback list id when `list_id` is null). */
 export function mapExpenseDto(dto: ExpenseDto, fallbackListId: string) {
+  const rule = dto.recurrence_rule;
+  const recurrenceRule =
+    rule != null && (RECURRENCE_RULE_VALUES as readonly string[]).includes(rule) ? rule : undefined;
   return {
     id: String(dto.id),
     amount: parseFloat(dto.amount),
@@ -64,6 +105,8 @@ export function mapExpenseDto(dto: ExpenseDto, fallbackListId: string) {
     currency: dto.currency,
     isIncome: !!dto.is_income,
     listId: dto.list_id != null ? String(dto.list_id) : fallbackListId,
+    recurringExpenseId: dto.recurring_expense_id ?? undefined,
+    recurrenceRule,
   };
 }
 
@@ -210,6 +253,34 @@ export async function createExpense(expense: {
     auth: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  });
+}
+
+export async function createRecurringExpense(body: {
+  amount: number;
+  description: string;
+  category: string;
+  currency: string;
+  is_income?: boolean;
+  recurrence_rule: RecurrenceRule;
+  anchor_date: string;
+  list_id?: number;
+}) {
+  const payload: Record<string, unknown> = {
+    amount: body.amount,
+    description: body.description,
+    category: body.category,
+    currency: body.currency,
+    is_income: body.is_income ?? false,
+    recurrence_rule: body.recurrence_rule,
+    anchor_date: body.anchor_date,
+  };
+  if (body.list_id != null) payload.list_id = body.list_id;
+  return apiFetch<RecurringExpenseDto>("/api/recurring-expenses/", {
+    method: "POST",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 }
 
