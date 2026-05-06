@@ -34,7 +34,11 @@ import type { Language } from "../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
-import { saveBarPaddingBottom } from "../../lib/saveBarPaddingBottom";
+import {
+  actionBarInnerBottomPad,
+  keyboardLiftPaddingBottom,
+} from "../../lib/keyboardFooterChrome";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset";
 import { currencySymbolFor } from "../../lib/formatMoney";
 
 type RecurrenceId =
@@ -179,7 +183,10 @@ export default function AddExpense() {
   } = useStore();
 
   const activeList = lists.find((l) => l.id === activeListId);
-  const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
+  const keyboardInset = useKeyboardInset();
+  const keyboardLiftPad =
+    Platform.OS === "android" ? 0 : keyboardLiftPaddingBottom(keyboardInset);
+  const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
 
   const homeCats = useMemo(() => {
     let cats = buildCategoriesForHome(enabledCategoryIds, customCategories, categoryDisplayOverrides);
@@ -304,9 +311,9 @@ export default function AddExpense() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
         style={{ flex: 1 }}
+        behavior={Platform.OS === "android" ? "padding" : undefined}
+        enabled={Platform.OS !== "android" || keyboardInset > 0}
       >
         <View style={{ flex: 1 }}>
           <Pressable
@@ -317,21 +324,23 @@ export default function AddExpense() {
             <Ionicons name="close" size={28} color={textColor} />
           </Pressable>
 
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets
-            nestedScrollEnabled
-            contentContainerStyle={{
-              paddingHorizontal: 20,
-              paddingTop: 8,
-              paddingBottom: 88 + saveBarBottomPad,
-              flexGrow: 1,
-              minHeight: Math.max(420, winH - insets.top - Math.max(insets.bottom, 16) - 168),
-              justifyContent: "center",
-            }}
-          >
+          <View style={{ flex: 1, paddingBottom: keyboardLiftPad }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              keyboardDismissMode="interactive"
+              automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+              nestedScrollEnabled
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: 8,
+                paddingBottom: 20,
+                flexGrow: 1,
+                minHeight: Math.max(420, winH - insets.top - Math.max(insets.bottom, 16) - 168),
+                justifyContent: "center",
+              }}
+            >
             <View style={{ gap: 10 }}>
               <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                 <Pressable onPress={() => setDateModalOpen(true)} style={pillStyle}>
@@ -450,45 +459,42 @@ export default function AddExpense() {
             </View>
           </ScrollView>
 
-          <View
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: saveBarBottomPad,
-              backgroundColor: bottomBarBg,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: isDark ? "#222" : "#e5e5e5",
-            }}
-          >
-            <Pressable
-              onPress={handleSave}
-              disabled={saving}
+            <View
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                backgroundColor: saveBtnBg,
-                borderRadius: 16,
-                paddingVertical: 16,
-                opacity: saving ? 0.65 : 1,
+                paddingHorizontal: 20,
+                paddingTop: 12,
+                paddingBottom: footerInnerBottomPad,
+                backgroundColor: bottomBarBg,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: isDark ? "#222" : "#e5e5e5",
               }}
             >
-              {saving ? (
-                <ActivityIndicator color={textColor} />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={22} color={textColor} />
-                  <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>
-                    {t("common.save")}
-                  </Text>
-                </>
-              )}
-            </Pressable>
+              <Pressable
+                onPress={handleSave}
+                disabled={saving}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  backgroundColor: saveBtnBg,
+                  borderRadius: 16,
+                  paddingVertical: 16,
+                  opacity: saving ? 0.65 : 1,
+                }}
+              >
+                {saving ? (
+                  <ActivityIndicator color={textColor} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={22} color={textColor} />
+                    <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>
+                      {t("common.save")}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>

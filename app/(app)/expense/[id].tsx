@@ -26,8 +26,13 @@ import type { Language } from "../../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../../../lib/listDisplayName";
+import {
+  actionBarInnerBottomPad,
+  keyboardLiftPaddingBottom,
+} from "../../../lib/keyboardFooterChrome";
 import { saveBarPaddingBottom } from "../../../lib/saveBarPaddingBottom";
 import { currencySymbolFor } from "../../../lib/formatMoney";
+import { useKeyboardInset } from "../../../hooks/useKeyboardInset";
 
 type RecurrenceId =
   | "once"
@@ -92,6 +97,8 @@ const REC_LABELS: Record<Language, Record<RecurrenceId, string>> = {
   },
 };
 
+const CORAL = "#FF6B6B";
+
 const REC_IDS: RecurrenceId[] = [
   "once",
   "daily",
@@ -137,6 +144,7 @@ export default function ExpenseDetailScreen() {
   const router = useRouter();
   const throttledPush = useThrottledRouter();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   const { t } = useTranslation();
   const { showAlert, showConfirm } = useAppDialog();
   const rawId = useLocalSearchParams<{ id: string | string[] }>().id;
@@ -227,6 +235,9 @@ export default function ExpenseDetailScreen() {
 
   const activeList = lists.find((l) => l.id === listId);
   const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
+  const keyboardLiftPad =
+    Platform.OS === "android" ? 0 : keyboardLiftPaddingBottom(keyboardInset);
+  const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
 
   const bg = isDark ? "#000000" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#111";
@@ -302,21 +313,12 @@ export default function ExpenseDetailScreen() {
     })();
   };
 
-  const appendHashtag = () => {
-    setDescription((d) => {
-      const t = d.trimEnd();
-      if (!t) return "#";
-      if (t.endsWith("#")) return t;
-      return `${t} #`;
-    });
-  };
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
         style={{ flex: 1 }}
+        behavior={Platform.OS === "android" ? "padding" : undefined}
+        enabled={Platform.OS !== "android" || keyboardInset > 0}
       >
         <View style={{ flex: 1 }}>
           <Pressable
@@ -327,15 +329,17 @@ export default function ExpenseDetailScreen() {
             <Ionicons name="close" size={28} color={textColor} />
           </Pressable>
 
+          <View style={{ flex: 1, paddingBottom: keyboardLiftPad }}>
           <ScrollView
+            style={{ flex: 1 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingTop: 8,
-              paddingBottom: 88 + saveBarBottomPad,
+              paddingBottom: 20,
               flexGrow: 1,
               justifyContent: "center",
             }}
@@ -419,70 +423,61 @@ export default function ExpenseDetailScreen() {
 
           <View
             style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              paddingHorizontal: 28,
+              flexDirection: "row",
+              gap: 12,
+              paddingHorizontal: 20,
               paddingTop: 12,
-              paddingBottom: saveBarBottomPad,
+              paddingBottom: footerInnerBottomPad,
               backgroundColor: bottomBarBg,
               borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: isDark ? "#222" : "#e5e5e5",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
+              borderTopColor: isDark ? "#2c2c2c" : "#e0e0e0",
             }}
           >
             <Pressable
-              onPress={appendHashtag}
+              onPress={handleDelete}
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                backgroundColor: isDark ? "#2c2c2e" : "#e8e8ec",
+                flex: 1,
+                height: 52,
+                borderRadius: 14,
+                backgroundColor: CORAL,
                 alignItems: "center",
                 justifyContent: "center",
+                flexDirection: "row",
+                gap: 8,
               }}
+              accessibilityRole="button"
+              accessibilityLabel={t("common.delete")}
             >
-              <Text style={{ color: textColor, fontSize: 20, fontWeight: "700" }}>#</Text>
+              <Ionicons name="trash-outline" size={20} color="#fff" />
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{t("common.delete")}</Text>
             </Pressable>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-              <Pressable
-                onPress={handleDelete}
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: isDark ? "#fff" : "#333",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: isDark ? "#1a1a1a" : "#fff",
-                }}
-              >
-                <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
-              </Pressable>
-              <Pressable
-                onPress={() => void handleSave()}
-                disabled={saving}
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: saving ? 0.6 : 1,
-                }}
-              >
-                {saving ? (
-                  <ActivityIndicator color={textColor} size="small" />
-                ) : (
-                  <Ionicons name="checkmark" size={26} color={textColor} />
-                )}
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={() => void handleSave()}
+              disabled={saving}
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: 14,
+                backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 8,
+                opacity: saving ? 0.65 : 1,
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("common.save")}
+            >
+              {saving ? (
+                <ActivityIndicator color={textColor} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark" size={22} color={textColor} />
+                  <Text style={{ color: textColor, fontWeight: "700", fontSize: 16 }}>{t("common.save")}</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
           </View>
         </View>
       </KeyboardAvoidingView>

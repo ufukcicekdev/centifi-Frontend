@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -16,11 +17,16 @@ import { useTranslation } from "react-i18next";
 import { useStore } from "../../../store/useStore";
 import { getCategoryMeta } from "../../../constants/mockData";
 import { BUDGET_COLOR_PALETTE } from "../../../constants/budgetColors";
-import { foregroundOnHex, hexToRgba } from "../../../lib/colorUi";
+import { hexToRgba } from "../../../lib/colorUi";
 import { currencySymbolFor, formatMoneyAmount } from "../../../lib/formatMoney";
 import { averageMonthlySpendForCategory } from "../../../lib/categoryBudgetStats";
 import type { Language } from "../../../i18n";
 import { useAppDialog } from "../../../context/AppDialogContext";
+import { useKeyboardInset } from "../../../hooks/useKeyboardInset";
+import {
+  actionBarInnerBottomPad,
+  keyboardLiftPaddingBottom,
+} from "../../../lib/keyboardFooterChrome";
 
 const CORAL = "#FF6B6B";
 
@@ -31,6 +37,7 @@ export default function CategoryBudgetScreen() {
   const { t, i18n } = useTranslation();
   const { showAlert, showConfirm } = useAppDialog();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
 
   const isDark = useStore((s) => s.isDark);
   const expenses = useStore((s) => s.expenses);
@@ -79,8 +86,12 @@ export default function CategoryBudgetScreen() {
   const avgLabel = avg > 0 ? formatMoneyAmount(avg, lang, displayCurrency) : "—";
 
   const heroBg = hexToRgba(selectedColor, isDark ? 0.42 : 0.28);
-  const onSaveBtn = foregroundOnHex(selectedColor);
   const amountSymbol = currencySymbolFor(displayCurrency, lang);
+  const footerBorder = isDark ? "#2c2c2c" : "#e0e0e0";
+  const footerBarBg = isDark ? "#0a0a0a" : "#fff";
+  const keyboardLiftPad =
+    Platform.OS === "android" ? 0 : keyboardLiftPaddingBottom(keyboardInset);
+  const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
 
   const handleSave = useCallback(() => {
     if (!categoryId || !meta) return;
@@ -145,7 +156,8 @@ export default function CategoryBudgetScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: bg }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "android" ? "padding" : undefined}
+      enabled={Platform.OS !== "android" || keyboardInset > 0}
     >
       <View style={{ flex: 1 }}>
         <View
@@ -188,30 +200,18 @@ export default function CategoryBudgetScreen() {
           >
             {meta.name}
           </Text>
-          <Pressable
-            onPress={handleSave}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: selectedColor,
-            }}
-            accessibilityLabel={t("common.save")}
-          >
-            <Ionicons name="checkmark" size={26} color={onSaveBtn} />
-          </Pressable>
+          <View style={{ width: 44, height: 44 }} />
         </View>
 
+        <View style={{ flex: 1, paddingBottom: keyboardLiftPad }}>
         <ScrollView
+          style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 8,
-            paddingBottom: Math.max(insets.bottom, 32),
+            paddingBottom: 24,
             alignItems: "stretch",
           }}
         >
@@ -332,7 +332,7 @@ export default function CategoryBudgetScreen() {
               backgroundColor: isDark ? "#141414" : "#fafafa",
               paddingHorizontal: 18,
               paddingVertical: 16,
-              marginBottom: 28,
+              marginBottom: 8,
             }}
           >
             <Text style={{ color: textColor, fontSize: 36, fontWeight: "600", marginRight: 6, minWidth: 28 }}>
@@ -354,7 +354,20 @@ export default function CategoryBudgetScreen() {
               }}
             />
           </View>
+        </ScrollView>
 
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 12,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+            paddingBottom: footerInnerBottomPad,
+            backgroundColor: footerBarBg,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: footerBorder,
+          }}
+        >
           <Pressable
             onPress={() => {
               void (async () => {
@@ -367,21 +380,43 @@ export default function CategoryBudgetScreen() {
                 if (ok) handleRemove();
               })();
             }}
-            style={({ pressed }) => ({
-              alignSelf: "stretch",
-              flexDirection: "row",
+            style={{
+              flex: 1,
+              height: 52,
+              borderRadius: 14,
+              backgroundColor: CORAL,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: CORAL,
-              paddingVertical: 16,
-              borderRadius: 14,
-              opacity: pressed ? 0.85 : 1,
-            })}
+              flexDirection: "row",
+              gap: 8,
+            }}
+            accessibilityRole="button"
           >
-            <Ionicons name="trash-outline" size={22} color="#fff" style={{ marginRight: 10 }} />
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{t("budgets.removeBudget")}</Text>
+            <Ionicons name="trash-outline" size={20} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15, flexShrink: 1 }} textAlign="center">
+              {t("budgets.removeBudget")}
+            </Text>
           </Pressable>
-        </ScrollView>
+          <Pressable
+            onPress={handleSave}
+            style={{
+              flex: 1,
+              height: 52,
+              borderRadius: 14,
+              backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "row",
+              gap: 8,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.save")}
+          >
+            <Ionicons name="checkmark" size={22} color={textColor} />
+            <Text style={{ color: textColor, fontWeight: "700", fontSize: 16 }}>{t("common.save")}</Text>
+          </Pressable>
+        </View>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );

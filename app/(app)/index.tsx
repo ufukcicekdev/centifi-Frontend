@@ -381,13 +381,8 @@ export default function Dashboard() {
   /** Alt yüzen şeridin kapladığı yükseklik — ScrollView içeriği bunun altına kaydırılabilsin */
   const floatingChromeHeight = showSearchBar ? 12 + searchStripExtra + bottomBarInset : bottomBarBlockHeight;
   const scrollBottomPad = floatingChromeHeight + 36;
-  /**
-   * Android: `adjustResize` (app.json `softwareKeyboardLayoutMode: resize`) ile kök layout zaten
-   * klavye kadar küçülür — buraya bir de keyboardInset eklemek çubuğu iki kez yukarı iter (üstte görünür).
-   * iOS: floating layer için klavye yüksekliği gerekir.
-   */
-  const floatingBarBottom =
-    showSearchBar ? (Platform.OS === "android" ? 0 : keyboardInset) : 0;
+  /** Klavye açıkken yüzen search/FAB şeridini klavyenin üstüne it. */
+  const floatingBarBottom = showSearchBar ? keyboardInset : 0;
 
   const micRed = "#FF4757";
   const fabMenuBg = isDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.96)";

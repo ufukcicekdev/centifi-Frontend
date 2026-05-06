@@ -189,7 +189,7 @@ export default function CategoryEditorModal({
           }}
         />
         <Text style={{ color: textColor, fontSize: 18, fontWeight: "700", marginBottom: 20 }}>
-          {existing ? "Edit Category" : "New Category"}
+          {existing ? t("settings.categoryEditorEditTitle") : t("settings.categoryEditorNewTitle")}
         </Text>
 
         <Pressable
@@ -222,7 +222,7 @@ export default function CategoryEditorModal({
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Category name"
+            placeholder={t("settings.categoryNamePlaceholder")}
             placeholderTextColor={mutedColor}
             style={{ color: textColor, fontSize: 16, padding: 0 }}
           />
@@ -242,10 +242,8 @@ export default function CategoryEditorModal({
             opacity: pressed ? 0.8 : 1,
           })}
         >
-          <Text
-            style={{ color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" }}
-          >
-            {existing ? "Update" : "Create Category"}
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" }}>
+            {existing ? t("settings.categoryEditorUpdate") : t("settings.categoryEditorCreate")}
           </Text>
         </Pressable>
       </View>

@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import type { ExpenseList } from "../constants/mockData";
 import type { Language } from "../i18n";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 import { useAppDialog } from "../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../lib/listDisplayName";
@@ -102,6 +103,7 @@ export default function ListsPickerModal({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const keyboardInset = useKeyboardInset();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!visible) {
@@ -140,12 +142,15 @@ export default function ListsPickerModal({
             paddingHorizontal: 20,
             paddingTop: 22,
             /**
-             * Android'de Modal + `adjustResize` ile sheet zaten klavyenin üstüne çıkar.
-             * Burada bir de keyboardInset eklemek içerği iki kez yukarı iter ve "Yeni liste adı"
-             * alanını görünmez yapabilir.
+             * Modal alt sheet’i activity’nin `adjustResize` davranışından bağımsızdır;
+             * Android’de klavye açıldığında alt boşluğu klavye yüksekliği kadar artırıyoruz
+             * ki TextInput + Ekle butonu klavyenin hemen üstünde kalsın.
              */
-            paddingBottom: Platform.OS === "android" ? 36 : Math.max(36, keyboardInset + 20),
-            maxHeight: "72%",
+            paddingBottom:
+              keyboardInset > 0
+                ? keyboardInset + 12
+                : Math.max(36, insets.bottom + 20),
+            maxHeight: "82%",
           }}
         >
             <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 10 }}>

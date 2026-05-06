@@ -3,7 +3,7 @@
     "name": "Centifi",
     "slug": "centifi",
     "owner": "centifi",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -33,7 +33,7 @@
         "backgroundColor": "#6C63FF"
       },
       "package": "centifi.app",
-      "versionCode": 2,
+      "versionCode": 4,
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",

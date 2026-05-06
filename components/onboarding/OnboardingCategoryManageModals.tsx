@@ -23,6 +23,11 @@ import {
 } from "../../constants/mockData";
 import { EmojiPickerSheet } from "../CategoryEditorModal";
 import { useStore } from "../../store/useStore";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset";
+import {
+  actionBarInnerBottomPad,
+  keyboardLiftPaddingBottom,
+} from "../../lib/keyboardFooterChrome";
 
 const CORAL = "#FF6B6B";
 const PURPLE = "#6C63FF";
@@ -313,6 +318,7 @@ export function OnboardingCategoryEditModal({
   const { t } = useTranslation();
   const { showAlert, showConfirm } = useAppDialog();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("📦");
   const [colorPair, setColorPair] = useState(COLORS[0]);
@@ -374,39 +380,48 @@ export function OnboardingCategoryEditModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: bg }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
+        <Pressable
+          onPress={onClose}
+          hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
+          style={{
+            alignSelf: "flex-start",
+            marginLeft: 8,
+            paddingTop: closeRowPaddingTop,
+            paddingLeft: 12,
+            paddingBottom: 8,
+            paddingRight: 12,
+            minWidth: 44,
+            minHeight: 44,
+            justifyContent: "center",
+          }}
+          accessibilityLabel="Close"
         >
-          <Pressable
-            onPress={onClose}
-            hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
-            style={{
-              alignSelf: "flex-start",
-              marginLeft: 8,
-              paddingTop: closeRowPaddingTop,
-              paddingLeft: 12,
-              paddingBottom: 8,
-              paddingRight: 12,
-              minWidth: 44,
-              minHeight: 44,
-              justifyContent: "center",
-            }}
-            accessibilityLabel="Close"
-          >
-            <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : text} />
-          </Pressable>
+          <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : text} />
+        </Pressable>
 
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: 24,
-              paddingTop: 8,
-              paddingBottom: 120,
-              alignItems: "center",
-            }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+        <View
+          style={{
+            flex: 1,
+            paddingBottom:
+              Platform.OS === "android"
+                ? keyboardInset > 0
+                  ? keyboardInset + insets.bottom
+                  : 0
+                : keyboardLiftPaddingBottom(keyboardInset),
+          }}
+        >
+          <KeyboardAvoidingView behavior={undefined} style={{ flex: 1 }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                paddingHorizontal: 24,
+                paddingTop: 8,
+                paddingBottom: 24,
+                alignItems: "center",
+              }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
             <View style={{ position: "relative", marginBottom: 20 }}>
               <View
                 style={{
@@ -455,8 +470,18 @@ export function OnboardingCategoryEditModal({
               }}
             />
 
-            <Text style={{ alignSelf: "flex-start", color: muted, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 10 }}>
-              COLOR
+            <Text
+              style={{
+                alignSelf: "flex-start",
+                color: muted,
+                fontSize: 11,
+                fontWeight: "700",
+                letterSpacing: 1,
+                marginBottom: 10,
+                textTransform: "uppercase",
+              }}
+            >
+              {t("settings.categoryColorLabel")}
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 32, justifyContent: "center" }}>
               {COLORS.map((c) => (
@@ -475,18 +500,15 @@ export function OnboardingCategoryEditModal({
               ))}
             </View>
           </ScrollView>
+          </KeyboardAvoidingView>
 
           <View
             style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
               flexDirection: "row",
               gap: 12,
               paddingHorizontal: 20,
               paddingTop: 12,
-              paddingBottom: Math.max(insets.bottom, 20),
+              paddingBottom: actionBarInnerBottomPad(keyboardInset, insets.bottom),
               backgroundColor: isDark ? "#0a0a0a" : "#fff",
               borderTopWidth: StyleSheet.hairlineWidth,
               borderTopColor: border,
@@ -525,9 +547,9 @@ export function OnboardingCategoryEditModal({
               <Text style={{ color: text, fontWeight: "700", fontSize: 16 }}>{labels.save}</Text>
             </Pressable>
           </View>
+        </View>
 
-          <EmojiPickerSheet visible={emojiOpen} onSelect={setEmoji} onClose={() => setEmojiOpen(false)} isDark={isDark} />
-        </KeyboardAvoidingView>
+        <EmojiPickerSheet visible={emojiOpen} onSelect={setEmoji} onClose={() => setEmojiOpen(false)} isDark={isDark} />
       </View>
     </Modal>
   );

@@ -51,9 +51,15 @@ import { ensureLocalNotificationPermissions } from "../../lib/localNotifications
 import { clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
+import {
+  actionBarInnerBottomPad,
+  keyboardLiftPaddingBottom,
+} from "../../lib/keyboardFooterChrome";
 
 const PURPLE = "#6C63FF";
 const DESTRUCTIVE = "#FF453A";
+/** Kategori düzenleme alt şeridi ile aynı silme rengi */
+const CORAL = "#FF6B6B";
 
 function splitDisplayName(full: string): { first_name: string; last_name: string } {
   const parts = full.trim().split(/\s+/).filter(Boolean);
@@ -677,6 +683,8 @@ export default function Settings() {
   const [profileName, setProfileName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
+  const settingsScrollRef = useRef<ScrollView>(null);
 
   const bg = isDark ? "#000000" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#000";
@@ -959,13 +967,18 @@ export default function Settings() {
       </View>
 
       <ScrollView
+        ref={settingsScrollRef}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
-        /** Android: auto keyboard insets can cause “shaky” layout while scrolling. */
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        /** Android: klavye açıkken altta ekstra kaydırma alanı (özellikle “Yeni liste”). */
         contentContainerStyle={{
           paddingHorizontal: GUTTER,
-          paddingBottom: 24 + Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0),
+          paddingBottom:
+            24 +
+            Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0) +
+            (Platform.OS === "android" ? keyboardInset : 0),
         }}
       >
 
@@ -1650,225 +1663,199 @@ export default function Settings() {
           setListEmojiPickerOpen(false);
         }}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top", "left", "right", "bottom"]}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top", "left", "right"]}>
+          <Pressable
+            onPress={() => {
+              if (savingListEdit || deletingList) return;
+              setEditingList(null);
+              setEditListName("");
+              setEditListEmoji("📋");
+              setListEmojiPickerOpen(false);
+            }}
+            hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
+            style={{
+              alignSelf: "flex-start",
+              marginLeft: 8,
+              paddingTop: 12,
+              paddingLeft: 12,
+              paddingBottom: 8,
+              paddingRight: 12,
+              minWidth: 44,
+              minHeight: 44,
+              justifyContent: "center",
+            }}
+            accessibilityLabel="Close"
+          >
+            <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : textColor} />
+          </Pressable>
+
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 8,
-              paddingVertical: 12,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: divider,
-              backgroundColor: cardBg,
+              flex: 1,
+              paddingBottom:
+                Platform.OS === "android"
+                  ? keyboardInset > 0
+                    ? keyboardInset + insets.bottom
+                    : 0
+                  : keyboardLiftPaddingBottom(keyboardInset),
             }}
           >
-            <Pressable
-              onPress={() => {
-                if (savingListEdit || deletingList) return;
-                setEditingList(null);
-                setEditListName("");
-                setEditListEmoji("📋");
-                setListEmojiPickerOpen(false);
-              }}
-              style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
-              hitSlop={12}
-            >
-              <Ionicons name="close" size={26} color={mutedColor} />
-            </Pressable>
-            <Text
-              style={{
-                flex: 1,
-                textAlign: "center",
-                color: textColor,
-                fontSize: 17,
-                fontWeight: "700",
-              }}
-            >
-              {t("settings.editList")}
-            </Text>
-            <View style={{ width: 44, height: 44 }} />
-          </View>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-          >
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={undefined}>
             <ScrollView
               style={{ flex: 1 }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
               contentContainerStyle={{
-                flexGrow: 1,
-                paddingHorizontal: GUTTER,
-                paddingTop: 24,
-                paddingBottom: 24 + insets.bottom,
-                minHeight: win.height * 0.55,
+                paddingHorizontal: 24,
+                paddingTop: 8,
+                paddingBottom: 24,
+                alignItems: "center",
               }}
+              showsVerticalScrollIndicator={false}
             >
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: "center",
-                  width: "100%",
-                  maxWidth: 480,
-                  alignSelf: "center",
-                }}
-              >
+              <View style={{ position: "relative", marginBottom: 20 }}>
                 <View
                   style={{
-                    backgroundColor: cardBg,
-                    borderRadius: 16,
-                    padding: 20,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor,
+                    width: 120,
+                    height: 120,
+                    borderRadius: 28,
+                    backgroundColor: isDark ? "#1c1c1e" : "#efefef",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "700",
-                      color: mutedColor,
-                      letterSpacing: 0.6,
-                      textTransform: "uppercase",
-                      marginBottom: 10,
-                    }}
-                  >
-                    {t("settings.listNameLabel")}
-                  </Text>
-                  <TextInput
-                    value={editListName}
-                    onChangeText={setEditListName}
-                    placeholder={t("settings.listNamePlaceholder")}
-                    placeholderTextColor={mutedColor}
-                    editable={!savingListEdit && !deletingList}
-                    autoFocus
-                    style={{
-                      color: textColor,
-                      fontSize: 17,
-                      backgroundColor: inputBg,
-                      borderRadius: 12,
-                      paddingHorizontal: 14,
-                      paddingVertical: 14,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "700",
-                      color: mutedColor,
-                      letterSpacing: 0.6,
-                      textTransform: "uppercase",
-                      marginTop: 18,
-                      marginBottom: 10,
-                    }}
-                  >
-                    {t("settings.listIconLabel")}
-                  </Text>
-                  <Pressable
-                    onPress={() => setListEmojiPickerOpen(true)}
-                    disabled={savingListEdit || deletingList}
-                    style={({ pressed }) => ({
-                      alignItems: "center",
-                      justifyContent: "center",
-                      paddingVertical: 14,
-                      borderRadius: 14,
-                      backgroundColor: inputBg,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor,
-                      opacity: pressed ? 0.85 : savingListEdit || deletingList ? 0.45 : 1,
-                    })}
-                    accessibilityRole="button"
-                  >
-                    <Text style={{ fontSize: 48 }}>{editListEmoji.trim() || "📋"}</Text>
-                    <Text
-                      style={{
-                        marginTop: 10,
-                        color: PURPLE,
-                        fontSize: 14,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {t("settings.listIconHint")}
-                    </Text>
-                  </Pressable>
-                  {!canDeleteEditedList && editingList.id !== "private" && !editingList.isDefault ? (
-                    <Text
-                      style={{
-                        marginTop: 12,
-                        fontSize: 13,
-                        lineHeight: 18,
-                        color: mutedColor,
-                      }}
-                    >
-                      {t("settings.cannotDeleteListHasExpenses")}
-                    </Text>
-                  ) : null}
-                  <Pressable
-                    onPress={() => void handleSaveListEdit()}
-                    disabled={!listEditSaveReady || savingListEdit || deletingList}
-                    style={({ pressed }) => {
-                      const active = listEditSaveReady && !deletingList;
-                      return {
-                        marginTop: 20,
-                        width: "100%",
-                        borderRadius: 14,
-                        paddingVertical: 16,
-                        minHeight: 52,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: active ? PURPLE : isDark ? "rgba(44, 44, 46, 0.6)" : "#e8e8ed",
-                        borderWidth: active ? 0 : 1.5,
-                        borderColor: active
-                          ? "transparent"
-                          : isDark
-                            ? "rgba(255,255,255,0.28)"
-                            : "rgba(0,0,0,0.1)",
-                        opacity: pressed && active && !savingListEdit ? 0.88 : 1,
-                      };
-                    }}
-                  >
-                    {savingListEdit ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text
-                        style={{
-                          textAlign: "center",
-                          color: listEditSaveReady ? "#fff" : isDark ? "rgba(255,255,255,0.72)" : "#636366",
-                          fontWeight: "700",
-                          fontSize: 16,
-                        }}
-                      >
-                        {t("common.save")}
-                      </Text>
-                    )}
-                  </Pressable>
-                  {canDeleteEditedList ? (
-                    <Pressable
-                      onPress={() => void handleConfirmDeleteEditedList()}
-                      disabled={savingListEdit || deletingList}
-                      style={({ pressed }) => ({
-                        marginTop: 14,
-                        paddingVertical: 14,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        opacity: pressed && !deletingList ? 0.75 : savingListEdit || deletingList ? 0.45 : 1,
-                      })}
-                    >
-                      {deletingList ? (
-                        <ActivityIndicator color={DESTRUCTIVE} />
-                      ) : (
-                        <Text style={{ color: DESTRUCTIVE, fontWeight: "700", fontSize: 16 }}>
-                          {t("settings.deleteList")}
-                        </Text>
-                      )}
-                    </Pressable>
-                  ) : null}
+                  <Text style={{ fontSize: 56 }}>{editListEmoji.trim() || "📋"}</Text>
                 </View>
+                <Pressable
+                  onPress={() => setListEmojiPickerOpen(true)}
+                  disabled={savingListEdit || deletingList}
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: isDark ? "#2c2c2e" : "#e8e8ec",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 2,
+                    borderColor: bg,
+                  }}
+                  accessibilityLabel={t("settings.listIconHint")}
+                >
+                  <Ionicons name="pencil" size={16} color={textColor} />
+                </Pressable>
               </View>
+
+              <TextInput
+                value={editListName}
+                onChangeText={setEditListName}
+                placeholder={t("settings.listNamePlaceholder")}
+                placeholderTextColor={mutedColor}
+                editable={!savingListEdit && !deletingList}
+                autoFocus
+                style={{
+                  color: textColor,
+                  fontSize: 28,
+                  fontWeight: "700",
+                  textAlign: "center",
+                  marginBottom: 12,
+                  minWidth: "100%",
+                }}
+              />
+
+              {!canDeleteEditedList && editingList.id !== "private" && !editingList.isDefault ? (
+                <Text
+                  style={{
+                    marginTop: 8,
+                    fontSize: 13,
+                    lineHeight: 18,
+                    color: mutedColor,
+                    textAlign: "center",
+                    paddingHorizontal: 12,
+                  }}
+                >
+                  {t("settings.cannotDeleteListHasExpenses")}
+                </Text>
+              ) : null}
             </ScrollView>
           </KeyboardAvoidingView>
+
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 12,
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: actionBarInnerBottomPad(keyboardInset, insets.bottom),
+              backgroundColor: isDark ? "#0a0a0a" : "#fff",
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: divider,
+            }}
+          >
+            {canDeleteEditedList ? (
+              <Pressable
+                onPress={() => void handleConfirmDeleteEditedList()}
+                disabled={savingListEdit || deletingList}
+                style={{
+                  flex: 1,
+                  height: 52,
+                  borderRadius: 14,
+                  backgroundColor: CORAL,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  gap: 8,
+                  opacity: savingListEdit || deletingList ? 0.45 : 1,
+                }}
+              >
+                {deletingList ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={20} color="#fff" />
+                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15, flexShrink: 1 }} textAlign="center">
+                      {t("settings.deleteList")}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => void handleSaveListEdit()}
+              disabled={!listEditSaveReady || savingListEdit || deletingList}
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: 14,
+                backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 8,
+                opacity: !listEditSaveReady || deletingList ? 0.55 : 1,
+              }}
+            >
+              {savingListEdit ? (
+                <ActivityIndicator color={textColor} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark" size={22} color={textColor} />
+                  <Text
+                    style={{
+                      color: listEditSaveReady ? textColor : mutedColor,
+                      fontWeight: "700",
+                      fontSize: 16,
+                    }}
+                  >
+                    {t("common.save")}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+          </View>
           <EmojiPickerSheet
             visible={listEmojiPickerOpen}
             onSelect={setEditListEmoji}
