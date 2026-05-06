@@ -1,4 +1,4 @@
-package app.centifi
+package centifi.app
 
 import android.content.Context
 import org.json.JSONArray
@@ -10,7 +10,7 @@ internal object BankNotifPrefs {
   const val KEY_QUEUE = "pending_native_queue_json"
   /** Uygulama içi “Bildirimleri aç” ile senkron; kapalıysa OS bildirimi göstermeyiz. */
   const val KEY_SYSTEM_NOTIF_ENABLED = "bank_system_notif_enabled"
-  const val ACTION_QUEUE_UPDATED = "app.centifi.BANK_PENDING_QUEUE_UPDATED"
+  const val ACTION_QUEUE_UPDATED = "centifi.app.BANK_PENDING_QUEUE_UPDATED"
 
   fun allowedPackages(ctx: Context): Set<String> {
     val prefs = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)

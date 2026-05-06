@@ -24,7 +24,7 @@ import { getCategoryMeta } from "../../../constants/mockData";
 import type { Language } from "../../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useTranslation } from "react-i18next";
-import { displayExpenseListName } from "../../../lib/listDisplayName";
+import { displayExpenseListName, displayListEmoji } from "../../../lib/listDisplayName";
 import { currencySymbolFor, formatAmountDigits } from "../../../lib/formatMoney";
 
 const CORAL = "#FF6B6B";
@@ -263,7 +263,13 @@ export default function CategoryDetailScreen() {
               </Pressable>
               <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
               <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
-                <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
+                {activeList ? (
+                  <Text style={{ fontSize: 15 }}>{displayListEmoji(activeList)}</Text>
+                ) : null}
+                <Text
+                  style={{ color: textColor, fontSize: 14, fontWeight: "600", flexShrink: 1 }}
+                  numberOfLines={1}
+                >
                   {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={mutedColor} />

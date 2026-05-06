@@ -158,8 +158,8 @@ interface AppState {
   // Lists
   lists: ExpenseList[];
   activeListId: string;
-  addList: (name: string) => Promise<void>;
-  updateList: (id: string, name: string) => Promise<void>;
+  addList: (name: string, emoji?: string) => Promise<void>;
+  updateList: (id: string, name: string, emoji?: string) => Promise<void>;
   removeList: (id: string) => Promise<void>;
   setActiveList: (id: string) => void;
 
@@ -263,6 +263,7 @@ export const useStore = create<AppState>((set, get) => {
             id: String(l.id),
             name: l.name,
             isDefault: l.is_default,
+            emoji: typeof l.emoji === "string" && l.emoji.trim() ? l.emoji.trim() : undefined,
           })) :
           DEFAULT_LISTS;
 
@@ -708,36 +709,68 @@ export const useStore = create<AppState>((set, get) => {
   // Lists
   lists: DEFAULT_LISTS,
   activeListId: "private",
-  addList: async (name) => {
+  addList: async (name, emoji) => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const emojiTrim = emoji?.trim() ?? "";
     if (!get().isAuthenticated) {
       set((state) => ({
-        lists: [...state.lists, { id: `list_${Date.now()}`, name: trimmed }],
+        lists: [
+          ...state.lists,
+          {
+            id: `list_${Date.now()}`,
+            name: trimmed,
+            ...(emojiTrim ? { emoji: emojiTrim } : {}),
+          },
+        ],
       }));
       return;
     }
-    const dto = await createExpenseList(trimmed);
+    const dto = await createExpenseList(trimmed, emojiTrim || undefined);
+    const dtoEmoji = typeof dto.emoji === "string" && dto.emoji.trim() ? dto.emoji.trim() : undefined;
     set((state) => ({
-      lists: [...state.lists, { id: String(dto.id), name: dto.name, isDefault: dto.is_default }],
+      lists: [
+        ...state.lists,
+        {
+          id: String(dto.id),
+          name: dto.name,
+          isDefault: dto.is_default,
+          ...(dtoEmoji ? { emoji: dtoEmoji } : {}),
+        },
+      ],
     }));
   },
-  updateList: async (id, name) => {
+  updateList: async (id, name, emoji) => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const emojiTrim = emoji?.trim() ?? "";
     const localOnly = !get().isAuthenticated || id.startsWith("list_");
     if (localOnly) {
       set((state) => ({
-        lists: state.lists.map((l) => (l.id === id ? { ...l, name: trimmed } : l)),
+        lists: state.lists.map((l) => {
+          if (l.id !== id) return l;
+          const next: ExpenseList = { ...l, name: trimmed };
+          if (emojiTrim) next.emoji = emojiTrim;
+          else delete next.emoji;
+          return next;
+        }),
       }));
       return;
     }
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) return;
-    const dto = await patchExpenseList(numId, trimmed);
+    const dto = await patchExpenseList(numId, { name: trimmed, emoji: emojiTrim });
+    const dtoEmoji = typeof dto.emoji === "string" && dto.emoji.trim() ? dto.emoji.trim() : undefined;
     set((state) => ({
       lists: state.lists.map((l) =>
-        l.id === id ? { id: String(dto.id), name: dto.name, isDefault: dto.is_default } : l,
+        l.id === id ?
+          {
+            id: String(dto.id),
+            name: dto.name,
+            isDefault: dto.is_default,
+            ...(dtoEmoji ? { emoji: dtoEmoji } : {}),
+          }
+        : l,
       ),
     }));
   },

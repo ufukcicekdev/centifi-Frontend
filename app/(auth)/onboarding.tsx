@@ -74,15 +74,11 @@ export default function Onboarding() {
     addCategory: t("settings.addCategory"),
   };
   const catEditLabels = {
-    delete: tr ? "Sil" : "Delete",
-    save: tr ? "Kaydet" : "Save",
-    cannotDeleteBuiltin: tr
-      ? "Varsayılan kategoriler silinemez."
-      : "Built-in categories can’t be deleted.",
-    cannotDeleteHasTx: tr
-      ? "Bu kategoride işlem var. Önce işlemleri başka kategoriye taşıyın veya silin."
-      : "This category has transactions. Remove or reassign them first.",
-    namePlaceholder: tr ? "Kategori adı" : "Category name",
+    delete: t("common.delete"),
+    save: t("common.save"),
+    cannotDeleteBuiltin: t("settings.cannotDeleteBuiltinCategory"),
+    cannotDeleteHasTx: t("settings.cannotDeleteCategoryHasTransactions"),
+    namePlaceholder: t("settings.categoryNamePlaceholder"),
   };
 
   const editHasTransactions =
@@ -266,7 +262,7 @@ export default function Onboarding() {
         </View>
         {step < STEPS - 1 && (
           <Pressable onPress={() => setStep(s => s + 1)} style={{ alignSelf: "flex-end", marginBottom: 8 }} hitSlop={12}>
-            <Text style={{ color: muted, fontSize: 13 }}>Skip</Text>
+            <Text style={{ color: muted, fontSize: 13 }}>{t("onboarding.skip")}</Text>
           </Pressable>
         )}
 
@@ -275,15 +271,15 @@ export default function Onboarding() {
           <View style={{ paddingTop: 24 }}>
             <Text style={{ fontSize: 56, textAlign: "center", marginBottom: 20 }}>👋</Text>
             <Text style={{ color: text, fontSize: 26, fontWeight: "800", textAlign: "center", marginBottom: 10 }}>
-              Welcome to Centifi
+              {t("onboarding.welcomeTitle")}
             </Text>
             <Text style={{ color: muted, fontSize: 15, textAlign: "center", lineHeight: 22, marginBottom: 36 }}>
-              Let's set up your account in a few quick steps.
+              {t("onboarding.welcomeBody")}
             </Text>
             {[
-              { emoji: "📊", title: "Track expenses", desc: "Log with text, photo or voice" },
-              { emoji: "🏦", title: "Bank integration", desc: "Auto-import from your bank app" },
-              { emoji: "🤖", title: "AI-powered", desc: "Smart categorization & insights" },
+              { emoji: "📊", title: t("onboarding.welcomeCard1Title"), desc: t("onboarding.welcomeCard1Desc") },
+              { emoji: "🏦", title: t("onboarding.welcomeCard2Title"), desc: t("onboarding.welcomeCard2Desc") },
+              { emoji: "🤖", title: t("onboarding.welcomeCard3Title"), desc: t("onboarding.welcomeCard3Desc") },
             ].map((item) => (
               <View key={item.title} style={{
                 flexDirection: "row", alignItems: "center",
@@ -303,9 +299,11 @@ export default function Onboarding() {
         {/* ── STEP 1: Categories ── */}
         {step === 1 && (
           <View style={{ paddingTop: 16 }}>
-            <Text style={{ color: text, fontSize: 24, fontWeight: "800", marginBottom: 6 }}>Choose categories</Text>
+            <Text style={{ color: text, fontSize: 24, fontWeight: "800", marginBottom: 6 }}>
+              {t("onboarding.chooseCategoriesTitle")}
+            </Text>
             <Text style={{ color: muted, fontSize: 14, marginBottom: 16 }}>
-              Tap to select. Chosen categories show a ring and checkmark.
+              {t("onboarding.chooseCategoriesBody")}
             </Text>
             <Pressable
               onPress={() => setManageListOpen(true)}
@@ -320,7 +318,7 @@ export default function Onboarding() {
             >
               <Ionicons name="create-outline" size={20} color={PURPLE} />
               <Text style={{ color: PURPLE, fontSize: 15, fontWeight: "700" }}>
-                {tr ? "Kategorileri düzenle" : "Edit categories"}
+                {t("onboarding.editCategories")}
               </Text>
             </Pressable>
             {categoryRows.map((row, rowIdx) => (
@@ -362,7 +360,9 @@ export default function Onboarding() {
                         }}>
                           <Ionicons name="add" size={26} color={muted} />
                         </View>
-                        <Text style={{ color: muted, fontSize: 12, fontWeight: "600", marginTop: 8 }}>Add</Text>
+                        <Text style={{ color: muted, fontSize: 12, fontWeight: "600", marginTop: 8 }}>
+                          {t("onboarding.add")}
+                        </Text>
                       </Pressable>
                     ) : renderCategoryTile(cat, iconW)}
                   </View>
@@ -370,7 +370,7 @@ export default function Onboarding() {
               </View>
             ))}
             <Text style={{ color: muted, fontSize: 13, textAlign: "center", marginTop: 4 }}>
-              {selected.length} selected
+              {t("onboarding.selectedCount", { count: selected.length })}
             </Text>
           </View>
         )}
@@ -378,16 +378,18 @@ export default function Onboarding() {
         {/* ── STEP 2: Bank ── */}
         {step === 2 && (
           <View style={{ paddingTop: 16, width: "100%", maxWidth: "100%" }}>
-            <Text style={{ color: text, fontSize: 24, fontWeight: "800", marginBottom: 6 }}>Connect your bank</Text>
+            <Text style={{ color: text, fontSize: 24, fontWeight: "800", marginBottom: 6 }}>
+              {t("onboarding.connectBankTitle")}
+            </Text>
             <Text style={{ color: muted, fontSize: 14, lineHeight: 20, marginBottom: 24 }}>
-              Auto-log expenses from bank notifications — no account access needed.
+              {t("onboarding.connectBankBody")}
             </Text>
             <View style={{ backgroundColor: card, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: "hidden", marginBottom: 16 }}>
               {[
-                { n: "1", icon: "storefront-outline" as const, title: "Open your bank app", desc: "Find it on Play Store or App Store" },
-                { n: "2", icon: "copy-outline" as const, title: "Copy the store link", desc: "Tap Share → Copy link on the store page" },
-                { n: "3", icon: "link-outline" as const, title: "Paste it in Settings", desc: "Settings → Bank Integrations → Add bank" },
-                { n: "4", icon: "notifications-outline" as const, title: "Allow notifications", desc: "Centifi reads payment notifications only" },
+                { n: "1", icon: "storefront-outline" as const, title: t("onboarding.bankStep1Title"), desc: t("onboarding.bankStep1Desc") },
+                { n: "2", icon: "copy-outline" as const, title: t("onboarding.bankStep2Title"), desc: t("onboarding.bankStep2Desc") },
+                { n: "3", icon: "link-outline" as const, title: t("onboarding.bankStep3Title"), desc: t("onboarding.bankStep3Desc") },
+                { n: "4", icon: "notifications-outline" as const, title: t("onboarding.bankStep4Title"), desc: t("onboarding.bankStep4Desc") },
               ].map((item, idx, arr) => (
                 <View key={item.n}>
                   <View style={{ flexDirection: "row", alignItems: "center", padding: 14 }}>
@@ -407,7 +409,7 @@ export default function Onboarding() {
             <View style={{ backgroundColor: `${PURPLE}15`, borderRadius: 12, padding: 14, flexDirection: "row" }}>
               <Ionicons name="shield-checkmark-outline" size={18} color={PURPLE} style={{ marginRight: 10, marginTop: 1 }} />
               <Text style={{ color: muted, fontSize: 13, lineHeight: 20, flex: 1 }}>
-                Centifi never accesses your bank account. It only reads notification text on your device.
+                {t("onboarding.bankPrivacy")}
               </Text>
             </View>
           </View>
@@ -454,7 +456,7 @@ export default function Onboarding() {
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
                   <Ionicons name="chevron-back" size={20} color={text} style={{ marginRight: 6 }} />
                   <Text style={{ color: text, fontSize: 16, fontWeight: "700" }} numberOfLines={1}>
-                    Prev
+                    {t("onboarding.prev")}
                   </Text>
                 </View>
               </Pressable>
@@ -491,7 +493,7 @@ export default function Onboarding() {
                       }}
                       numberOfLines={1}
                     >
-                      {step < STEPS - 1 ? "Continue" : "Get Started 🚀"}
+                      {step < STEPS - 1 ? t("onboarding.continue") : t("onboarding.getStarted")}
                     </Text>
                     {step < STEPS - 1 ? (
                       <Ionicons name="chevron-forward" size={20} color={primaryCtaText} style={{ marginLeft: 6 }} />
@@ -530,7 +532,7 @@ export default function Onboarding() {
             >
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
                 <Text style={{ color: primaryCtaText, fontSize: 16, fontWeight: "700", letterSpacing: 0.2 }}>
-                  Continue
+                  {t("onboarding.continue")}
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={primaryCtaText} style={{ marginLeft: 6 }} />
               </View>
@@ -552,7 +554,7 @@ export default function Onboarding() {
             }}
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <Text style={{ color: text, fontSize: 18, fontWeight: "800" }}>New category</Text>
+              <Text style={{ color: text, fontSize: 18, fontWeight: "800" }}>{t("onboarding.newCategory")}</Text>
               <Pressable onPress={closeAddCategoryModal} hitSlop={12}>
                 <Ionicons name="close" size={22} color={muted} />
               </Pressable>
@@ -561,16 +563,20 @@ export default function Onboarding() {
               <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: newColor.bg, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
                 <Text style={{ fontSize: 32 }}>{newEmoji}</Text>
               </View>
-              <Text style={{ color: newColor.color, fontSize: 14, fontWeight: "700" }}>{newName || "Category name"}</Text>
+              <Text style={{ color: newColor.color, fontSize: 14, fontWeight: "700" }}>
+                {newName || t("onboarding.categoryNamePlaceholder")}
+              </Text>
             </View>
             <View style={{ backgroundColor: inputBg, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: border, marginBottom: 16 }}>
               <TextInput
                 value={newName} onChangeText={setNewName}
-                placeholder="Category name" placeholderTextColor={muted}
+                placeholder={t("onboarding.categoryNamePlaceholder")} placeholderTextColor={muted}
                 style={{ color: text, fontSize: 15, paddingVertical: 12 }}
               />
             </View>
-            <Text style={{ color: muted, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 8 }}>EMOJI</Text>
+            <Text style={{ color: muted, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 8 }}>
+              {t("onboarding.emoji")}
+            </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
               {EMOJI_OPTIONS.map(em => (
                 <Pressable key={em} onPress={() => setNewEmoji(em)} style={{

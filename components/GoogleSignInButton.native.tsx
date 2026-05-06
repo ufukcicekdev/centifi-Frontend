@@ -31,7 +31,7 @@ function formatGoogleNativeError(e: unknown): string {
     const code = (e as { code?: string | number }).code;
     const msg = (e as { message?: string }).message ?? "";
     if (code === 10 || String(code) === "10" || /DEVELOPER_ERROR/i.test(String(msg))) {
-      return `${msg || "DEVELOPER_ERROR"}\n\nGenelde sebep: Google Cloud → Android OAuth istemcisinde bu APK’nın SHA-1’i yok (debug APK ile release/EAS farklıdır; ikisini de ekleyin) veya paket adı app.centifi değil.\n\nYerel: android/ içinde ./gradlew signingReport\nPlay/EAS: Play Console veya EAS keystore SHA-1`;
+      return `${msg || "DEVELOPER_ERROR"}\n\nGenelde sebep: Google Cloud → Android OAuth istemcisinde (paket: centifi.app) bu derlemenin SHA-1’i eksik.\n• Mağazadan indirilen sürüm: Play Console → Uygulama bütünlüğü → Uygulama imzalama anahtarı sertifikası → SHA-1 (çoğu zaman gerekli olan budur).\n• Yerel/AAB imzalama: upload keystore SHA-1.\nDebug ile release SHA-1 farklıdır; gerekiyorsa ikisini de ekleyin.\n\nYerel: android/ içinde ./gradlew signingReport`;
     }
     return msg ? `${String(code)}: ${msg}` : String(code);
   }

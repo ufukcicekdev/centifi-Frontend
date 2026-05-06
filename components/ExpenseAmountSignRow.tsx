@@ -32,10 +32,14 @@ export default function ExpenseAmountSignRow({
   const amtColor = isIncome ? INCOME_GREEN : CORAL;
 
   const segPad = { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 } as const;
+  // Keep the amount visually centered regardless of suffix/button width.
+  const leftSlotWidth = 64;
+  const rightSlotWidth = 110;
 
   return (
     <View
       style={{
+        position: "relative",
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: stepperBg,
@@ -45,49 +49,73 @@ export default function ExpenseAmountSignRow({
         gap: 6,
       }}
     >
-      <Pressable
-        onPress={onSelectExpense}
-        accessibilityRole="button"
-        accessibilityState={{ selected: expenseSel }}
-        style={{
-          ...segPad,
-          backgroundColor: expenseSel ? (isDark ? "#3a2528" : "#ffe8e8") : "transparent",
-          borderWidth: expenseSel ? 1.5 : 0,
-          borderColor: expenseSel ? CORAL : "transparent",
-        }}
-      >
-        <Text style={{ color: CORAL, fontSize: 22, fontWeight: "700", textAlign: "center" }}>−</Text>
-      </Pressable>
       <TextInput
         value={amount}
         onChangeText={onChangeAmount}
         keyboardType="decimal-pad"
         style={{
-          flex: 1,
+          width: "100%",
           color: amtColor,
           fontSize: 32,
           fontWeight: "700",
           textAlign: "center",
           paddingVertical: 6,
+          paddingLeft: leftSlotWidth,
+          paddingRight: rightSlotWidth,
           minWidth: 80,
         }}
       />
-      <Text style={{ color: mutedColor, fontSize: 17, fontWeight: "600" }}>{currencySuffix}</Text>
-      <Pressable
-        onPress={onSelectIncome}
-        accessibilityRole="button"
-        accessibilityState={{ selected: incomeSel }}
+      <View style={{ position: "absolute", left: 8, width: leftSlotWidth, alignItems: "flex-start" }}>
+        <Pressable
+          onPress={onSelectExpense}
+          accessibilityRole="button"
+          accessibilityState={{ selected: expenseSel }}
+          style={{
+            ...segPad,
+            backgroundColor: expenseSel ? (isDark ? "#3a2528" : "#ffe8e8") : "transparent",
+            borderWidth: expenseSel ? 1.5 : 0,
+            borderColor: expenseSel ? CORAL : "transparent",
+          }}
+        >
+          <Text style={{ color: CORAL, fontSize: 22, fontWeight: "700", textAlign: "center" }}>−</Text>
+        </Pressable>
+      </View>
+
+      <View
         style={{
-          ...segPad,
-          backgroundColor: incomeSel ? (isDark ? "#1e3329" : "#e8faf3") : "transparent",
-          borderWidth: incomeSel ? 1.5 : 0,
-          borderColor: incomeSel ? INCOME_GREEN : "transparent",
+          position: "absolute",
+          right: 8,
+          width: rightSlotWidth,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 10,
         }}
       >
-        <Text style={{ color: incomeSel ? INCOME_GREEN : mutedColor, fontSize: 22, fontWeight: "700", textAlign: "center" }}>
-          +
-        </Text>
-      </Pressable>
+        <Text style={{ color: mutedColor, fontSize: 17, fontWeight: "600" }}>{currencySuffix}</Text>
+        <Pressable
+          onPress={onSelectIncome}
+          accessibilityRole="button"
+          accessibilityState={{ selected: incomeSel }}
+          style={{
+            ...segPad,
+            backgroundColor: incomeSel ? (isDark ? "#1e3329" : "#e8faf3") : "transparent",
+            borderWidth: incomeSel ? 1.5 : 0,
+            borderColor: incomeSel ? INCOME_GREEN : "transparent",
+          }}
+        >
+          <Text
+            style={{
+              color: incomeSel ? INCOME_GREEN : mutedColor,
+              fontSize: 22,
+              fontWeight: "700",
+              textAlign: "center",
+            }}
+          >
+            +
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

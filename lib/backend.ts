@@ -114,6 +114,7 @@ export type ExpenseListDto = {
   id: number;
   name: string;
   is_default: boolean;
+  emoji?: string;
 };
 
 /** When omitted or legacy `"private"`, API attaches the user's default list. */
@@ -369,21 +370,25 @@ export async function listExpenseLists() {
   return apiFetch<{ results: ExpenseListDto[] }>("/api/expense-lists/", { method: "GET", auth: true });
 }
 
-export async function createExpenseList(name: string) {
+export async function createExpenseList(name: string, emoji?: string) {
+  const payload: { name: string; emoji?: string } = { name: name.trim() };
+  const em = emoji?.trim();
+  if (em) payload.emoji = em;
   return apiFetch<ExpenseListDto>("/api/expense-lists/", {
     method: "POST",
     auth: true,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(payload),
   });
 }
 
-export async function patchExpenseList(id: number, name: string) {
+export async function patchExpenseList(id: number, body: { name: string; emoji?: string }) {
+  const trimmedEmoji = body.emoji?.trim() ?? "";
   return apiFetch<ExpenseListDto>(`/api/expense-lists/${id}/`, {
     method: "PATCH",
     auth: true,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: name.trim() }),
+    body: JSON.stringify({ name: body.name.trim(), emoji: trimmedEmoji }),
   });
 }
 

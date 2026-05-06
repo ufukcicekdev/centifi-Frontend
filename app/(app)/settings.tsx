@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Image,
   InteractionManager,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
@@ -33,7 +34,7 @@ import {
   PRESET_BANK_PACKAGES,
   type ExpenseList,
 } from "../../constants/mockData";
-import CategoryEditorModal from "../../components/CategoryEditorModal";
+import CategoryEditorModal, { EmojiPickerSheet } from "../../components/CategoryEditorModal";
 import {
   OnboardingCategoryGridModal,
   OnboardingCategoryEditModal,
@@ -49,7 +50,7 @@ import { isValidEmail } from "../../lib/isValidEmail";
 import { ensureLocalNotificationPermissions } from "../../lib/localNotifications";
 import { clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
-import { displayExpenseListName } from "../../lib/listDisplayName";
+import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
 
 const PURPLE = "#6C63FF";
 const DESTRUCTIVE = "#FF453A";
@@ -116,6 +117,7 @@ function Card({ children, isDark }: { children: React.ReactNode; isDark: boolean
 function SettingsRow({
   isDark,
   icon,
+  leading,
   iconTint,
   title,
   subtitle,
@@ -125,7 +127,10 @@ function SettingsRow({
   destructive,
 }: {
   isDark: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
+  /** `leading` yoksa zorunlu */
+  icon?: keyof typeof Ionicons.glyphMap;
+  /** Varsa sol sütunda ikon yerine özel içerik (ör. liste emojisi) */
+  leading?: React.ReactNode;
   iconTint?: string;
   title: string;
   subtitle?: string;
@@ -155,7 +160,7 @@ function SettingsRow({
           justifyContent: "center",
         }}
       >
-        <Ionicons name={icon} size={22} color={tint} />
+        {leading ?? <Ionicons name={icon ?? "ellipse-outline"} size={22} color={tint} />}
       </View>
       <View style={{ flex: 1, marginLeft: ICON_GAP, minWidth: 0, justifyContent: "center" }}>
         <Text style={{ color: titleColor, fontSize: 16, fontWeight: "500" }} numberOfLines={1}>
@@ -601,6 +606,7 @@ export default function Settings() {
     lists,
     addList,
     updateList,
+    removeList,
     bankAutomations,
     addBankAutomation,
     toggleBankAutomation,
@@ -631,6 +637,7 @@ export default function Settings() {
       lists: s.lists,
       addList: s.addList,
       updateList: s.updateList,
+      removeList: s.removeList,
       bankAutomations: s.bankAutomations,
       addBankAutomation: s.addBankAutomation,
       toggleBankAutomation: s.toggleBankAutomation,
@@ -661,7 +668,11 @@ export default function Settings() {
   const [newListName, setNewListName] = useState("");
   const [editingList, setEditingList] = useState<ExpenseList | null>(null);
   const [editListName, setEditListName] = useState("");
+  const [editListEmoji, setEditListEmoji] = useState("📋");
+  const [listEmojiPickerOpen, setListEmojiPickerOpen] = useState(false);
   const [savingListEdit, setSavingListEdit] = useState(false);
+  const [deletingList, setDeletingList] = useState(false);
+  const win = useWindowDimensions();
   const [profileEmail, setProfileEmail] = useState("");
   const [profileName, setProfileName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -772,7 +783,18 @@ export default function Settings() {
     [displayCurrency, language],
   );
 
-  const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const appVersion =
+    (Constants as any).nativeAppVersion ??
+    Constants.expoConfig?.version ??
+    (Constants as any).manifest?.version ??
+    "1.0.0";
+  const buildVersion =
+    (Constants as any).nativeBuildVersion ??
+    (Constants.expoConfig as any)?.ios?.buildNumber ??
+    (Constants.expoConfig as any)?.android?.versionCode ??
+    "";
+  const supportEmail = "info@centifi.app";
+  const websiteUrl = "https://centifi.app";
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -838,8 +860,25 @@ export default function Settings() {
 
   const listEditTrim = editListName.trim();
   const listEditValid = listEditTrim.length > 0;
-  const listEditDirty = !!(editingList && listEditTrim !== editingList.name.trim());
-  const listEditSaveReady = !!(editingList && listEditValid && listEditDirty && !savingListEdit);
+  const storedListEmojiNorm =
+    editingList ? ((editingList.emoji ?? "").trim() || "📋") : "";
+  const editListEmojiNorm = editListEmoji.trim() || "📋";
+  const listEditDirty = !!(
+    editingList &&
+    (listEditTrim !== editingList.name.trim() || editListEmojiNorm !== storedListEmojiNorm)
+  );
+  const listEditSaveReady = !!(editingList && listEditValid && listEditDirty && !savingListEdit && !deletingList);
+
+  const editListExpenseCount = useMemo(() => {
+    if (!editingList) return 0;
+    return expenses.filter((e) => e.listId === editingList.id).length;
+  }, [editingList, expenses]);
+
+  const canDeleteEditedList =
+    !!editingList &&
+    editingList.id !== "private" &&
+    !editingList.isDefault &&
+    editListExpenseCount === 0;
 
   const handleSaveListEdit = async () => {
     if (!editingList) return;
@@ -850,13 +889,40 @@ export default function Settings() {
     }
     setSavingListEdit(true);
     try {
-      await updateList(editingList.id, name);
+      const rawEmoji = editListEmoji.trim();
+      const emojiForStore = rawEmoji === "" || rawEmoji === "📋" ? "" : rawEmoji;
+      await updateList(editingList.id, name, emojiForStore);
       setEditingList(null);
       setEditListName("");
+      setEditListEmoji("📋");
+      setListEmojiPickerOpen(false);
     } catch {
       showAlert(t("common.error"), t("settings.listUpdateFailed"));
     } finally {
       setSavingListEdit(false);
+    }
+  };
+
+  const handleConfirmDeleteEditedList = async () => {
+    if (!editingList || !canDeleteEditedList) return;
+    const ok = await showConfirm({
+      title: t("settings.deleteListConfirmTitle"),
+      message: t("settings.deleteListConfirmMessage"),
+      destructive: true,
+      confirmText: t("settings.deleteList"),
+    });
+    if (!ok) return;
+    setDeletingList(true);
+    try {
+      await removeList(editingList.id);
+      setEditingList(null);
+      setEditListName("");
+      setEditListEmoji("📋");
+      setListEmojiPickerOpen(false);
+    } catch {
+      showAlert(t("common.error"), t("settings.listDeleteFailed"));
+    } finally {
+      setDeletingList(false);
     }
   };
 
@@ -1106,7 +1172,7 @@ export default function Settings() {
               <SettingsRow
                 key={list.id}
                 isDark={isDark}
-                icon="list-outline"
+                leading={<EmojiLeading emoji={displayListEmoji(list)} isDark={isDark} />}
                 title={displayExpenseListName(list.name, t)}
                 dividerTop={idx !== 0}
                 onPress={
@@ -1114,6 +1180,7 @@ export default function Settings() {
                     ? () => {
                         setEditingList(list);
                         setEditListName(list.name);
+                        setEditListEmoji(displayListEmoji(list));
                       }
                     : undefined
                 }
@@ -1576,11 +1643,14 @@ export default function Settings() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
+          if (savingListEdit || deletingList) return;
           setEditingList(null);
           setEditListName("");
+          setEditListEmoji("📋");
+          setListEmojiPickerOpen(false);
         }}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: cardBg }} edges={["top", "left", "right", "bottom"]}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top", "left", "right", "bottom"]}>
           <View
             style={{
               flexDirection: "row",
@@ -1589,12 +1659,16 @@ export default function Settings() {
               paddingVertical: 12,
               borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: divider,
+              backgroundColor: cardBg,
             }}
           >
             <Pressable
               onPress={() => {
+                if (savingListEdit || deletingList) return;
                 setEditingList(null);
                 setEditListName("");
+                setEditListEmoji("📋");
+                setListEmojiPickerOpen(false);
               }}
               style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
               hitSlop={12}
@@ -1614,80 +1688,193 @@ export default function Settings() {
             </Text>
             <View style={{ width: 44, height: 44 }} />
           </View>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: GUTTER, paddingBottom: 32 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "700",
-                color: mutedColor,
-                letterSpacing: 0.6,
-                textTransform: "uppercase",
-                marginBottom: 8,
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          >
+            <ScrollView
+              style={{ flex: 1 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: GUTTER,
+                paddingTop: 24,
+                paddingBottom: 24 + insets.bottom,
+                minHeight: win.height * 0.55,
               }}
             >
-              {t("settings.listNamePlaceholder")}
-            </Text>
-            <TextInput
-              value={editListName}
-              onChangeText={setEditListName}
-              placeholder={t("settings.listNamePlaceholder")}
-              placeholderTextColor={mutedColor}
-              autoFocus
-              style={{
-                color: textColor,
-                fontSize: 16,
-                backgroundColor: inputBg,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 14,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor,
-              }}
-            />
-            <View style={{ width: "100%", paddingTop: 48 }}>
-              <Pressable
-                onPress={() => void handleSaveListEdit()}
-                disabled={!listEditSaveReady}
-                style={({ pressed }) => {
-                  const active = listEditSaveReady;
-                  return {
-                    width: "100%",
-                    alignSelf: "stretch",
-                    borderRadius: 14,
-                    paddingVertical: 16,
-                    paddingHorizontal: 20,
-                    minHeight: 54,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: active ? PURPLE : isDark ? "rgba(44, 44, 46, 0.6)" : "#e8e8ed",
-                    borderWidth: active ? 0 : 1.5,
-                    borderColor: active
-                      ? "transparent"
-                      : isDark
-                        ? "rgba(255,255,255,0.28)"
-                        : "rgba(0,0,0,0.1)",
-                    opacity: pressed && active && !savingListEdit ? 0.88 : 1,
-                  };
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  width: "100%",
+                  maxWidth: 480,
+                  alignSelf: "center",
                 }}
               >
-                {savingListEdit ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
+                <View
+                  style={{
+                    backgroundColor: cardBg,
+                    borderRadius: 16,
+                    padding: 20,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor,
+                  }}
+                >
                   <Text
                     style={{
-                      width: "100%",
-                      textAlign: "center",
-                      color: listEditSaveReady ? "#fff" : isDark ? "rgba(255,255,255,0.72)" : "#636366",
+                      fontSize: 12,
                       fontWeight: "700",
-                      fontSize: 16,
+                      color: mutedColor,
+                      letterSpacing: 0.6,
+                      textTransform: "uppercase",
+                      marginBottom: 10,
                     }}
                   >
-                    {t("common.save")}
+                    {t("settings.listNameLabel")}
                   </Text>
-                )}
-              </Pressable>
-            </View>
-          </ScrollView>
+                  <TextInput
+                    value={editListName}
+                    onChangeText={setEditListName}
+                    placeholder={t("settings.listNamePlaceholder")}
+                    placeholderTextColor={mutedColor}
+                    editable={!savingListEdit && !deletingList}
+                    autoFocus
+                    style={{
+                      color: textColor,
+                      fontSize: 17,
+                      backgroundColor: inputBg,
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 14,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "700",
+                      color: mutedColor,
+                      letterSpacing: 0.6,
+                      textTransform: "uppercase",
+                      marginTop: 18,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {t("settings.listIconLabel")}
+                  </Text>
+                  <Pressable
+                    onPress={() => setListEmojiPickerOpen(true)}
+                    disabled={savingListEdit || deletingList}
+                    style={({ pressed }) => ({
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingVertical: 14,
+                      borderRadius: 14,
+                      backgroundColor: inputBg,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor,
+                      opacity: pressed ? 0.85 : savingListEdit || deletingList ? 0.45 : 1,
+                    })}
+                    accessibilityRole="button"
+                  >
+                    <Text style={{ fontSize: 48 }}>{editListEmoji.trim() || "📋"}</Text>
+                    <Text
+                      style={{
+                        marginTop: 10,
+                        color: PURPLE,
+                        fontSize: 14,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {t("settings.listIconHint")}
+                    </Text>
+                  </Pressable>
+                  {!canDeleteEditedList && editingList.id !== "private" && !editingList.isDefault ? (
+                    <Text
+                      style={{
+                        marginTop: 12,
+                        fontSize: 13,
+                        lineHeight: 18,
+                        color: mutedColor,
+                      }}
+                    >
+                      {t("settings.cannotDeleteListHasExpenses")}
+                    </Text>
+                  ) : null}
+                  <Pressable
+                    onPress={() => void handleSaveListEdit()}
+                    disabled={!listEditSaveReady || savingListEdit || deletingList}
+                    style={({ pressed }) => {
+                      const active = listEditSaveReady && !deletingList;
+                      return {
+                        marginTop: 20,
+                        width: "100%",
+                        borderRadius: 14,
+                        paddingVertical: 16,
+                        minHeight: 52,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: active ? PURPLE : isDark ? "rgba(44, 44, 46, 0.6)" : "#e8e8ed",
+                        borderWidth: active ? 0 : 1.5,
+                        borderColor: active
+                          ? "transparent"
+                          : isDark
+                            ? "rgba(255,255,255,0.28)"
+                            : "rgba(0,0,0,0.1)",
+                        opacity: pressed && active && !savingListEdit ? 0.88 : 1,
+                      };
+                    }}
+                  >
+                    {savingListEdit ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text
+                        style={{
+                          textAlign: "center",
+                          color: listEditSaveReady ? "#fff" : isDark ? "rgba(255,255,255,0.72)" : "#636366",
+                          fontWeight: "700",
+                          fontSize: 16,
+                        }}
+                      >
+                        {t("common.save")}
+                      </Text>
+                    )}
+                  </Pressable>
+                  {canDeleteEditedList ? (
+                    <Pressable
+                      onPress={() => void handleConfirmDeleteEditedList()}
+                      disabled={savingListEdit || deletingList}
+                      style={({ pressed }) => ({
+                        marginTop: 14,
+                        paddingVertical: 14,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: pressed && !deletingList ? 0.75 : savingListEdit || deletingList ? 0.45 : 1,
+                      })}
+                    >
+                      {deletingList ? (
+                        <ActivityIndicator color={DESTRUCTIVE} />
+                      ) : (
+                        <Text style={{ color: DESTRUCTIVE, fontWeight: "700", fontSize: 16 }}>
+                          {t("settings.deleteList")}
+                        </Text>
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+          <EmojiPickerSheet
+            visible={listEmojiPickerOpen}
+            onSelect={setEditListEmoji}
+            onClose={() => setListEmojiPickerOpen(false)}
+            isDark={isDark}
+          />
         </SafeAreaView>
       </Modal>
       ) : null}
@@ -1933,16 +2120,51 @@ export default function Settings() {
             </Pressable>
             <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>{t("settings.aboutModalTitle")}</Text>
           </View>
-          <View style={{ padding: GUTTER, paddingBottom: 32 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: GUTTER, paddingBottom: 32 }}>
             <Text style={{ fontSize: 24, fontWeight: "800", color: textColor, letterSpacing: -0.4 }}>Centifi</Text>
             <Text style={{ fontSize: 15, color: mutedColor, marginTop: 10, lineHeight: 22 }}>{t("settings.aboutTagline")}</Text>
-            <View style={{ marginTop: 28, paddingTop: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: divider }}>
+            <View style={{ marginTop: 22 }}>
+              <Card isDark={isDark}>
+                <SettingsRow
+                  isDark={isDark}
+                  icon="document-text-outline"
+                  title={t("settings.privacyPolicy")}
+                  dividerTop={false}
+                  onPress={() => {
+                    setShowAboutModal(false);
+                    InteractionManager.runAfterInteractions(() => setShowPrivacyModal(true));
+                  }}
+                  right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+                />
+                <SettingsRow
+                  isDark={isDark}
+                  icon="globe-outline"
+                  title={t("settings.website")}
+                  dividerTop
+                  onPress={() => void Linking.openURL(websiteUrl)}
+                  right={<Ionicons name="open-outline" size={18} color={mutedColor} />}
+                />
+                <SettingsRow
+                  isDark={isDark}
+                  icon="mail-outline"
+                  title={t("settings.contact")}
+                  subtitle={supportEmail}
+                  dividerTop
+                  onPress={() => void Linking.openURL(`mailto:${supportEmail}`)}
+                  right={<Ionicons name="open-outline" size={18} color={mutedColor} />}
+                />
+              </Card>
+            </View>
+
+            <View style={{ marginTop: 22, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: divider }}>
               <Text style={{ fontSize: 12, color: mutedColor, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8 }}>
                 {t("settings.version")}
               </Text>
-              <Text style={{ fontSize: 17, color: textColor, fontWeight: "600" }}>{appVersion}</Text>
+              <Text style={{ fontSize: 17, color: textColor, fontWeight: "700" }}>
+                {buildVersion ? `${appVersion} (${t("settings.build")} ${String(buildVersion)})` : appVersion}
+              </Text>
             </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
       ) : null}

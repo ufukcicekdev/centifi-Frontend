@@ -1,4 +1,4 @@
-package app.centifi
+package centifi.app
 
 import android.app.Notification
 import android.service.notification.NotificationListenerService

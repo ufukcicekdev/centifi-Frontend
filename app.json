@@ -2,6 +2,7 @@
   "expo": {
     "name": "Centifi",
     "slug": "centifi",
+    "owner": "centifi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -31,8 +32,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6C63FF"
       },
-      "package": "app.centifi",
-      "versionCode": 1,
+      "package": "centifi.app",
+      "versionCode": 2,
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",
@@ -56,6 +57,12 @@
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9f1ab0f0-dce2-483d-92b0-32e46bb86935"
+      }
     }
   }
 }

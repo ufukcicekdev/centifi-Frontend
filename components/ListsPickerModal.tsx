@@ -14,7 +14,7 @@ import type { ExpenseList } from "../constants/mockData";
 import type { Language } from "../i18n";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 import { useAppDialog } from "../context/AppDialogContext";
-import { displayExpenseListName } from "../lib/listDisplayName";
+import { displayExpenseListName, displayListEmoji } from "../lib/listDisplayName";
 
 const COPY: Record<
   Language,
@@ -74,11 +74,6 @@ const COPY: Record<
     cancel: "Cancelar",
   },
 };
-
-function listEmoji(list: ExpenseList): string {
-  if (list.id === "private" || list.isDefault) return "🤫";
-  return "📋";
-}
 
 export default function ListsPickerModal({
   visible,
@@ -144,7 +139,12 @@ export default function ListsPickerModal({
             borderTopRightRadius: 24,
             paddingHorizontal: 20,
             paddingTop: 22,
-            paddingBottom: Math.max(36, keyboardInset + 20),
+            /**
+             * Android'de Modal + `adjustResize` ile sheet zaten klavyenin üstüne çıkar.
+             * Burada bir de keyboardInset eklemek içerği iki kez yukarı iter ve "Yeni liste adı"
+             * alanını görünmez yapabilir.
+             */
+            paddingBottom: Platform.OS === "android" ? 36 : Math.max(36, keyboardInset + 20),
             maxHeight: "72%",
           }}
         >
@@ -298,7 +298,7 @@ export default function ListsPickerModal({
                         marginRight: 14,
                       }}
                     >
-                      <Text style={{ fontSize: 24 }}>{listEmoji(list)}</Text>
+                      <Text style={{ fontSize: 24 }}>{displayListEmoji(list)}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: text, fontSize: 17, fontWeight: "700" }}>

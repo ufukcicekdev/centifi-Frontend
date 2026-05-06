@@ -38,6 +38,8 @@ export interface ExpenseList {
   name: string;
   /** Matches backend default list (e.g. "Private list"). */
   isDefault?: boolean;
+  /** Custom lists only — shown in picker / settings; empty → default 📋 */
+  emoji?: string;
 }
 
 export interface BankAutomation {

@@ -51,7 +51,7 @@ import {
 import { formatApiErrorDetailBody, type ApiError } from "../../lib/api";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { useTranslation } from "react-i18next";
-import { displayExpenseListName } from "../../lib/listDisplayName";
+import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
 import { flushBudgetThresholdCheck } from "../../lib/budgetThresholdNotifications";
 import type { Language } from "../../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../../lib/formatMoney";
@@ -381,8 +381,13 @@ export default function Dashboard() {
   /** Alt yüzen şeridin kapladığı yükseklik — ScrollView içeriği bunun altına kaydırılabilsin */
   const floatingChromeHeight = showSearchBar ? 12 + searchStripExtra + bottomBarInset : bottomBarBlockHeight;
   const scrollBottomPad = floatingChromeHeight + 36;
-  /** Arama + klavye: hap klavyenin üstünde; ikonlar: tam alt */
-  const floatingBarBottom = showSearchBar ? keyboardInset : 0;
+  /**
+   * Android: `adjustResize` (app.json `softwareKeyboardLayoutMode: resize`) ile kök layout zaten
+   * klavye kadar küçülür — buraya bir de keyboardInset eklemek çubuğu iki kez yukarı iter (üstte görünür).
+   * iOS: floating layer için klavye yüksekliği gerekir.
+   */
+  const floatingBarBottom =
+    showSearchBar ? (Platform.OS === "android" ? 0 : keyboardInset) : 0;
 
   const micRed = "#FF4757";
   const fabMenuBg = isDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.96)";
@@ -539,7 +544,13 @@ export default function Dashboard() {
                 gap: 4,
               }}
             >
-              <Text style={{ color: textColor, fontSize: 13, fontWeight: "600" }}>
+              {activeList ? (
+                <Text style={{ fontSize: 14 }}>{displayListEmoji(activeList)}</Text>
+              ) : null}
+              <Text
+                style={{ color: textColor, fontSize: 13, fontWeight: "600", flexShrink: 1 }}
+                numberOfLines={1}
+              >
                 {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
               </Text>
               <Ionicons name="chevron-down" size={13} color={mutedColor} />

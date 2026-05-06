@@ -2,6 +2,37 @@
  * app.json ile birleşir; @react-native-google-signin için iosUrlScheme şart (Firebase’siz).
  * EXPO_PUBLIC_GOOGLE_*_CLIENT_ID .env’de yüklüyken prebuild çalıştırın.
  */
+// EAS / Expo config eval sırasında `.env` otomatik yüklenmeyebilir.
+// Bu yüzden burada minimal bir `.env` loader ile EXPO_PUBLIC_* değerlerini process.env'e alıyoruz.
+const fs = require("fs");
+const path = require("path");
+
+function loadDotEnvOnce() {
+  try {
+    const p = path.join(__dirname, ".env");
+    if (!fs.existsSync(p)) return;
+    const raw = fs.readFileSync(p, "utf8");
+    raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"))
+      .forEach((line) => {
+        const ix = line.indexOf("=");
+        if (ix <= 0) return;
+        const key = line.slice(0, ix).trim();
+        let val = line.slice(ix + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (process.env[key] == null) process.env[key] = val;
+      });
+  } catch {
+    // ignore
+  }
+}
+
+loadDotEnvOnce();
+
 const appJson = require("./app.json");
 
 function deriveGoogleIosUrlScheme() {

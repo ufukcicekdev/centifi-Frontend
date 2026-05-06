@@ -29,10 +29,11 @@ import AddExpenseDatePickerModal from "../../components/AddExpenseDatePickerModa
 import ListsPickerModal from "../../components/ListsPickerModal";
 import CategoryEditorModal from "../../components/CategoryEditorModal";
 import ExpenseAmountSignRow from "../../components/ExpenseAmountSignRow";
+import BlockingOverlay from "../../components/BlockingOverlay";
 import type { Language } from "../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
-import { displayExpenseListName } from "../../lib/listDisplayName";
+import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
 import { saveBarPaddingBottom } from "../../lib/saveBarPaddingBottom";
 import { currencySymbolFor } from "../../lib/formatMoney";
 
@@ -350,7 +351,13 @@ export default function AddExpense() {
                 </Pressable>
                 <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
                 <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
-                  <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
+                  {activeList ? (
+                    <Text style={{ fontSize: 15 }}>{displayListEmoji(activeList)}</Text>
+                  ) : null}
+                  <Text
+                    style={{ color: textColor, fontSize: 14, fontWeight: "600", flexShrink: 1 }}
+                    numberOfLines={1}
+                  >
                     {activeList ? displayExpenseListName(activeList.name, t) : t("lists.defaultPrivateList")}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
@@ -556,6 +563,8 @@ export default function AddExpense() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <BlockingOverlay visible={saving} isDark={isDark} />
     </SafeAreaView>
   );
 }
