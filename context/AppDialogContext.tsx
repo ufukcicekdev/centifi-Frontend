@@ -1,4 +1,12 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import {
   Modal,
   View,
@@ -11,11 +19,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
 import i18n from "../i18n";
+import { Ionicons } from "@expo/vector-icons";
 import Button from "../components/ui/Button";
-
-const PURPLE = "#6C63FF";
-const DESTRUCTIVE = "#FF453A";
-const DESTRUCTIVE_DARK = "#FF6B6B";
+import { buildAppDialogTheme } from "../components/dialog/appDialogTheme";
+import { ConfirmDialogCard } from "../components/dialog/ConfirmDialogCard";
 
 export type ShowConfirmOptions = {
   title: string;
@@ -25,6 +32,8 @@ export type ShowConfirmOptions = {
   /** Varsayılan: i18n `common.cancel` */
   cancelText?: string;
   destructive?: boolean;
+  /** Confirm pill leading icon (default: trash if destructive, else checkmark). */
+  confirmIcon?: ComponentProps<typeof Ionicons>["name"];
 };
 
 type AlertPayload = { kind: "alert"; title: string; message: string };
@@ -35,6 +44,7 @@ type ConfirmPayload = {
   confirmText: string;
   cancelText: string;
   destructive: boolean;
+  confirmIcon?: ComponentProps<typeof Ionicons>["name"];
 };
 
 type DialogPayload = AlertPayload | ConfirmPayload;
@@ -54,34 +64,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
   const confirmResolveRef = useRef<((value: boolean) => void) | null>(null);
   const { height: winH } = useWindowDimensions();
 
-  const theme = useMemo(() => {
-    if (isDark) {
-      return {
-        overlay: "rgba(5, 8, 18, 0.72)",
-        cardBg: "#171f32",
-        border: "#404758",
-        title: "#f0f2f8",
-        body: "#b8c0d4",
-        secondaryBtnBg: "#2a2f4a",
-        secondaryBtnBorder: "#404758",
-        secondaryBtnLabel: "#bfc2ff",
-        confirmAccentBg: PURPLE,
-        confirmDestructiveBg: DESTRUCTIVE_DARK,
-      };
-    }
-    return {
-      overlay: "rgba(0, 0, 0, 0.45)",
-      cardBg: "#ffffff",
-      border: "rgba(0,0,0,0.08)",
-      title: "#111111",
-      body: "#444444",
-      secondaryBtnBg: "#f2f2f7",
-      secondaryBtnBorder: "#d1d1d6",
-      secondaryBtnLabel: "#007AFF",
-      confirmAccentBg: PURPLE,
-      confirmDestructiveBg: DESTRUCTIVE,
-    };
-  }, [isDark]);
+  const theme = useMemo(() => buildAppDialogTheme(isDark), [isDark]);
 
   const finishConfirm = useCallback((result: boolean) => {
     const r = confirmResolveRef.current;
@@ -117,6 +100,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
         confirmText,
         cancelText,
         destructive: !!options.destructive,
+        confirmIcon: options.confirmIcon,
       });
       setOpen(true);
     });
@@ -136,11 +120,6 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
       hideAlert();
     }
   };
-
-  const confirmBg =
-    payload?.kind === "confirm" && payload.destructive ?
-      theme.confirmDestructiveBg
-    : theme.confirmAccentBg;
 
   return (
     <AppDialogContext.Provider value={value}>
@@ -167,28 +146,27 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
             pointerEvents="box-none"
           >
             <View style={styles.cardOuter}>
-              <View
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: theme.cardBg,
-                    borderColor: theme.border,
-                  },
-                ]}
-                accessibilityRole="alert"
-              >
-                <Text style={[styles.title, { color: theme.title }]}>{payload?.title ?? ""}</Text>
-                {payload && payload.message ?
-                  <ScrollView
-                    style={{ maxHeight: maxCardHeight }}
-                    showsVerticalScrollIndicator={payload.message.length > 280}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    <Text style={[styles.message, { color: theme.body }]}>{payload.message}</Text>
-                  </ScrollView>
-                : null}
-
-                {payload?.kind === "alert" ? (
+              {payload?.kind === "alert" ? (
+                <View
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: theme.cardBg,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  accessibilityRole="alert"
+                >
+                  <Text style={[styles.title, { color: theme.title }]}>{payload.title}</Text>
+                  {payload.message ?
+                    <ScrollView
+                      style={{ maxHeight: maxCardHeight }}
+                      showsVerticalScrollIndicator={payload.message.length > 280}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      <Text style={[styles.message, { color: theme.body }]}>{payload.message}</Text>
+                    </ScrollView>
+                  : null}
                   <Button
                     title={String(i18n.t("common.ok"))}
                     onPress={hideAlert}
@@ -203,36 +181,22 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
                     labelStyle={{ color: theme.secondaryBtnLabel, fontWeight: "800" }}
                     accessibilityLabel={String(i18n.t("common.ok"))}
                   />
-                ) : payload?.kind === "confirm" ? (
-                  <View style={styles.confirmRow}>
-                    <View style={{ flex: 1 }}>
-                      <Button
-                        title={payload.cancelText}
-                        onPress={() => finishConfirm(false)}
-                        variant="secondary"
-                        size="md"
-                        fullWidth
-                        style={{
-                          backgroundColor: theme.secondaryBtnBg,
-                          borderColor: theme.secondaryBtnBorder,
-                          borderWidth: 1,
-                        }}
-                        labelStyle={{ color: theme.secondaryBtnLabel, fontWeight: "800" }}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Button
-                        title={payload.confirmText}
-                        onPress={() => finishConfirm(true)}
-                        variant={payload.destructive ? "destructive" : "primary"}
-                        size="md"
-                        fullWidth
-                        style={{ backgroundColor: confirmBg }}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-              </View>
+                </View>
+              ) : payload?.kind === "confirm" ? (
+                <ConfirmDialogCard
+                  isDark={isDark}
+                  themeOverride={theme}
+                  title={payload.title}
+                  message={payload.message}
+                  cancelText={payload.cancelText}
+                  confirmText={payload.confirmText}
+                  destructive={payload.destructive}
+                  confirmIcon={payload.confirmIcon}
+                  maxMessageHeight={maxCardHeight}
+                  onCancel={() => finishConfirm(false)}
+                  onConfirm={() => finishConfirm(true)}
+                />
+              ) : null}
             </View>
           </View>
         </View>
@@ -260,11 +224,12 @@ const styles = StyleSheet.create({
   center: {
     flex: 1,
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "stretch",
   },
   cardOuter: {
     width: "100%",
     maxWidth: 400,
+    alignSelf: "center",
     zIndex: 1,
   },
   card: {
@@ -290,50 +255,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 18,
-  },
-  singleButton: {
-    alignSelf: "stretch",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  singleButtonLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  /** İptal (sol) + onay (sağ); eşit genişlik, standart mobil diyalog */
-  confirmRow: {
-    flexDirection: "row",
-    width: "100%",
-    marginTop: 8,
-    alignSelf: "stretch",
-    gap: 10,
-  },
-  confirmBtn: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 48,
-  },
-  confirmBtnSecondary: {
-    borderWidth: 1,
-  },
-  confirmBtnPrimary: {},
-  confirmBtnLabelSecondary: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  confirmBtnLabelPrimary: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-    textAlign: "center",
   },
 });

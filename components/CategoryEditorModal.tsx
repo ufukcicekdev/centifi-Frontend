@@ -145,7 +145,7 @@ export default function CategoryEditorModal({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      showAlert(t("common.error"), t("settings.enterCategoryName"));
+      showAlert(t("common.formValidationTitle"), t("settings.enterCategoryName"));
       return;
     }
     const payload: CategoryEditorPayload = {

@@ -34,12 +34,13 @@ import {
   PRESET_BANK_PACKAGES,
   type ExpenseList,
 } from "../../constants/mockData";
-import CategoryEditorModal, { EmojiPickerSheet } from "../../components/CategoryEditorModal";
+import { EmojiPickerSheet } from "../../components/CategoryEditorModal";
 import {
   OnboardingCategoryGridModal,
   OnboardingCategoryEditModal,
   isBuiltinCategoryId,
 } from "../../components/onboarding/OnboardingCategoryManageModals";
+import { OnboardingAddCategoryFullScreenModal } from "../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 import { CurrencyPickerModal } from "../../components/CurrencyPickerModal";
 import { getCurrencyLabel } from "../../lib/currencies";
 import { currencySymbolFor } from "../../lib/formatMoney";
@@ -603,7 +604,6 @@ export default function Settings() {
   const {
     isDark, toggleTheme, language, setLanguage,
     displayCurrency, setDisplayCurrency,
-    monthlyBudget, setMonthlyBudget,
     notificationsEnabled, setNotificationsEnabled,
     customCategories,
     addCategory,
@@ -632,8 +632,6 @@ export default function Settings() {
       setLanguage: s.setLanguage,
       displayCurrency: s.displayCurrency,
       setDisplayCurrency: s.setDisplayCurrency,
-      monthlyBudget: s.monthlyBudget,
-      setMonthlyBudget: s.setMonthlyBudget,
       notificationsEnabled: s.notificationsEnabled,
       setNotificationsEnabled: s.setNotificationsEnabled,
       customCategories: s.customCategories,
@@ -662,9 +660,7 @@ export default function Settings() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const [budgetInput, setBudgetInput] = useState(monthlyBudget.toString());
   const [showCatModal, setShowCatModal] = useState(false);
-  const [editingCat, setEditingCat] = useState<CustomCategory | undefined>();
   const [manageListOpen, setManageListOpen] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const reopenListAfterAdd = useRef(false);
@@ -693,15 +689,6 @@ export default function Settings() {
   const borderColor = isDark ? "#2a2a2a" : "#e5e5e5";
   const inputBg = isDark ? "#111" : "#f5f5f5";
   const divider = isDark ? "#2a2a2a" : "#efefef";
-
-  const handleBudgetSave = () => {
-    const val = parseFloat(budgetInput.replace(",", "."));
-    if (!isNaN(val) && val > 0) setMonthlyBudget(val);
-  };
-
-  useEffect(() => {
-    setBudgetInput(monthlyBudget.toString());
-  }, [monthlyBudget]);
 
   useEffect(() => {
     if (showProfileModal && user) {
@@ -784,11 +771,6 @@ export default function Settings() {
     () =>
       `${displayCurrency} — ${getCurrencyLabel(displayCurrency, i18n.resolvedLanguage ?? i18n.language)}`,
     [displayCurrency, i18n.language, i18n.resolvedLanguage],
-  );
-
-  const budgetCurrencySymbol = useMemo(
-    () => currencySymbolFor(displayCurrency, language as Language),
-    [displayCurrency, language],
   );
 
   const appVersion =
@@ -1035,6 +1017,7 @@ export default function Settings() {
                   confirmText: t("settings.logOut"),
                   cancelText: t("common.cancel"),
                   destructive: true,
+                  confirmIcon: "log-out-outline",
                 });
                 if (ok) logout();
               })();
@@ -1083,75 +1066,11 @@ export default function Settings() {
         {/* BUDGET */}
         <SectionLabel label={t("settings.budget")} isDark={isDark} />
         <Card isDark={isDark}>
-          <View style={{ paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-              <View style={{ width: ICON_COL, alignItems: "center", paddingTop: 4 }}>
-                <Ionicons name="cash-outline" size={22} color={mutedColor} />
-              </View>
-              <View style={{ flex: 1, marginLeft: ICON_GAP, minWidth: 0 }}>
-                <Text
-                  style={{
-                    color: mutedColor,
-                    fontSize: 11,
-                    fontWeight: "700",
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                    marginBottom: 10,
-                  }}
-                >
-                  {t("settings.monthlyBudget")}
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View
-                    style={{
-                      flex: 1,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: isDark ? "#000000" : inputBg,
-                      borderRadius: 12,
-                      paddingHorizontal: 14,
-                      paddingVertical: 12,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor,
-                      minHeight: 48,
-                    }}
-                  >
-                    <Text style={{ color: mutedColor, fontSize: 17, marginRight: 6, minWidth: 28 }}>
-                      {budgetCurrencySymbol}
-                    </Text>
-                    <TextInput
-                      value={budgetInput}
-                      onChangeText={setBudgetInput}
-                      keyboardType="decimal-pad"
-                      style={{ flex: 1, color: textColor, fontSize: 17, fontWeight: "600", padding: 0 }}
-                      returnKeyType="done"
-                      onSubmitEditing={handleBudgetSave}
-                    />
-                  </View>
-                  <Pressable
-                    onPress={handleBudgetSave}
-                    style={({ pressed }) => ({
-                      marginLeft: 10,
-                      backgroundColor: PURPLE,
-                      paddingHorizontal: 18,
-                      paddingVertical: 13,
-                      borderRadius: 12,
-                      opacity: pressed ? 0.85 : 1,
-                      minWidth: 76,
-                      alignItems: "center",
-                    })}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("common.save")}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </View>
           <SettingsRow
             isDark={isDark}
             icon="pie-chart-outline"
             title={t("settings.categoryBudgets")}
-            dividerTop
+            dividerTop={false}
             onPress={() => {
               if (!isAuthenticated) {
                 showAlert(t("budgets.signInRequiredTitle"), t("budgets.signInRequiredBody"));
@@ -1605,7 +1524,6 @@ export default function Settings() {
         onAddCategory={() => {
           reopenListAfterAdd.current = true;
           setManageListOpen(false);
-          setEditingCat(undefined);
           setShowCatModal(true);
         }}
         isDark={isDark}
@@ -1629,16 +1547,14 @@ export default function Settings() {
       ) : null}
 
       {showCatModal ? (
-      <CategoryEditorModal
-        visible
-        existing={editingCat}
-        onSave={async (data) => {
-          if (editingCat) await updateCategory(editingCat.id, data);
-          else await addCategory(data);
-        }}
-        onClose={closeAddCategoryModal}
-        isDark={isDark}
-      />
+        <OnboardingAddCategoryFullScreenModal
+          visible
+          onClose={closeAddCategoryModal}
+          onCreate={async (data) => {
+            await addCategory(data);
+          }}
+          isDark={isDark}
+        />
       ) : null}
       {showBankModal ? (
       <AddBankModal

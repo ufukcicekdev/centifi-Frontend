@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { Dimensions, Keyboard, Platform } from "react-native";
 
-function keyboardHeightFromEvent(e: { endCoordinates: { height: number; screenY: number } }): number {
+export function keyboardHeightFromEvent(e: {
+  endCoordinates: { height: number; screenY: number };
+}): number {
   if (Platform.OS === "ios") return e.endCoordinates.height;
   const winH = Dimensions.get("window").height;
+  const screenH = Dimensions.get("screen").height;
   const { height: reported, screenY } = e.endCoordinates;
-  const fromScreenY = Math.max(0, winH - screenY);
-  return Math.max(reported, fromScreenY);
+  const fromWin = Math.max(0, winH - screenY);
+  const fromScreen = Math.max(0, screenH - screenY);
+  return Math.max(reported, fromWin, fromScreen);
 }
 
 /**
@@ -23,7 +27,9 @@ export function useKeyboardInset(): number {
     const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const subShow = Keyboard.addListener(showEvt, (e) => setHeight(keyboardHeightFromEvent(e)));
+    const subShow = Keyboard.addListener(showEvt, (e) =>
+      setHeight(keyboardHeightFromEvent(e)),
+    );
     const subHide = Keyboard.addListener(hideEvt, () => setHeight(0));
 
     return () => {

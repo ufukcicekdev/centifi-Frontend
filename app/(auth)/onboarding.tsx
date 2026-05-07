@@ -1,8 +1,12 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
-  View, Text, Pressable, ScrollView,
-  TextInput, ActivityIndicator, Modal,
-  StyleSheet, useWindowDimensions,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,9 +20,7 @@ import {
   OnboardingCategoryEditModal,
   isBuiltinCategoryId,
 } from "../../components/onboarding/OnboardingCategoryManageModals";
-import { useKeyboardInset } from "../../hooks/useKeyboardInset";
-import { useAppDialog } from "../../context/AppDialogContext";
-
+import { OnboardingAddCategoryFullScreenModal } from "../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 const PURPLE = "#6C63FF";
 /** Categories grid: 3 columns; horizontal padding must match ScrollView `paddingHorizontal` */
 const CAT_GRID_GAP = 12;
@@ -28,14 +30,6 @@ const CONTENT_PAD = 24;
 const FOOTER_PAD = 24;
 const FOOTER_BTN_GAP = 12;
 
-const EMOJI_OPTIONS = ["🎯","🎮","🍕","✈️","🏋️","📚","🐶","💄","🎸","🏠","🌿","💡","🎁","👗","🚀","⚽"];
-const COLORS = [
-  { color: "#FF6B6B", bg: "#FF6B6B22" }, { color: "#4ECDC4", bg: "#4ECDC422" },
-  { color: "#A29BFE", bg: "#A29BFE22" }, { color: "#55EFC4", bg: "#55EFC422" },
-  { color: "#FDCB6E", bg: "#FDCB6E22" }, { color: "#74B9FF", bg: "#74B9FF22" },
-  { color: "#FD79A8", bg: "#FD79A822" }, { color: "#6C63FF", bg: "#6C63FF22" },
-];
-
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -44,7 +38,6 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 export default function Onboarding() {
   const { t } = useTranslation();
-  const { showAlert } = useAppDialog();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   /** Web + first paint: module `Dimensions` was 0 → mashed footer & clipped grid */
@@ -59,14 +52,10 @@ export default function Onboarding() {
   const [selected, setSelected] = useState<string[]>(BUILTIN_CATEGORIES.map(c => c.id));
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newEmoji, setNewEmoji] = useState("🎯");
-  const [newColor, setNewColor] = useState(COLORS[0]);
   const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
   const [manageListOpen, setManageListOpen] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const reopenListAfterAdd = useRef(false);
-  const keyboardInset = useKeyboardInset();
 
   const tr = language === "tr";
   const catManageLabels = {
@@ -127,7 +116,6 @@ export default function Onboarding() {
   const muted = isDark ? "#777" : "#888";
   const border = isDark ? "#2a2a2a" : "#e0e0e0";
   const iconBg = isDark ? "#1c2033" : "#eef0f8";
-  const inputBg = isDark ? "#111" : "#f0f0f0";
   /** Primary CTA: purple + white text so it stays visible on dark bg (white pill + dark text failed to render contrast on some builds). */
   const primaryCtaBg = PURPLE;
   const primaryCtaText = "#fff";
@@ -149,23 +137,21 @@ export default function Onboarding() {
   const toggle = (id: string) =>
     setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  const addCat = () => {
-    if (!newName.trim()) {
-      showAlert(t("common.error"), t("onboarding.categoryNameRequired"));
-      return;
-    }
+  const handleAddCategoryFromModal = (payload: {
+    name: string;
+    emoji: string;
+    color: string;
+    bgColor: string;
+  }) => {
     const c: CustomCategory = {
-      id: `c_${Date.now()}`, name: newName.trim(),
-      emoji: newEmoji, color: newColor.color, bgColor: newColor.bg,
+      id: `c_${Date.now()}`,
+      name: payload.name,
+      emoji: payload.emoji,
+      color: payload.color,
+      bgColor: payload.bgColor,
     };
-    setCustomCats(p => [...p, c]);
-    setSelected(p => [...p, c.id]);
-    setNewName(""); setNewEmoji("🎯"); setNewColor(COLORS[0]);
-    setShowModal(false);
-    if (reopenListAfterAdd.current) {
-      setManageListOpen(true);
-      reopenListAfterAdd.current = false;
-    }
+    setCustomCats((p) => [...p, c]);
+    setSelected((p) => [...p, c.id]);
   };
 
   const finish = async () => {
@@ -541,73 +527,12 @@ export default function Onboarding() {
         )}
       </View>
 
-      {/* ── ADD CATEGORY MODAL ── */}
-      <Modal visible={showModal} transparent animationType="slide" onRequestClose={closeAddCategoryModal}>
-        <View style={{ flex: 1, backgroundColor: "#00000088", justifyContent: "flex-end" }}>
-          <View
-            style={{
-              backgroundColor: card,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 24,
-              paddingBottom: 40 + keyboardInset,
-            }}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <Text style={{ color: text, fontSize: 18, fontWeight: "800" }}>{t("onboarding.newCategory")}</Text>
-              <Pressable onPress={closeAddCategoryModal} hitSlop={12}>
-                <Ionicons name="close" size={22} color={muted} />
-              </Pressable>
-            </View>
-            <View style={{ alignItems: "center", marginBottom: 20 }}>
-              <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: newColor.bg, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
-                <Text style={{ fontSize: 32 }}>{newEmoji}</Text>
-              </View>
-              <Text style={{ color: newColor.color, fontSize: 14, fontWeight: "700" }}>
-                {newName || t("onboarding.categoryNamePlaceholder")}
-              </Text>
-            </View>
-            <View style={{ backgroundColor: inputBg, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: border, marginBottom: 16 }}>
-              <TextInput
-                value={newName} onChangeText={setNewName}
-                placeholder={t("onboarding.categoryNamePlaceholder")} placeholderTextColor={muted}
-                style={{ color: text, fontSize: 15, paddingVertical: 12 }}
-              />
-            </View>
-            <Text style={{ color: muted, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 8 }}>
-              {t("onboarding.emoji")}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              {EMOJI_OPTIONS.map(em => (
-                <Pressable key={em} onPress={() => setNewEmoji(em)} style={{
-                  width: 42, height: 42, borderRadius: 10, alignItems: "center", justifyContent: "center",
-                  backgroundColor: em === newEmoji ? `${PURPLE}22` : inputBg,
-                  borderWidth: em === newEmoji ? 2 : 1, borderColor: em === newEmoji ? PURPLE : border,
-                  marginRight: 8,
-                }}>
-                  <Text style={{ fontSize: 20 }}>{em}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Text style={{ color: muted, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 10 }}>COLOR</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
-              {COLORS.map(c => (
-                <Pressable key={c.color} onPress={() => setNewColor(c)} style={{
-                  width: 34, height: 34, borderRadius: 17, backgroundColor: c.color,
-                  borderWidth: c.color === newColor.color ? 3 : 0, borderColor: "#fff",
-                  transform: [{ scale: c.color === newColor.color ? 1.15 : 1 }],
-                }} />
-              ))}
-            </View>
-            <Pressable onPress={addCat} style={({ pressed }) => ({
-              height: 52, borderRadius: 14, backgroundColor: PURPLE,
-              alignItems: "center", justifyContent: "center", opacity: pressed ? 0.8 : 1,
-            })}>
-              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Add Category</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <OnboardingAddCategoryFullScreenModal
+        visible={showModal}
+        onClose={closeAddCategoryModal}
+        onCreate={handleAddCategoryFromModal}
+        isDark={isDark}
+      />
 
       <OnboardingCategoryGridModal
         visible={manageListOpen}

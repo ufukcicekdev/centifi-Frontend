@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { Platform } from "react-native";
 import {
-  Expense, MOCK_EXPENSES, MONTHLY_BUDGET,
-  CustomCategory, BUILTIN_CATEGORIES,
+  Expense, MOCK_EXPENSES,
+  CustomCategory, BUILTIN_CATEGORIES, isBuiltinCategoryId,
+  getCategoryMeta,
   ExpenseList, DEFAULT_LISTS,
   BankAutomation, PRESET_BANK_AUTOMATIONS, PRESET_BANK_PACKAGES,
   type CategoryDisplayOverrides,
@@ -63,15 +64,8 @@ export function buildCategoriesForHome(
   displayOverrides?: CategoryDisplayOverrides | null,
 ): CustomCategory[] {
   const mapOne = (c: CustomCategory): CustomCategory => {
-    const ov = displayOverrides?.[c.id];
-    if (!ov) return c;
-    return {
-      ...c,
-      name: ov.name ?? c.name,
-      emoji: ov.emoji ?? c.emoji,
-      color: ov.color ?? c.color,
-      bgColor: ov.bgColor ?? c.bgColor,
-    };
+    const m = getCategoryMeta(c.id, customCategories, displayOverrides);
+    return { ...c, name: m.name, emoji: m.emoji, color: m.color, bgColor: m.bgColor };
   };
   const all = [...BUILTIN_CATEGORIES, ...customCategories].map(mapOne);
   if (enabledCategoryIds == null) return all;
@@ -110,10 +104,6 @@ interface AppState {
   expensesNextPagePath: string | null;
   expensesLoadingMore: boolean;
   loadMoreExpenses: () => Promise<void>;
-
-  // Budget
-  monthlyBudget: number;
-  setMonthlyBudget: (budget: number) => void;
 
   /** Per-category monthly limits + alert prefs (persisted locally). */
   categoryBudgets: Record<string, CategoryBudgetEntry>;
@@ -290,9 +280,6 @@ export const useStore = create<AppState>((set, get) => {
       const serverLng = (["en", "tr", "de", "fr", "es"].includes(serverRaw) ? serverRaw : "en") as Language;
       const resolvedLang: Language = (savedPref ?? deviceLng ?? serverLng) as Language;
 
-      const mbRaw = parseFloat(String(me.monthly_budget ?? "0"));
-      const monthlyBudget = Number.isFinite(mbRaw) ? mbRaw : MONTHLY_BUDGET;
-
       const budgetPrefs = await loadBudgetPrefs(uid).catch(() => null);
 
       const dcRaw = me.display_currency?.trim().toUpperCase();
@@ -311,7 +298,6 @@ export const useStore = create<AppState>((set, get) => {
         userName: (displayName.split(" ")[0] ?? "User").trim() || "User",
         isDark: !!me.is_dark_mode,
         notificationsEnabled: !!me.notifications_enabled,
-        monthlyBudget,
         language: resolvedLang,
         onboardingCompleted: !!me.onboarding_completed,
         isPro: !!me.is_pro,
@@ -512,9 +498,6 @@ export const useStore = create<AppState>((set, get) => {
     }
   },
 
-  monthlyBudget: MONTHLY_BUDGET,
-  setMonthlyBudget: (budget) => set({ monthlyBudget: budget }),
-
   categoryBudgets: {},
   budgetAlertsEnabled: true,
   budgetAlertThresholdPercent: 80,
@@ -699,12 +682,24 @@ export const useStore = create<AppState>((set, get) => {
 
   categoryDisplayOverrides: {},
   setCategoryDisplayOverride: (categoryId, patch) =>
-    set((state) => ({
-      categoryDisplayOverrides: {
-        ...state.categoryDisplayOverrides,
-        [categoryId]: { ...state.categoryDisplayOverrides[categoryId], ...patch },
-      },
-    })),
+    set((state) => {
+      const merged = { ...state.categoryDisplayOverrides[categoryId], ...patch };
+      if (isBuiltinCategoryId(categoryId)) {
+        const { name: _omit, ...withoutName } = merged;
+        return {
+          categoryDisplayOverrides: {
+            ...state.categoryDisplayOverrides,
+            [categoryId]: withoutName,
+          },
+        };
+      }
+      return {
+        categoryDisplayOverrides: {
+          ...state.categoryDisplayOverrides,
+          [categoryId]: merged,
+        },
+      };
+    }),
 
   // Lists
   lists: DEFAULT_LISTS,

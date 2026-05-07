@@ -27,7 +27,7 @@ import {
 import type { RecurrenceRule } from "../../lib/backend";
 import AddExpenseDatePickerModal from "../../components/AddExpenseDatePickerModal";
 import ListsPickerModal from "../../components/ListsPickerModal";
-import CategoryEditorModal from "../../components/CategoryEditorModal";
+import { OnboardingAddCategoryFullScreenModal } from "../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 import ExpenseAmountSignRow from "../../components/ExpenseAmountSignRow";
 import BlockingOverlay from "../../components/BlockingOverlay";
 import type { Language } from "../../i18n";
@@ -251,7 +251,7 @@ export default function AddExpense() {
       return;
     }
     if (!description.trim()) {
-      showAlert(t("common.error"), t("forms.descriptionRequired"));
+      showAlert(t("common.formValidationTitle"), t("forms.descriptionRequired"));
       return;
     }
 
@@ -508,11 +508,11 @@ export default function AddExpense() {
         language={lang}
       />
 
-      <CategoryEditorModal
+      <OnboardingAddCategoryFullScreenModal
         visible={categoryEditorOpen}
         onClose={() => setCategoryEditorOpen(false)}
         isDark={isDark}
-        onSave={async (data) => {
+        onCreate={async (data) => {
           const row = await addCategory(data);
           setSelectedCategory(row.id);
         }}

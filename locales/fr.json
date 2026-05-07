@@ -17,13 +17,13 @@
     "delete": "Supprimer",
     "loading": "Chargement...",
     "error": "Une erreur s'est produite",
+    "formValidationTitle": "Information manquante",
     "close": "Fermer",
     "today": "Aujourd’hui",
     "yesterday": "Hier"
   },
   "dashboard": {
     "greeting": "Bonjour, {{name}} 👋",
-    "monthlyBudget": "Budget mensuel",
     "remaining": "Restant",
     "spent": "Dépensé",
     "of": "sur",
@@ -90,7 +90,7 @@
   },
   "forms": {
     "validAmount": "Entrez un montant valide.",
-    "descriptionRequired": "Ajoutez une description.",
+    "descriptionRequired": "Ne laissez pas le champ description vide.",
     "saveFailed": "Impossible d’enregistrer.",
     "saveFailedRetry": "Impossible d’enregistrer. Réessayez."
   },
@@ -194,6 +194,7 @@
     "chooseCategoriesTitle": "Choisis tes catégories",
     "editCategories": "Modifier les catégories",
     "cannotDeleteBuiltinCategory": "Les catégories intégrées ne peuvent pas être supprimées.",
+    "builtinCategoryNameLocked": "Les noms des catégories intégrées suivent la langue de l’app et ne peuvent pas être modifiés.",
     "cannotDeleteCategoryHasTransactions": "Cette catégorie contient des transactions. Supprimez ou réaffectez-les d’abord.",
     "categoryNamePlaceholder": "Nom de la catégorie",
     "categoryEditorNewTitle": "Nouvelle catégorie",
@@ -202,7 +203,7 @@
     "categoryEditorUpdate": "Mettre à jour",
     "categoryColorLabel": "Couleur",
     "categorySaveFailed": "Impossible d’enregistrer la catégorie.",
-    "enterCategoryName": "Veuillez saisir un nom de catégorie.",
+    "enterCategoryName": "Ne laissez pas le nom de la catégorie vide.",
     "categoryDeleteFailed": "Impossible de supprimer la catégorie.",
     "addCategory": "Ajouter une catégorie",
     "lists": "Listes",
@@ -217,6 +218,8 @@
     "deleteList": "Supprimer la liste",
     "deleteListConfirmTitle": "Supprimer cette liste ?",
     "deleteListConfirmMessage": "La liste sera supprimée définitivement. Cette action est irréversible.",
+    "deleteCategoryConfirmTitle": "Supprimer cette catégorie ?",
+    "deleteCategoryConfirmMessage": "La catégorie sera supprimée. Cette action est irréversible.",
     "cannotDeleteListHasExpenses": "Impossible de supprimer une liste qui contient des dépenses. Déplacez ou supprimez-les d’abord.",
     "listDeleteFailed": "Impossible de supprimer la liste.",
     "addList": "Ajouter",
@@ -245,7 +248,6 @@
     "bankFillFields": "Veuillez remplir tous les champs.",
     "bankAddFailed": "Impossible d’ajouter l’app bancaire.",
     "viewInStore": "Voir dans le store ↗",
-    "monthlyBudget": "Budget mensuel",
     "categoryBudgets": "Budgets par catégorie",
     "reportSection": "Rapport",
     "reportMenu": "Rapport par e-mail",
@@ -371,7 +373,7 @@
     "defaultPrivateList": "Liste privée"
   },
   "onboarding": {
-    "categoryNameRequired": "Veuillez saisir un nom.",
+    "categoryNameRequired": "Ne laissez pas le nom de la catégorie vide.",
     "skip": "Passer",
     "prev": "Préc.",
     "continue": "Continuer",

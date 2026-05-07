@@ -19,7 +19,7 @@ import { buildCategoriesForHome, useStore } from "../../../store/useStore";
 import { getCategoryMeta } from "../../../constants/mockData";
 import AddExpenseDatePickerModal from "../../../components/AddExpenseDatePickerModal";
 import ListsPickerModal from "../../../components/ListsPickerModal";
-import CategoryEditorModal from "../../../components/CategoryEditorModal";
+import { OnboardingAddCategoryFullScreenModal } from "../../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 import ExpenseAmountSignRow from "../../../components/ExpenseAmountSignRow";
 import BlockingOverlay from "../../../components/BlockingOverlay";
 import type { Language } from "../../../i18n";
@@ -265,7 +265,7 @@ export default function ExpenseDetailScreen() {
       return;
     }
     if (!description.trim()) {
-      showAlert(t("common.error"), t("forms.descriptionRequired"));
+      showAlert(t("common.formValidationTitle"), t("forms.descriptionRequired"));
       return;
     }
     setSaving(true);
@@ -615,11 +615,11 @@ export default function ExpenseDetailScreen() {
         </View>
       </Modal>
 
-      <CategoryEditorModal
+      <OnboardingAddCategoryFullScreenModal
         visible={categoryEditorOpen}
         onClose={() => setCategoryEditorOpen(false)}
         isDark={isDark}
-        onSave={async (data) => {
+        onCreate={async (data) => {
           const row = await addCategory(data);
           setSelectedCategory(row.id);
         }}

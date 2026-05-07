@@ -9,7 +9,6 @@ export type BackendUser = {
   last_name: string;
   /** False for Apple/Google-only accounts until they set a password. */
   has_password?: boolean;
-  monthly_budget: string;
   language: string;
   /** ISO 4217 — preferred display currency for UI / budgets */
   display_currency?: string;

@@ -17,13 +17,13 @@
     "delete": "Löschen",
     "loading": "Laden...",
     "error": "Etwas ist schiefgelaufen",
+    "formValidationTitle": "Pflichtangabe",
     "close": "Schließen",
     "today": "Heute",
     "yesterday": "Gestern"
   },
   "dashboard": {
     "greeting": "Hallo, {{name}} 👋",
-    "monthlyBudget": "Monatsbudget",
     "remaining": "Verbleibend",
     "spent": "Ausgegeben",
     "of": "von",
@@ -90,7 +90,7 @@
   },
   "forms": {
     "validAmount": "Bitte einen gültigen Betrag eingeben.",
-    "descriptionRequired": "Bitte eine Beschreibung hinzufügen.",
+    "descriptionRequired": "Bitte das Beschreibungsfeld nicht leer lassen.",
     "saveFailed": "Konnte nicht speichern.",
     "saveFailedRetry": "Konnte nicht speichern. Erneut versuchen."
   },
@@ -194,6 +194,7 @@
     "chooseCategoriesTitle": "Wähle deine Kategorien",
     "editCategories": "Kategorien bearbeiten",
     "cannotDeleteBuiltinCategory": "Standardkategorien können nicht gelöscht werden.",
+    "builtinCategoryNameLocked": "Standardkategorien sind an die App-Sprache gebunden und können nicht umbenannt werden.",
     "cannotDeleteCategoryHasTransactions": "Diese Kategorie enthält Buchungen. Bitte zuerst verschieben oder löschen.",
     "categoryNamePlaceholder": "Kategoriename",
     "categoryEditorNewTitle": "Neue Kategorie",
@@ -202,7 +203,7 @@
     "categoryEditorUpdate": "Aktualisieren",
     "categoryColorLabel": "Farbe",
     "categorySaveFailed": "Kategorie konnte nicht gespeichert werden.",
-    "enterCategoryName": "Bitte einen Kategorienamen eingeben.",
+    "enterCategoryName": "Bitte das Feld für den Kategorienamen nicht leer lassen.",
     "categoryDeleteFailed": "Kategorie konnte nicht gelöscht werden.",
     "addCategory": "Kategorie hinzufügen",
     "lists": "Listen",
@@ -217,6 +218,8 @@
     "deleteList": "Liste löschen",
     "deleteListConfirmTitle": "Liste löschen?",
     "deleteListConfirmMessage": "Die Liste wird dauerhaft entfernt. Das kann nicht rückgängig gemacht werden.",
+    "deleteCategoryConfirmTitle": "Diese Kategorie löschen?",
+    "deleteCategoryConfirmMessage": "Die Kategorie wird entfernt. Dies kann nicht rückgängig gemacht werden.",
     "cannotDeleteListHasExpenses": "Listen mit Ausgaben können nicht gelöscht werden. Verschieben oder entfernen Sie die Buchungen zuerst.",
     "listDeleteFailed": "Liste konnte nicht gelöscht werden.",
     "addList": "Hinzufügen",
@@ -245,7 +248,6 @@
     "bankFillFields": "Bitte alle Felder ausfüllen.",
     "bankAddFailed": "Bank-App konnte nicht hinzugefügt werden.",
     "viewInStore": "Im Store ansehen ↗",
-    "monthlyBudget": "Monatsbudget",
     "categoryBudgets": "Kategorie-Budgets",
     "reportSection": "Bericht",
     "reportMenu": "Bericht per E-Mail",
@@ -371,7 +373,7 @@
     "defaultPrivateList": "Private Liste"
   },
   "onboarding": {
-    "categoryNameRequired": "Bitte gib einen Namen ein.",
+    "categoryNameRequired": "Bitte das Feld für den Kategorienamen nicht leer lassen.",
     "skip": "Überspringen",
     "prev": "Zurück",
     "continue": "Weiter",

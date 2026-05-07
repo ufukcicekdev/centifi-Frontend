@@ -383,6 +383,11 @@ export default function Dashboard() {
   const scrollBottomPad = floatingChromeHeight + 36;
   /** Klavye açıkken yüzen search/FAB şeridini klavyenin üstüne it. */
   const floatingBarBottom = showSearchBar ? keyboardInset : 0;
+  /** Klavye açıkken arama hapının altına bottomBarInset vermek klavye ile arada büyük boşluk yaratıyordu. */
+  const searchKeyboardOpen = showSearchBar && keyboardInset > 0;
+  const searchFloatMarginTop = searchKeyboardOpen ? 0 : 12;
+  const searchFloatMarginBottom = searchKeyboardOpen ? 0 : 10;
+  const searchFloatPaddingBottom = searchKeyboardOpen ? 0 : bottomBarInset;
 
   const micRed = "#FF4757";
   const fabMenuBg = isDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.96)";
@@ -733,9 +738,9 @@ export default function Dashboard() {
           <Animated.View
             style={{
               marginHorizontal: 16,
-              marginTop: 12,
-              marginBottom: 10,
-              paddingBottom: bottomBarInset,
+              marginTop: searchFloatMarginTop,
+              marginBottom: searchFloatMarginBottom,
+              paddingBottom: searchFloatPaddingBottom,
               opacity: searchAnim,
               transform: [{ translateY: searchTranslateY }],
             }}

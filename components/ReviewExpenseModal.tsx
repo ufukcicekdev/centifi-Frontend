@@ -24,8 +24,9 @@ import type { Language } from "../i18n";
 import { buildCategoriesForHome, useStore } from "../store/useStore";
 import AddExpenseDatePickerModal from "./AddExpenseDatePickerModal";
 import { saveBarPaddingBottom } from "../lib/saveBarPaddingBottom";
-import CategoryEditorModal from "./CategoryEditorModal";
+import { OnboardingAddCategoryFullScreenModal } from "./onboarding/OnboardingAddCategoryFullScreenModal";
 import { useAppDialog } from "../context/AppDialogContext";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
 export type ReviewParsingKind = "receipt" | "voice" | "text";
 
@@ -130,6 +131,7 @@ export default function ReviewExpenseModal({
   const { t } = useTranslation();
   const { showAlert } = useAppDialog();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   const { width: winW } = useWindowDimensions();
   const {
     isDark,
@@ -274,6 +276,10 @@ export default function ReviewExpenseModal({
         showAlert(t("review.invalidAmountTitle"), t("review.invalidAmountRow", { n: i + 1 }));
         return;
       }
+      if (!row.description.trim()) {
+        showAlert(t("common.formValidationTitle"), t("forms.descriptionRequired"));
+        return;
+      }
     }
 
     setSaving(true);
@@ -331,8 +337,10 @@ export default function ReviewExpenseModal({
   const emptyParsed = !parsing && !success && parsedExpenses != null && parsedExpenses.length === 0;
 
   const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
+  /** Klavye açıkken tampon aşağıda fazla boşluk bırakıyordu */
+  const saveBarPaddingBottomResolved = keyboardInset > 0 ? 0 : saveBarBottomPad;
   const scrollContentBottomPad = showForm
-    ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR_BASE + saveBarBottomPad + Math.min(80, Math.max(0, (rows.length - 1) * 28))
+    ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR_BASE + saveBarPaddingBottomResolved + Math.min(80, Math.max(0, (rows.length - 1) * 28))
     : 40;
 
   const parsingCopy = useMemo(() => {
@@ -653,7 +661,7 @@ export default function ReviewExpenseModal({
                   bottom: 0,
                   paddingHorizontal: 20,
                   paddingTop: 12,
-                  paddingBottom: saveBarBottomPad,
+                  paddingBottom: saveBarPaddingBottomResolved,
                   backgroundColor: bottomBarBg,
                   borderTopWidth: StyleSheet.hairlineWidth,
                   borderTopColor: isDark ? "#222222" : "#e5e5e5",
@@ -701,11 +709,11 @@ export default function ReviewExpenseModal({
           language={lang}
         />
 
-        <CategoryEditorModal
+        <OnboardingAddCategoryFullScreenModal
           visible={categoryModalRow !== null}
           onClose={() => setCategoryModalRow(null)}
           isDark={isDark}
-          onSave={async (data) => {
+          onCreate={async (data) => {
             const created = await addCategory(data);
             if (categoryModalRow !== null) {
               patchRow(categoryModalRow, { category: created.id });

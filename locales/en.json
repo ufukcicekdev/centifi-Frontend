@@ -17,13 +17,13 @@
     "delete": "Delete",
     "loading": "Loading...",
     "error": "Something went wrong",
+    "formValidationTitle": "Missing information",
     "close": "Close",
     "today": "Today",
     "yesterday": "Yesterday"
   },
   "dashboard": {
     "greeting": "Hi, {{name}} 👋",
-    "monthlyBudget": "Monthly Budget",
     "remaining": "Remaining",
     "spent": "Spent",
     "of": "of",
@@ -90,7 +90,7 @@
   },
   "forms": {
     "validAmount": "Please enter a valid amount.",
-    "descriptionRequired": "Please add a description.",
+    "descriptionRequired": "Don't leave the description field empty.",
     "saveFailed": "Could not save.",
     "saveFailedRetry": "Could not save. Try again."
   },
@@ -194,6 +194,7 @@
     "chooseCategoriesTitle": "Choose your categories",
     "editCategories": "Edit categories",
     "cannotDeleteBuiltinCategory": "Built-in categories can’t be deleted.",
+    "builtinCategoryNameLocked": "Built-in names follow the app language and can’t be edited.",
     "cannotDeleteCategoryHasTransactions": "This category has transactions. Remove or reassign them first.",
     "categoryNamePlaceholder": "Category name",
     "categoryEditorNewTitle": "New category",
@@ -202,7 +203,7 @@
     "categoryEditorUpdate": "Update category",
     "categoryColorLabel": "Color",
     "categorySaveFailed": "Could not save category.",
-    "enterCategoryName": "Please enter a category name.",
+    "enterCategoryName": "Don't leave the category name field empty.",
     "categoryDeleteFailed": "Could not delete category.",
     "addCategory": "Add category",
     "lists": "Lists",
@@ -217,6 +218,8 @@
     "deleteList": "Delete list",
     "deleteListConfirmTitle": "Delete this list?",
     "deleteListConfirmMessage": "This list will be removed permanently. You can’t undo this.",
+    "deleteCategoryConfirmTitle": "Delete this category?",
+    "deleteCategoryConfirmMessage": "This category will be removed. You can’t undo this.",
     "cannotDeleteListHasExpenses": "Lists with expenses can’t be deleted. Move or remove those transactions first.",
     "listDeleteFailed": "Could not delete the list.",
     "addList": "Add",
@@ -245,7 +248,6 @@
     "bankFillFields": "Please fill in all fields.",
     "bankAddFailed": "Could not add bank app.",
     "viewInStore": "View in store ↗",
-    "monthlyBudget": "Monthly Budget",
     "categoryBudgets": "Category budgets",
     "reportSection": "Pro & reports",
     "reportMenu": "Email report",
@@ -371,7 +373,7 @@
     "defaultPrivateList": "Private list"
   },
   "onboarding": {
-    "categoryNameRequired": "Please enter a name.",
+    "categoryNameRequired": "Don't leave the category name field empty.",
     "skip": "Skip",
     "prev": "Prev",
     "continue": "Continue",

@@ -70,6 +70,10 @@ export const BUILTIN_CATEGORIES: CustomCategory[] = [
   { id: "other",         name: "Other",         emoji: "📦", color: "#B2BEC3", bgColor: "#B2BEC320" },
 ];
 
+export function isBuiltinCategoryId(id: string): boolean {
+  return BUILTIN_CATEGORIES.some((b) => b.id === id);
+}
+
 // Legacy compat map — used by old components
 export const CATEGORY_META: Record<string, { emoji: string; color: string; bgColor: string }> =
   Object.fromEntries(BUILTIN_CATEGORIES.map((c) => [c.id, { emoji: c.emoji, color: c.color, bgColor: c.bgColor }]));
@@ -101,11 +105,13 @@ export function getCategoryMeta(
   }
 
   const ov = displayOverrides?.[categoryId];
+  /** Built-in labels always come from i18n; `name` overrides are not allowed. */
+  const resolvedName = builtin ? defaultName : (ov?.name ?? defaultName);
   return {
     emoji: ov?.emoji ?? base.emoji,
     color: ov?.color ?? base.color,
     bgColor: ov?.bgColor ?? base.bgColor,
-    name: ov?.name ?? defaultName,
+    name: resolvedName,
   };
 }
 
@@ -137,8 +143,6 @@ export const PRESET_BANK_APP_IDS = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.
 
 /** Backend ile birleşince `id` `ubank_*` olabilir; paket adı sabit kalır. */
 export const PRESET_BANK_PACKAGES = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.packageName));
-
-export const MONTHLY_BUDGET = 2000;
 
 export const MOCK_EXPENSES: Expense[] = [
   { id: "1", amount: 24.5,  description: "Starbucks coffee",     category: "food",          date: "2026-05-01", currency: "USD", listId: "private" },

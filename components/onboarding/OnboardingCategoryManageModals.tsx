@@ -26,8 +26,11 @@ import { useStore } from "../../store/useStore";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
 import {
   actionBarInnerBottomPad,
-  keyboardLiftPaddingBottom,
 } from "../../lib/keyboardFooterChrome";
+import { ConfirmDialogCard } from "../dialog/ConfirmDialogCard";
+import { buildAppDialogTheme } from "../dialog/appDialogTheme";
+
+export { isBuiltinCategoryId } from "../../constants/mockData";
 
 const CORAL = "#FF6B6B";
 const PURPLE = "#6C63FF";
@@ -53,10 +56,6 @@ const COLORS = [
   { color: "#FD79A8", bg: "#FD79A822" },
   { color: "#6C63FF", bg: "#6C63FF22" },
 ];
-
-export function isBuiltinCategoryId(id: string): boolean {
-  return BUILTIN_CATEGORIES.some((b) => b.id === id);
-}
 
 type GridModalProps = {
   visible: boolean;
@@ -316,13 +315,20 @@ export function OnboardingCategoryEditModal({
   labels,
 }: EditModalProps) {
   const { t } = useTranslation();
-  const { showAlert, showConfirm } = useAppDialog();
+  const { showAlert } = useAppDialog();
   const insets = useSafeAreaInsets();
   const keyboardInset = useKeyboardInset();
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("📦");
   const [colorPair, setColorPair] = useState(COLORS[0]);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!visible) setDeleteConfirmOpen(false);
+  }, [visible]);
+
+  const dialogTheme = useMemo(() => buildAppDialogTheme(isDark), [isDark]);
 
   useEffect(() => {
     if (visible && initial) {
@@ -344,27 +350,20 @@ export function OnboardingCategoryEditModal({
   const closeRowPaddingTop = Math.max(statusBarTop, 12);
 
   const handleDeletePress = () => {
-    void (async () => {
-      if (isBuiltin) {
-        showAlert(labels.cannotDeleteBuiltin);
-        return;
-      }
-      if (hasTransactions) {
-        showAlert(labels.cannotDeleteHasTx);
-        return;
-      }
-      const ok = await showConfirm({
-        title: labels.delete,
-        confirmText: labels.delete,
-        cancelText: t("common.cancel"),
-        destructive: true,
-      });
-      if (ok) onDelete();
-    })();
+    if (isBuiltin) {
+      showAlert(labels.cannotDeleteBuiltin);
+      return;
+    }
+    if (hasTransactions) {
+      showAlert(labels.cannotDeleteHasTx);
+      return;
+    }
+    setDeleteConfirmOpen(true);
   };
 
   const handleSave = () => {
-    const n = name.trim();
+    if (!initial) return;
+    const n = (isBuiltin ? initial.name : name).trim();
     if (!n) return;
     onSave({
       name: n,
@@ -402,12 +401,8 @@ export function OnboardingCategoryEditModal({
         <View
           style={{
             flex: 1,
-            paddingBottom:
-              Platform.OS === "android"
-                ? keyboardInset > 0
-                  ? keyboardInset + insets.bottom
-                  : 0
-                : keyboardLiftPaddingBottom(keyboardInset),
+            /** Klavye açıkken yalnızca IME yüksekliği — Android’de +insets.bottom ve iOS’ta +KEYBOARD_GAP fazla boşluk bırakıyordu */
+            paddingBottom: keyboardInset > 0 ? keyboardInset : 0,
           }}
         >
           <KeyboardAvoidingView behavior={undefined} style={{ flex: 1 }}>
@@ -455,20 +450,49 @@ export function OnboardingCategoryEditModal({
               </Pressable>
             </View>
 
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder={labels.namePlaceholder}
-              placeholderTextColor={muted}
-              style={{
-                color: text,
-                fontSize: 28,
-                fontWeight: "700",
-                textAlign: "center",
-                marginBottom: 20,
-                minWidth: "100%",
-              }}
-            />
+            {isBuiltin ? (
+              <>
+                <Text
+                  style={{
+                    color: text,
+                    fontSize: 28,
+                    fontWeight: "700",
+                    textAlign: "center",
+                    marginBottom: 8,
+                    minWidth: "100%",
+                  }}
+                >
+                  {initial.name}
+                </Text>
+                <Text
+                  style={{
+                    color: muted,
+                    fontSize: 13,
+                    textAlign: "center",
+                    lineHeight: 18,
+                    marginBottom: 20,
+                    paddingHorizontal: 8,
+                  }}
+                >
+                  {t("settings.builtinCategoryNameLocked")}
+                </Text>
+              </>
+            ) : (
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={labels.namePlaceholder}
+                placeholderTextColor={muted}
+                style={{
+                  color: text,
+                  fontSize: 28,
+                  fontWeight: "700",
+                  textAlign: "center",
+                  marginBottom: 20,
+                  minWidth: "100%",
+                }}
+              />
+            )}
 
             <Text
               style={{
@@ -508,7 +532,8 @@ export function OnboardingCategoryEditModal({
               gap: 12,
               paddingHorizontal: 20,
               paddingTop: 12,
-              paddingBottom: actionBarInnerBottomPad(keyboardInset, insets.bottom),
+              paddingBottom:
+                keyboardInset > 0 ? 0 : actionBarInnerBottomPad(keyboardInset, insets.bottom),
               backgroundColor: isDark ? "#0a0a0a" : "#fff",
               borderTopWidth: StyleSheet.hairlineWidth,
               borderTopColor: border,
@@ -550,6 +575,41 @@ export function OnboardingCategoryEditModal({
         </View>
 
         <EmojiPickerSheet visible={emojiOpen} onSelect={setEmoji} onClose={() => setEmojiOpen(false)} isDark={isDark} />
+
+        {deleteConfirmOpen ? (
+          <View
+            style={[StyleSheet.absoluteFillObject, { zIndex: 2000 }]}
+            pointerEvents="box-none"
+          >
+            <Pressable
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: dialogTheme.overlay }]}
+              onPress={() => setDeleteConfirmOpen(false)}
+              accessibilityRole="button"
+            />
+            <View
+              pointerEvents="box-none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                { justifyContent: "center", paddingHorizontal: 24, alignItems: "stretch" },
+              ]}
+            >
+              <ConfirmDialogCard
+                isDark={isDark}
+                themeOverride={dialogTheme}
+                title={t("settings.deleteCategoryConfirmTitle")}
+                message={t("settings.deleteCategoryConfirmMessage")}
+                cancelText={t("common.cancel")}
+                confirmText={labels.delete}
+                destructive
+                onCancel={() => setDeleteConfirmOpen(false)}
+                onConfirm={() => {
+                  setDeleteConfirmOpen(false);
+                  onDelete();
+                }}
+              />
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   );

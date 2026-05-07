@@ -82,8 +82,14 @@ export default function CategorySpendScroller({
             key={cat.id}
             onPress={() => onSelectCategory(selected ? null : cat.id)}
             onLongPress={() => onLongPressCategory(cat.id)}
+            android_ripple={{
+              color: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)",
+              borderless: false,
+              radius: ITEM_W / 2,
+            }}
             style={{ width: ITEM_W }}
           >
+            {({ pressed }) => (
             <View
               style={{
                 borderRadius: 22,
@@ -93,7 +99,13 @@ export default function CategorySpendScroller({
                 borderWidth: selected ? 2 : 0,
                 borderColor: selected ? "rgba(255,255,255,0.72)" : "transparent",
                 borderStyle: selected ? "dashed" : "solid",
-                backgroundColor: selected ? "rgba(85, 239, 196, 0.14)" : "transparent",
+                backgroundColor: selected
+                  ? "rgba(85, 239, 196, 0.14)"
+                  : pressed
+                    ? isDark
+                      ? "rgba(255,255,255,0.10)"
+                      : "rgba(0,0,0,0.07)"
+                    : "transparent",
               }}
             >
               <View
@@ -128,6 +140,7 @@ export default function CategorySpendScroller({
                 {currencySymbol ? `${currencySymbol}${rounded}` : rounded}
               </Text>
             </View>
+            )}
           </Pressable>
         );
       })}

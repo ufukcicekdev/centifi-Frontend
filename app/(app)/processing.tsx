@@ -122,11 +122,21 @@ export default function Processing() {
       showAlert(t("processing.invalidAmountTitle"), t("forms.validAmount"));
       return;
     }
+    if (!description.trim()) {
+      showAlert(t("common.formValidationTitle"), t("forms.descriptionRequired"));
+      return;
+    }
     try {
       const { notificationAsync, NotificationFeedbackType } = await import("expo-haptics");
       await notificationAsync(NotificationFeedbackType.Success);
     } catch {}
-    const payload = { amount: parseFloat(amount), description, category, date, currency: displayCurrency };
+    const payload = {
+      amount: parseFloat(amount),
+      description: description.trim(),
+      category,
+      date,
+      currency: displayCurrency,
+    };
     const list_id = expenseListIdForApi(activeListId);
     try {
       const created = await createExpense({

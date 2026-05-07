@@ -17,13 +17,13 @@
     "delete": "Eliminar",
     "loading": "Cargando...",
     "error": "Algo salió mal",
+    "formValidationTitle": "Falta información",
     "close": "Cerrar",
     "today": "Hoy",
     "yesterday": "Ayer"
   },
   "dashboard": {
     "greeting": "Hola, {{name}} 👋",
-    "monthlyBudget": "Presupuesto mensual",
     "remaining": "Restante",
     "spent": "Gastado",
     "of": "de",
@@ -90,7 +90,7 @@
   },
   "forms": {
     "validAmount": "Introduce un importe válido.",
-    "descriptionRequired": "Añade una descripción.",
+    "descriptionRequired": "No dejes el campo de descripción vacío.",
     "saveFailed": "No se pudo guardar.",
     "saveFailedRetry": "No se pudo guardar. Inténtalo de nuevo."
   },
@@ -194,6 +194,7 @@
     "chooseCategoriesTitle": "Elige tus categorías",
     "editCategories": "Editar categorías",
     "cannotDeleteBuiltinCategory": "Las categorías integradas no se pueden eliminar.",
+    "builtinCategoryNameLocked": "Los nombres de categorías integradas siguen el idioma de la app y no se pueden editar.",
     "cannotDeleteCategoryHasTransactions": "Esta categoría tiene transacciones. Elimínalas o reasígnalas primero.",
     "categoryNamePlaceholder": "Nombre de la categoría",
     "categoryEditorNewTitle": "Nueva categoría",
@@ -202,7 +203,7 @@
     "categoryEditorUpdate": "Actualizar",
     "categoryColorLabel": "Color",
     "categorySaveFailed": "No se pudo guardar la categoría.",
-    "enterCategoryName": "Introduce un nombre de categoría.",
+    "enterCategoryName": "No dejes vacío el nombre de la categoría.",
     "categoryDeleteFailed": "No se pudo eliminar la categoría.",
     "addCategory": "Añadir categoría",
     "lists": "Listas",
@@ -217,6 +218,8 @@
     "deleteList": "Eliminar lista",
     "deleteListConfirmTitle": "¿Eliminar esta lista?",
     "deleteListConfirmMessage": "La lista se eliminará de forma permanente. No se puede deshacer.",
+    "deleteCategoryConfirmTitle": "¿Eliminar esta categoría?",
+    "deleteCategoryConfirmMessage": "La categoría se eliminará. No se puede deshacer.",
     "cannotDeleteListHasExpenses": "No puedes eliminar una lista con gastos. Mueve o borra esos movimientos primero.",
     "listDeleteFailed": "No se pudo eliminar la lista.",
     "addList": "Añadir",
@@ -245,7 +248,6 @@
     "bankFillFields": "Completa todos los campos.",
     "bankAddFailed": "No se pudo añadir la app bancaria.",
     "viewInStore": "Ver en la tienda ↗",
-    "monthlyBudget": "Presupuesto mensual",
     "categoryBudgets": "Presupuestos por categoría",
     "reportSection": "Informe",
     "reportMenu": "Informe por correo",
@@ -371,7 +373,7 @@
     "defaultPrivateList": "Lista privada"
   },
   "onboarding": {
-    "categoryNameRequired": "Introduce un nombre.",
+    "categoryNameRequired": "No dejes vacío el nombre de la categoría.",
     "skip": "Saltar",
     "prev": "Atrás",
     "continue": "Continuar",
