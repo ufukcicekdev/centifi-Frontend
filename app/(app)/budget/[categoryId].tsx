@@ -25,7 +25,7 @@ import { useAppDialog } from "../../../context/AppDialogContext";
 import { useKeyboardInset } from "../../../hooks/useKeyboardInset";
 import {
   actionBarInnerBottomPad,
-  keyboardLiftPaddingBottom,
+  expenseFormMainKeyboardLiftPad,
 } from "../../../lib/keyboardFooterChrome";
 
 const CORAL = "#FF6B6B";
@@ -89,8 +89,7 @@ export default function CategoryBudgetScreen() {
   const amountSymbol = currencySymbolFor(displayCurrency, lang);
   const footerBorder = isDark ? "#2c2c2c" : "#e0e0e0";
   const footerBarBg = isDark ? "#0a0a0a" : "#fff";
-  const keyboardLiftPad =
-    Platform.OS === "android" ? 0 : keyboardLiftPaddingBottom(keyboardInset);
+  const keyboardLiftPad = expenseFormMainKeyboardLiftPad(keyboardInset);
   const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
 
   const handleSave = useCallback(() => {

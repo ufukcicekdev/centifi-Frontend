@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, Pressable, ScrollView, StyleSheet, Image } from "react-native";
+import { View, Text, Pressable, ScrollView, StyleSheet, Image, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import type { BankAutomation } from "../constants/mockData";
@@ -119,12 +119,28 @@ export default function PendingBankTransactionsStrip({
                 </View>
               </Pressable>
               <Pressable
-                hitSlop={10}
-                onPress={() => onDismiss(item.id)}
-                style={styles.dismiss}
+                accessibilityRole="button"
                 accessibilityLabel={t("dashboard.pendingBankDismissA11y")}
+                hitSlop={{ top: 6, bottom: 6, left: 8, right: 10 }}
+                android_ripple={
+                  Platform.OS === "android"
+                    ? { color: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)", foreground: true }
+                    : undefined
+                }
+                onPress={() => onDismiss(item.id)}
+                style={({ pressed }) => [
+                  styles.dismissBtn,
+                  {
+                    borderColor: isDark ? "#3a3a3c" : "#d8d8dc",
+                    backgroundColor: isDark ? "#2a2a2c" : "#f2f2f7",
+                  },
+                  pressed && {
+                    backgroundColor: isDark ? "#3d3d40" : "#e6e6eb",
+                    borderColor: isDark ? "#48484a" : "#c8c8cc",
+                  },
+                ]}
               >
-                <Ionicons name="close" size={18} color={muted} />
+                <Ionicons name="close" size={20} color={isDark ? "#c4c4c8" : "#48484a"} />
               </Pressable>
             </View>
           );
@@ -147,10 +163,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingVertical: 14,
     paddingLeft: 14,
-    paddingRight: 8,
+    paddingRight: 6,
   },
-  dismiss: {
-    paddingHorizontal: 10,
+  dismissBtn: {
+    alignSelf: "center",
+    marginRight: 10,
+    marginVertical: 10,
+    minWidth: 40,
+    minHeight: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
     alignItems: "center",
   },

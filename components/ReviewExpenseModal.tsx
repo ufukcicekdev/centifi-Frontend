@@ -23,7 +23,10 @@ import { currencySymbolFor } from "../lib/formatMoney";
 import type { Language } from "../i18n";
 import { buildCategoriesForHome, useStore } from "../store/useStore";
 import AddExpenseDatePickerModal from "./AddExpenseDatePickerModal";
-import { saveBarPaddingBottom } from "../lib/saveBarPaddingBottom";
+import {
+  actionBarInnerBottomPad,
+  expenseFormMainKeyboardLiftPad,
+} from "../lib/keyboardFooterChrome";
 import { OnboardingAddCategoryFullScreenModal } from "./onboarding/OnboardingAddCategoryFullScreenModal";
 import { useAppDialog } from "../context/AppDialogContext";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
@@ -116,9 +119,6 @@ function parseAmountInput(raw: string): number {
   const n = parseFloat(normalized);
   return Number.isFinite(n) ? n : NaN;
 }
-
-/** Add ekranı ile aynı: sabit alt bar + ScrollView son boşluğu (saveBarPaddingBottom ayrıca eklenir) */
-const SCROLL_BOTTOM_PAD_WITH_SAVE_BAR_BASE = 100;
 
 export default function ReviewExpenseModal({
   visible,
@@ -336,11 +336,11 @@ export default function ReviewExpenseModal({
   const showForm = !parsing && !success && rows.length > 0;
   const emptyParsed = !parsing && !success && parsedExpenses != null && parsedExpenses.length === 0;
 
-  const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
-  /** Klavye açıkken tampon aşağıda fazla boşluk bırakıyordu */
-  const saveBarPaddingBottomResolved = keyboardInset > 0 ? 0 : saveBarBottomPad;
+  const keyboardLiftPad = expenseFormMainKeyboardLiftPad(keyboardInset);
+  const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
+  /** Alt şerit artık scroll dışında flex ile; sadece son içerik ile şerit arası nefes */
   const scrollContentBottomPad = showForm
-    ? SCROLL_BOTTOM_PAD_WITH_SAVE_BAR_BASE + saveBarPaddingBottomResolved + Math.min(80, Math.max(0, (rows.length - 1) * 28))
+    ? 24 + Math.min(80, Math.max(0, (rows.length - 1) * 28))
     : 40;
 
   const parsingCopy = useMemo(() => {
@@ -364,13 +364,13 @@ export default function ReviewExpenseModal({
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1, backgroundColor: bg }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
-      >
-        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "android" ? "padding" : undefined}
+          enabled={Platform.OS !== "android" || keyboardInset > 0}
+        >
           <View style={{ flex: 1 }}>
             <Pressable
               onPress={onClose}
@@ -382,20 +382,21 @@ export default function ReviewExpenseModal({
               <Ionicons name="close" size={28} color={textColor} />
             </Pressable>
 
-            <ScrollView
-              style={{ flex: 1 }}
-              showsVerticalScrollIndicator={false}
-              keyboardDismissMode="interactive"
-              automaticallyAdjustKeyboardInsets
-              nestedScrollEnabled
-              contentContainerStyle={{
-                paddingHorizontal: 20,
-                paddingTop: 8,
-                paddingBottom: scrollContentBottomPad,
-                flexGrow: parsing || success || emptyParsed ? 1 : undefined,
-              }}
-              keyboardShouldPersistTaps="handled"
-            >
+            <View style={{ flex: 1, paddingBottom: keyboardLiftPad }}>
+              <ScrollView
+                style={{ flex: 1 }}
+                showsVerticalScrollIndicator={false}
+                keyboardDismissMode="interactive"
+                automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+                nestedScrollEnabled
+                contentContainerStyle={{
+                  paddingHorizontal: 20,
+                  paddingTop: 8,
+                  paddingBottom: scrollContentBottomPad,
+                  flexGrow: parsing || success || emptyParsed ? 1 : undefined,
+                }}
+                keyboardShouldPersistTaps="handled"
+              >
               {parsing ? (
                 <View style={{ alignItems: "center", paddingTop: 72, paddingHorizontal: 12 }}>
                   <ActivityIndicator size="large" color="#6C63FF" />
@@ -650,50 +651,47 @@ export default function ReviewExpenseModal({
                   })}
                 </Animated.View>
               )}
-            </ScrollView>
+              </ScrollView>
 
-            {showForm && (
-              <View
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  paddingHorizontal: 20,
-                  paddingTop: 12,
-                  paddingBottom: saveBarPaddingBottomResolved,
-                  backgroundColor: bottomBarBg,
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderTopColor: isDark ? "#222222" : "#e5e5e5",
-                }}
-              >
-                <Pressable
-                  onPress={handleSaveAll}
-                  disabled={saving}
+              {showForm ? (
+                <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    backgroundColor: saveBtnBg,
-                    borderRadius: 16,
-                    paddingVertical: 16,
-                    opacity: saving ? 0.65 : 1,
+                    paddingHorizontal: 20,
+                    paddingTop: 12,
+                    paddingBottom: footerInnerBottomPad,
+                    backgroundColor: bottomBarBg,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: isDark ? "#222222" : "#e5e5e5",
                   }}
                 >
-                  {saving ? (
-                    <ActivityIndicator color={textColor} />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={22} color={textColor} />
-                      <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>{saveLabel}</Text>
-                    </>
-                  )}
-                </Pressable>
-              </View>
-            )}
+                  <Pressable
+                    onPress={handleSaveAll}
+                    disabled={saving}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      backgroundColor: saveBtnBg,
+                      borderRadius: 16,
+                      paddingVertical: 16,
+                      opacity: saving ? 0.65 : 1,
+                    }}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color={textColor} />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={22} color={textColor} />
+                        <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>{saveLabel}</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
           </View>
-        </SafeAreaView>
+        </KeyboardAvoidingView>
 
         <AddExpenseDatePickerModal
           visible={dateModalRow !== null}
@@ -721,7 +719,7 @@ export default function ReviewExpenseModal({
             setCategoryModalRow(null);
           }}
         />
-      </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }

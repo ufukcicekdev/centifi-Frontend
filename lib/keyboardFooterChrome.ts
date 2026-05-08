@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { saveBarPaddingBottom } from "./saveBarPaddingBottom";
 
 /**
@@ -14,6 +15,16 @@ const INNER_PAD_WHEN_KEYBOARD_OPEN = 8;
 export function keyboardLiftPaddingBottom(keyboardInset: number): number {
   if (keyboardInset <= 0) return 0;
   return keyboardInset + KEYBOARD_ABOVE_ACTION_BAR_GAP;
+}
+
+/**
+ * Masraf ekle / düzenle / bütçe ekranı ile aynı: `KeyboardAvoidingView` + scroll + alt şerit düzeninde
+ * iç `View`’ün `paddingBottom`’u. Android’de 0 bırakılır (KAV `padding` klavyeyi karşılar), iOS’ta IME + sabit gap.
+ */
+export function expenseFormMainKeyboardLiftPad(keyboardInset: number): number {
+  if (keyboardInset <= 0) return 0;
+  if (Platform.OS === "android") return 0;
+  return keyboardLiftPaddingBottom(keyboardInset);
 }
 
 /**

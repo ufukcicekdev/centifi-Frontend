@@ -36,7 +36,7 @@ import { useAppDialog } from "../../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
 import {
   actionBarInnerBottomPad,
-  keyboardLiftPaddingBottom,
+  expenseFormMainKeyboardLiftPad,
 } from "../../lib/keyboardFooterChrome";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
 import { currencySymbolFor } from "../../lib/formatMoney";
@@ -184,8 +184,7 @@ export default function AddExpense() {
 
   const activeList = lists.find((l) => l.id === activeListId);
   const keyboardInset = useKeyboardInset();
-  const keyboardLiftPad =
-    Platform.OS === "android" ? 0 : keyboardLiftPaddingBottom(keyboardInset);
+  const keyboardLiftPad = expenseFormMainKeyboardLiftPad(keyboardInset);
   const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
 
   const homeCats = useMemo(() => {

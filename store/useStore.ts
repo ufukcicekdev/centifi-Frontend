@@ -43,10 +43,34 @@ import { loadDisplayCurrency, saveDisplayCurrency } from "../lib/currencyPrefs";
 import { getDeviceAppLanguage } from "../lib/deviceLanguage";
 import { loadLanguage, saveLanguage } from "../lib/languagePrefs";
 import type { PendingBankTransaction } from "../lib/pendingBankTypes";
-import { loadPendingBankPrefs, savePendingBankPrefs } from "../lib/pendingBankPrefs";
+import { loadPendingBankPrefs, savePendingBankPrefs, clearPendingBankPrefs } from "../lib/pendingBankPrefs";
+import { isLikelySpendBankNotification } from "../lib/bankSpendNotificationHeuristic";
 import type { PeriodFilter } from "../lib/expenseFilters";
 import { defaultPeriodFilter } from "../lib/expenseFilters";
 import { flushBudgetThresholdCheck, queueBudgetThresholdCheck } from "../lib/budgetThresholdNotifications";
+
+/** Aynı id tekilleştir; önce gelen listede öncelik (yeni bildirimler önce). */
+function mergePendingBankRows(
+  preferFirst: PendingBankTransaction[],
+  second: PendingBankTransaction[],
+): PendingBankTransaction[] {
+  const byId = new Map<string, PendingBankTransaction>();
+  for (const r of preferFirst) byId.set(r.id, r);
+  for (const r of second) {
+    if (!byId.has(r.id)) byId.set(r.id, r);
+  }
+  return Array.from(byId.values()).sort((x, y) => y.createdAtMs - x.createdAtMs).slice(0, 80);
+}
+
+async function migrateLocalPendingBankToUser(userUid: string): Promise<void> {
+  if (!userUid || userUid === "local") return;
+  const localRows = await loadPendingBankPrefs("local");
+  if (localRows.length === 0) return;
+  const userRows = await loadPendingBankPrefs(userUid);
+  const merged = mergePendingBankRows(userRows, localRows);
+  await savePendingBankPrefs(userUid, merged);
+  await clearPendingBankPrefs("local");
+}
 
 export interface AuthUser {
   uid: string;
@@ -377,7 +401,10 @@ export const useStore = create<AppState>((set, get) => {
         void updateMe({ language: resolvedLang }).catch(() => {});
       }
       queueBudgetThresholdCheck(get);
-      void get().hydratePendingBankTransactions().catch(() => {});
+      if (patch.user?.uid) {
+        await migrateLocalPendingBankToUser(patch.user.uid).catch(() => {});
+      }
+      await get().hydratePendingBankTransactions().catch(() => {});
       void get().syncNotificationsWithOsPermission();
       return "ok";
     } catch (e: unknown) {
@@ -889,17 +916,19 @@ export const useStore = create<AppState>((set, get) => {
   pendingBankTransactions: [],
   hydratePendingBankTransactions: async () => {
     const uid = get().user?.uid ?? "local";
-    const rows = await loadPendingBankPrefs(uid);
-    set({ pendingBankTransactions: rows });
+    const fromDisk = await loadPendingBankPrefs(uid);
+    const snapshot = get().pendingBankTransactions;
+    const merged = mergePendingBankRows(fromDisk, snapshot);
+    set({ pendingBankTransactions: merged });
+    void savePendingBankPrefs(uid, merged).catch(() => {});
   },
   ingestNativePendingBankRows: (rows) => {
-    if (rows.length === 0) return;
+    const filtered = rows.filter((r) =>
+      isLikelySpendBankNotification(r.title, r.body, r.packageName),
+    );
+    if (filtered.length === 0) return;
     const uid = get().user?.uid ?? "local";
-    const cur = get().pendingBankTransactions;
-    const seen = new Set(cur.map((r) => r.id));
-    const newRows = rows.filter((r) => !seen.has(r.id));
-    if (newRows.length === 0) return;
-    const merged = [...newRows, ...cur].slice(0, 80);
+    const merged = mergePendingBankRows(filtered, get().pendingBankTransactions);
     set({ pendingBankTransactions: merged });
     void savePendingBankPrefs(uid, merged).catch(() => {});
     // OS bildirimi Android’de BankNotificationListener içinde gösterilir (arka planda JS çalışmaz).

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
@@ -16,9 +16,10 @@ import {
   Image,
   InteractionManager,
   useWindowDimensions,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useKeyboardInset } from "../../hooks/useKeyboardInset";
+import { useKeyboardInset, keyboardHeightFromEvent } from "../../hooks/useKeyboardInset";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,6 +56,7 @@ import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayN
 import {
   actionBarInnerBottomPad,
   keyboardLiftPaddingBottom,
+  expenseFormMainKeyboardLiftPad,
 } from "../../lib/keyboardFooterChrome";
 
 const PURPLE = "#6C63FF";
@@ -307,7 +309,10 @@ function AddBankModal({
   const { t } = useTranslation();
   const { showAlert } = useAppDialog();
   const insets = useSafeAreaInsets();
+  const { height: winH } = useWindowDimensions();
   const keyboardInset = useKeyboardInset();
+  const [bankKeyboardH, setBankKeyboardH] = useState(0);
+  const [bankModalBaselineWinH, setBankModalBaselineWinH] = useState(0);
   const [storeUrl, setStoreUrl] = useState("");
   const [manualName, setManualName] = useState("");
   const [showNameEdit, setShowNameEdit] = useState(false);
@@ -317,10 +322,14 @@ function AddBankModal({
   const [lookupLoading, setLookupLoading] = useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const bg = isDark ? "#0f0f0f" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#000";
   const mutedColor = isDark ? "#888" : "#666";
-  const inputBg = isDark ? "#111" : "#f5f5f5";
-  const borderColor = isDark ? "#2a2a2a" : "#e5e5e5";
+  const inputBg = isDark ? "#111" : "#f0f0f0";
+  const borderColor = isDark ? "#2a2a2a" : "#e0e0e0";
+  const bankScreenBottomBarBg = isDark ? "#0a0a0a" : "#fff";
+  const bankScreenSaveBtnBg = isDark ? "#2c2c2e" : "#e2e2e6";
+  const bankScreenSaveLabel = isDark ? "#fff" : "#111";
 
   const reset = React.useCallback(() => {
     setStoreUrl("");
@@ -339,6 +348,40 @@ function AddBankModal({
   React.useEffect(() => {
     if (visible) reset();
   }, [visible, reset]);
+
+  React.useEffect(() => {
+    if (!visible) {
+      setBankKeyboardH(0);
+      return;
+    }
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const subShow = Keyboard.addListener(showEvt, (e) =>
+      setBankKeyboardH(keyboardHeightFromEvent(e)),
+    );
+    const subHide = Keyboard.addListener(hideEvt, () => setBankKeyboardH(0));
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, [visible]);
+
+  useLayoutEffect(() => {
+    if (!visible) {
+      setBankModalBaselineWinH(0);
+      return;
+    }
+    setBankModalBaselineWinH((prev) => (prev === 0 ? winH : prev));
+  }, [visible, winH]);
+
+  const bankModalLayoutKbd =
+    visible && bankModalBaselineWinH > 0 ? Math.max(0, bankModalBaselineWinH - winH) : 0;
+  const bankKbdFromEvents = visible ? Math.max(keyboardInset, bankKeyboardH) : 0;
+  const bankModalKbdMax = Math.max(bankKbdFromEvents, bankModalLayoutKbd);
+  const bankModalPadBottom =
+    visible && bankModalKbdMax > 0
+      ? Math.max(0, keyboardLiftPaddingBottom(bankModalKbdMax) - bankModalLayoutKbd)
+      : 0;
 
   React.useEffect(() => {
     if (!visible) return;
@@ -422,139 +465,165 @@ function AddBankModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: "#00000066" }} onPress={onClose} />
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: isDark ? "#1a1a1a" : "#fff",
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          padding: 24,
-          paddingBottom: 20 + insets.bottom + keyboardInset,
-        }}
-      >
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top", "left", "right"]}>
         <View
           style={{
-            width: 36,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: isDark ? "#444" : "#ddd",
-            alignSelf: "center",
-            marginBottom: 20,
-          }}
-        />
-        <Text style={{ color: textColor, fontSize: 18, fontWeight: "700", marginBottom: 6 }}>
-          {t("settings.addBankModalTitle")}
-        </Text>
-        <Text style={{ color: mutedColor, fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
-          {t("settings.addBankModalBody")}
-        </Text>
-
-        <View
-          style={{
-            backgroundColor: inputBg,
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            borderWidth: 1,
-            borderColor,
-            marginBottom: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 20,
+            paddingTop: 8,
+            paddingBottom: 8,
           }}
         >
-          <TextInput
-            value={storeUrl}
-            onChangeText={setStoreUrl}
-            placeholder={t("settings.bankStoreUrlPlaceholder")}
-            placeholderTextColor={mutedColor}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={{ color: textColor, fontSize: 14, padding: 0 }}
-          />
+          <Pressable onPress={onClose} hitSlop={12}>
+            <Ionicons name="close" size={28} color={textColor} />
+          </Pressable>
+          <Text style={{ color: textColor, fontSize: 17, fontWeight: "700" }}>
+            {t("settings.addBankModalTitle")}
+          </Text>
+          <View style={{ width: 28 }} />
         </View>
 
-        {lookupLoading ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <ActivityIndicator color={PURPLE} />
-            <Text style={{ color: mutedColor, fontSize: 13 }}>{t("settings.bankFetchingMeta")}</Text>
-          </View>
-        ) : resolvedPkg ? (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 14,
-              padding: 12,
-              borderRadius: 12,
-              backgroundColor: isDark ? "#252528" : "#f0f0f5",
+        <View style={{ flex: 1, paddingBottom: bankModalPadBottom }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 24,
+              paddingTop: 12,
+              paddingBottom: 32,
             }}
           >
-            <StoreIconOrEmoji emoji="🏦" iconUrl={previewIcon} isDark={isDark} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ color: textColor, fontSize: 16, fontWeight: "700" }} numberOfLines={2}>
-                {displayName || resolvedName || fallbackAppLabelFromPackage(resolvedPkg)}
-              </Text>
-              <Text style={{ color: mutedColor, fontSize: 12, marginTop: 4 }} numberOfLines={1}>
-                {resolvedPkg}
-              </Text>
+            <Text style={{ color: mutedColor, fontSize: 14, marginBottom: 18, lineHeight: 20 }}>
+              {t("settings.addBankModalBody")}
+            </Text>
+
+            <View
+              style={{
+                backgroundColor: inputBg,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                borderWidth: 1,
+                borderColor,
+                marginBottom: 14,
+              }}
+            >
+              <TextInput
+                value={storeUrl}
+                onChangeText={setStoreUrl}
+                placeholder={t("settings.bankStoreUrlPlaceholder")}
+                placeholderTextColor={mutedColor}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={{ color: textColor, fontSize: 16, paddingVertical: 14 }}
+              />
             </View>
-          </View>
-        ) : null}
 
-        {showNameEdit ? (
+            {lookupLoading ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <ActivityIndicator color={PURPLE} />
+                <Text style={{ color: mutedColor, fontSize: 13 }}>{t("settings.bankFetchingMeta")}</Text>
+              </View>
+            ) : resolvedPkg ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 14,
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? "#252528" : "#f0f0f5",
+                }}
+              >
+                <StoreIconOrEmoji emoji="🏦" iconUrl={previewIcon} isDark={isDark} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: textColor, fontSize: 16, fontWeight: "700" }} numberOfLines={2}>
+                    {displayName || resolvedName || fallbackAppLabelFromPackage(resolvedPkg)}
+                  </Text>
+                  <Text style={{ color: mutedColor, fontSize: 12, marginTop: 4 }} numberOfLines={1}>
+                    {resolvedPkg}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {showNameEdit ? (
+              <View
+                style={{
+                  backgroundColor: inputBg,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  borderWidth: 1,
+                  borderColor,
+                  marginBottom: 12,
+                }}
+              >
+                <TextInput
+                  value={manualName}
+                  onChangeText={setManualName}
+                  placeholder={t("settings.bankNamePlaceholder")}
+                  placeholderTextColor={mutedColor}
+                  style={{ color: textColor, fontSize: 16, paddingVertical: 14 }}
+                />
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={() => setShowNameEdit((v) => !v)}
+              style={{ marginBottom: 8, alignSelf: "flex-start" }}
+            >
+              <Text style={{ color: PURPLE, fontSize: 14, fontWeight: "600" }}>
+                {showNameEdit ? t("settings.bankHideNameEdit") : t("settings.bankEditNameHint")}
+              </Text>
+            </Pressable>
+          </ScrollView>
+
           <View
             style={{
-              backgroundColor: inputBg,
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor,
-              marginBottom: 12,
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: actionBarInnerBottomPad(bankModalKbdMax, insets.bottom),
+              backgroundColor: bankScreenBottomBarBg,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: isDark ? "#222" : "#e5e5e5",
             }}
           >
-            <TextInput
-              value={manualName}
-              onChangeText={setManualName}
-              placeholder={t("settings.bankNamePlaceholder")}
-              placeholderTextColor={mutedColor}
-              style={{ color: textColor, fontSize: 15, padding: 0 }}
-            />
+            <Pressable
+              onPress={() => void handleSave()}
+              style={{
+                width: "100%",
+                alignSelf: "stretch",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                backgroundColor: bankScreenSaveBtnBg,
+                borderRadius: 16,
+                paddingVertical: 16,
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("common.save")}
+            >
+              <Ionicons name="checkmark-circle" size={22} color={bankScreenSaveLabel} />
+              <Text style={{ color: bankScreenSaveLabel, fontSize: 17, fontWeight: "700" }}>
+                {t("common.save")}
+              </Text>
+            </Pressable>
           </View>
-        ) : null}
-
-        <Pressable
-          onPress={() => setShowNameEdit((v) => !v)}
-          style={{ marginBottom: 16, alignSelf: "flex-start" }}
-        >
-          <Text style={{ color: PURPLE, fontSize: 14, fontWeight: "600" }}>
-            {showNameEdit ? t("settings.bankHideNameEdit") : t("settings.bankEditNameHint")}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => void handleSave()}
-          style={({ pressed }) => ({
-            backgroundColor: PURPLE,
-            borderRadius: 14,
-            paddingVertical: 16,
-            paddingHorizontal: 20,
-            alignItems: "center",
-            justifyContent: "center",
-            alignSelf: "stretch",
-            width: "100%",
-            opacity: pressed ? 0.8 : 1,
-          })}
-        >
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" }}>
-            {t("settings.bankModalSubmit")}
-          </Text>
-        </Pressable>
-      </View>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -680,6 +749,7 @@ export default function Settings() {
   const [savingProfile, setSavingProfile] = useState(false);
   const insets = useSafeAreaInsets();
   const keyboardInset = useKeyboardInset();
+  const listEditKeyboardLiftPad = expenseFormMainKeyboardLiftPad(keyboardInset);
   const settingsScrollRef = useRef<ScrollView>(null);
 
   const bg = isDark ? "#000000" : "#f5f5f5";
@@ -1570,7 +1640,7 @@ export default function Settings() {
       <Modal
         visible
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="fullScreen"
         onRequestClose={() => {
           if (savingListEdit || deletingList) return;
           setEditingList(null);
@@ -1579,56 +1649,58 @@ export default function Settings() {
           setListEmojiPickerOpen(false);
         }}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top", "left", "right"]}>
-          <Pressable
-            onPress={() => {
-              if (savingListEdit || deletingList) return;
-              setEditingList(null);
-              setEditListName("");
-              setEditListEmoji("📋");
-              setListEmojiPickerOpen(false);
-            }}
-            hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
-            style={{
-              alignSelf: "flex-start",
-              marginLeft: 8,
-              paddingTop: 12,
-              paddingLeft: 12,
-              paddingBottom: 8,
-              paddingRight: 12,
-              minWidth: 44,
-              minHeight: 44,
-              justifyContent: "center",
-            }}
-            accessibilityLabel="Close"
+        <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "android" ? "padding" : undefined}
+            enabled={Platform.OS !== "android" || keyboardInset > 0}
           >
-            <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : textColor} />
-          </Pressable>
+            <View style={{ flex: 1 }}>
+              <Pressable
+                onPress={() => {
+                  if (savingListEdit || deletingList) return;
+                  setEditingList(null);
+                  setEditListName("");
+                  setEditListEmoji("📋");
+                  setListEmojiPickerOpen(false);
+                }}
+                hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
+                style={{
+                  alignSelf: "flex-start",
+                  marginLeft: 8,
+                  paddingTop: 12,
+                  paddingLeft: 12,
+                  paddingBottom: 8,
+                  paddingRight: 12,
+                  minWidth: 44,
+                  minHeight: 44,
+                  justifyContent: "center",
+                }}
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : textColor} />
+              </Pressable>
 
-          <View
-            style={{
-              flex: 1,
-              paddingBottom:
-                Platform.OS === "android"
-                  ? keyboardInset > 0
-                    ? keyboardInset + insets.bottom
-                    : 0
-                  : keyboardLiftPaddingBottom(keyboardInset),
-            }}
-          >
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={undefined}>
-            <ScrollView
-              style={{ flex: 1 }}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-              contentContainerStyle={{
-                paddingHorizontal: 24,
-                paddingTop: 8,
-                paddingBottom: 24,
-                alignItems: "center",
-              }}
-              showsVerticalScrollIndicator={false}
-            >
+              <View
+                style={{
+                  flex: 1,
+                  paddingBottom: listEditKeyboardLiftPad,
+                }}
+              >
+                <ScrollView
+                  style={{ flex: 1 }}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="interactive"
+                  automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+                  nestedScrollEnabled
+                  contentContainerStyle={{
+                    paddingHorizontal: 24,
+                    paddingTop: 8,
+                    paddingBottom: 24,
+                    alignItems: "center",
+                  }}
+                  showsVerticalScrollIndicator={false}
+                >
               <View style={{ position: "relative", marginBottom: 20 }}>
                 <View
                   style={{
@@ -1696,82 +1768,85 @@ export default function Settings() {
                 </Text>
               ) : null}
             </ScrollView>
-          </KeyboardAvoidingView>
 
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 12,
-              paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: actionBarInnerBottomPad(keyboardInset, insets.bottom),
-              backgroundColor: isDark ? "#0a0a0a" : "#fff",
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: divider,
-            }}
-          >
-            {canDeleteEditedList ? (
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 12,
+                paddingHorizontal: 20,
+                paddingTop: 12,
+                paddingBottom: actionBarInnerBottomPad(keyboardInset, insets.bottom),
+                backgroundColor: isDark ? "#0a0a0a" : "#fff",
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: divider,
+              }}
+            >
+              {canDeleteEditedList ? (
+                <Pressable
+                  onPress={() => void handleConfirmDeleteEditedList()}
+                  disabled={savingListEdit || deletingList}
+                  style={{
+                    flex: 1,
+                    height: 52,
+                    borderRadius: 14,
+                    backgroundColor: CORAL,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "row",
+                    gap: 8,
+                    opacity: savingListEdit || deletingList ? 0.45 : 1,
+                  }}
+                >
+                  {deletingList ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="trash-outline" size={20} color="#fff" />
+                      <Text
+                        style={{ color: "#fff", fontWeight: "700", fontSize: 15, flexShrink: 1, textAlign: "center" }}
+                      >
+                        {t("settings.deleteList")}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
               <Pressable
-                onPress={() => void handleConfirmDeleteEditedList()}
-                disabled={savingListEdit || deletingList}
+                onPress={() => void handleSaveListEdit()}
+                disabled={!listEditSaveReady || savingListEdit || deletingList}
                 style={{
                   flex: 1,
                   height: 52,
                   borderRadius: 14,
-                  backgroundColor: CORAL,
+                  backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
                   alignItems: "center",
                   justifyContent: "center",
                   flexDirection: "row",
                   gap: 8,
-                  opacity: savingListEdit || deletingList ? 0.45 : 1,
+                  opacity: !listEditSaveReady || deletingList ? 0.55 : 1,
                 }}
               >
-                {deletingList ? (
-                  <ActivityIndicator color="#fff" />
+                {savingListEdit ? (
+                  <ActivityIndicator color={textColor} />
                 ) : (
                   <>
-                    <Ionicons name="trash-outline" size={20} color="#fff" />
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15, flexShrink: 1 }} textAlign="center">
-                      {t("settings.deleteList")}
+                    <Ionicons name="checkmark" size={22} color={textColor} />
+                    <Text
+                      style={{
+                        color: listEditSaveReady ? textColor : mutedColor,
+                        fontWeight: "700",
+                        fontSize: 16,
+                      }}
+                    >
+                      {t("common.save")}
                     </Text>
                   </>
                 )}
               </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => void handleSaveListEdit()}
-              disabled={!listEditSaveReady || savingListEdit || deletingList}
-              style={{
-                flex: 1,
-                height: 52,
-                borderRadius: 14,
-                backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
-                alignItems: "center",
-                justifyContent: "center",
-                flexDirection: "row",
-                gap: 8,
-                opacity: !listEditSaveReady || deletingList ? 0.55 : 1,
-              }}
-            >
-              {savingListEdit ? (
-                <ActivityIndicator color={textColor} />
-              ) : (
-                <>
-                  <Ionicons name="checkmark" size={22} color={textColor} />
-                  <Text
-                    style={{
-                      color: listEditSaveReady ? textColor : mutedColor,
-                      fontWeight: "700",
-                      fontSize: 16,
-                    }}
-                  >
-                    {t("common.save")}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-          </View>
+            </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
           <EmojiPickerSheet
             visible={listEmojiPickerOpen}
             onSelect={setEditListEmoji}

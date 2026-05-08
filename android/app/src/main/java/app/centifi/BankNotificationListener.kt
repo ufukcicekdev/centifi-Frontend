@@ -21,6 +21,7 @@ class BankNotificationListener : NotificationListenerService() {
         extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.trim() ?: ""
     }
     if (title.isEmpty() && body.isEmpty()) return
+    if (!BankNotificationSpendHeuristic.looksLikeSpendOrAccountMovement(title, body, pkg)) return
 
     val postTime = sbn.postTime
     val id = "${pkg}_${postTime}_${title.hashCode()}_${body.hashCode()}"

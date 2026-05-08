@@ -28,7 +28,7 @@ import { useAppDialog } from "../../../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../../../lib/listDisplayName";
 import {
   actionBarInnerBottomPad,
-  keyboardLiftPaddingBottom,
+  expenseFormMainKeyboardLiftPad,
 } from "../../../lib/keyboardFooterChrome";
 import { saveBarPaddingBottom } from "../../../lib/saveBarPaddingBottom";
 import { currencySymbolFor } from "../../../lib/formatMoney";
@@ -235,8 +235,7 @@ export default function ExpenseDetailScreen() {
 
   const activeList = lists.find((l) => l.id === listId);
   const saveBarBottomPad = saveBarPaddingBottom(insets.bottom);
-  const keyboardLiftPad =
-    Platform.OS === "android" ? 0 : keyboardLiftPaddingBottom(keyboardInset);
+  const keyboardLiftPad = expenseFormMainKeyboardLiftPad(keyboardInset);
   const footerInnerBottomPad = actionBarInnerBottomPad(keyboardInset, insets.bottom);
 
   const bg = isDark ? "#000000" : "#f5f5f5";

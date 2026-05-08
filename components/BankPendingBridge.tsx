@@ -6,6 +6,7 @@ const EVENT = "CentifiBankPendingUpdated";
 
 /**
  * Android: OS bildirim dinleyicisinden gelen kuyruğu boşaltır, etkin banka paketlerini native ile senkronlar.
+ * Senkronizden hemen sonra drain edilir; aksi halde ilk karede kuyruk, izin listesi yazılmadan boşaltılabiliyordu.
  * iOS’ta diğer uygulama bildirimleri okunamaz — burada işlem yok.
  */
 export default function BankPendingBridge() {
@@ -13,10 +14,19 @@ export default function BankPendingBridge() {
   const notificationsEnabled = useStore((s) => s.notificationsEnabled);
   const mounted = useRef(true);
 
-  const drain = useCallback(() => {
+  const syncThenDrain = useCallback(() => {
     if (Platform.OS !== "android") return;
     void (async () => {
-      const { drainBankListenerNativeQueue } = await import("../lib/bankNotificationAndroid");
+      const { syncBankListenerAllowedPackages, drainBankListenerNativeQueue } = await import(
+        "../lib/bankNotificationAndroid",
+      );
+      const pkgs = useStore
+        .getState()
+        .bankAutomations.filter((b) => b.enabled)
+        .map((b) => b.packageName.trim())
+        .filter(Boolean);
+      await syncBankListenerAllowedPackages(pkgs);
+      if (!mounted.current) return;
       const rows = await drainBankListenerNativeQueue();
       if (!mounted.current || rows.length === 0) return;
       useStore.getState().ingestNativePendingBankRows(rows);
@@ -33,15 +43,6 @@ export default function BankPendingBridge() {
   useEffect(() => {
     if (Platform.OS !== "android") return;
     void (async () => {
-      const { syncBankListenerAllowedPackages } = await import("../lib/bankNotificationAndroid");
-      const pkgs = bankAutomations.filter((b) => b.enabled).map((b) => b.packageName.trim()).filter(Boolean);
-      await syncBankListenerAllowedPackages(pkgs);
-    })();
-  }, [bankAutomations]);
-
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    void (async () => {
       const { syncBankSystemNotificationFlag } = await import("../lib/bankNotificationAndroid");
       await syncBankSystemNotificationFlag(notificationsEnabled);
     })();
@@ -49,16 +50,20 @@ export default function BankPendingBridge() {
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
-    drain();
+    syncThenDrain();
+  }, [bankAutomations, syncThenDrain]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
     const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active") drain();
+      if (s === "active") syncThenDrain();
     });
-    const ev = DeviceEventEmitter.addListener(EVENT, drain);
+    const ev = DeviceEventEmitter.addListener(EVENT, syncThenDrain);
     return () => {
       sub.remove();
       ev.remove();
     };
-  }, [drain]);
+  }, [syncThenDrain]);
 
   return null;
 }

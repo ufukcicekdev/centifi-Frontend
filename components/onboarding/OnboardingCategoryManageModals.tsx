@@ -26,6 +26,7 @@ import { useStore } from "../../store/useStore";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
 import {
   actionBarInnerBottomPad,
+  expenseFormMainKeyboardLiftPad,
 } from "../../lib/keyboardFooterChrome";
 import { ConfirmDialogCard } from "../dialog/ConfirmDialogCard";
 import { buildAppDialogTheme } from "../dialog/appDialogTheme";
@@ -379,33 +380,37 @@ export function OnboardingCategoryEditModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: bg }}>
-        <Pressable
-          onPress={onClose}
-          hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
-          style={{
-            alignSelf: "flex-start",
-            marginLeft: 8,
-            paddingTop: closeRowPaddingTop,
-            paddingLeft: 12,
-            paddingBottom: 8,
-            paddingRight: 12,
-            minWidth: 44,
-            minHeight: 44,
-            justifyContent: "center",
-          }}
-          accessibilityLabel="Close"
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "android" ? "padding" : undefined}
+          enabled={Platform.OS !== "android" || keyboardInset > 0}
         >
-          <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : text} />
-        </Pressable>
+          <View style={{ flex: 1 }}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={{ top: 16, bottom: 12, left: 16, right: 16 }}
+              style={{
+                alignSelf: "flex-start",
+                marginLeft: 8,
+                paddingTop: closeRowPaddingTop,
+                paddingLeft: 12,
+                paddingBottom: 8,
+                paddingRight: 12,
+                minWidth: 44,
+                minHeight: 44,
+                justifyContent: "center",
+              }}
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={28} color={isDark ? "#FFFFFF" : text} />
+            </Pressable>
 
-        <View
-          style={{
-            flex: 1,
-            /** Klavye açıkken yalnızca IME yüksekliği — Android’de +insets.bottom ve iOS’ta +KEYBOARD_GAP fazla boşluk bırakıyordu */
-            paddingBottom: keyboardInset > 0 ? keyboardInset : 0,
-          }}
-        >
-          <KeyboardAvoidingView behavior={undefined} style={{ flex: 1 }}>
+            <View
+              style={{
+                flex: 1,
+                paddingBottom: expenseFormMainKeyboardLiftPad(keyboardInset),
+              }}
+            >
             <ScrollView
               style={{ flex: 1 }}
               contentContainerStyle={{
@@ -524,7 +529,6 @@ export function OnboardingCategoryEditModal({
               ))}
             </View>
           </ScrollView>
-          </KeyboardAvoidingView>
 
           <View
             style={{
@@ -532,8 +536,7 @@ export function OnboardingCategoryEditModal({
               gap: 12,
               paddingHorizontal: 20,
               paddingTop: 12,
-              paddingBottom:
-                keyboardInset > 0 ? 0 : actionBarInnerBottomPad(keyboardInset, insets.bottom),
+              paddingBottom: actionBarInnerBottomPad(keyboardInset, insets.bottom),
               backgroundColor: isDark ? "#0a0a0a" : "#fff",
               borderTopWidth: StyleSheet.hairlineWidth,
               borderTopColor: border,
@@ -573,6 +576,8 @@ export function OnboardingCategoryEditModal({
             </Pressable>
           </View>
         </View>
+          </View>
+        </KeyboardAvoidingView>
 
         <EmojiPickerSheet visible={emojiOpen} onSelect={setEmoji} onClose={() => setEmojiOpen(false)} isDark={isDark} />
 
