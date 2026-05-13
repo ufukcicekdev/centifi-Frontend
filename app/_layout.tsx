@@ -3,7 +3,7 @@ import "../i18n";
 import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, AppState, StyleSheet, View } from "react-native";
+import { ActivityIndicator, AppState, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
@@ -11,6 +11,7 @@ import { AppDialogProvider } from "../context/AppDialogContext";
 import BudgetAlertForegroundListener from "../components/BudgetAlertForegroundListener";
 import BankPendingBridge from "../components/BankPendingBridge";
 import RevenueCatBridge from "../components/RevenueCatBridge";
+import { isRevenueCatConfigured } from "../lib/revenuecat";
 
 const BOOTSTRAP_PURPLE = "#6C63FF";
 
@@ -20,6 +21,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const isDark = useStore((s) => s.isDark);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const onboardingCompleted = useStore((s) => s.onboardingCompleted);
+  const isPro = useStore((s) => s.isPro);
   /** Until true, `isAuthenticated` is still the default — do not route or user briefly sees login. */
   const [sessionResolved, setSessionResolved] = useState(false);
 
@@ -38,6 +40,23 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     const inAuthGroup = segments[0] === "(auth)";
     const onOnboarding = segments[1] === "onboarding";
     const onPasswordReset = segments.includes("reset-password");
+    const inApp = segments[0] === "(app)";
+    const onSubscribe = segments[1] === "subscribe";
+    const onBankPending = segments[0] === "bank-pending";
+
+    /** Centifi Pro zorunlu: mağaza aboneliği yoksa ana uygulamaya sokma (RC yoksa / web’de kilitleme yok). */
+    const proGateActive =
+      Platform.OS !== "web" &&
+      isRevenueCatConfigured() &&
+      isAuthenticated &&
+      onboardingCompleted &&
+      inApp &&
+      !isPro;
+
+    if (proGateActive && !onSubscribe && !onBankPending) {
+      router.replace({ pathname: "/(app)/subscribe", params: { gate: "pro" } } as any);
+      return;
+    }
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
@@ -46,7 +65,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     } else if (isAuthenticated && onboardingCompleted && inAuthGroup && !onPasswordReset) {
       router.replace("/(app)");
     }
-  }, [sessionResolved, isAuthenticated, onboardingCompleted, segments, router]);
+  }, [sessionResolved, isAuthenticated, onboardingCompleted, isPro, segments, router]);
 
   return (
     <>

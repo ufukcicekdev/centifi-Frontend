@@ -735,8 +735,7 @@ export default function Settings() {
   const reopenListAfterAdd = useRef(false);
   const [showBankModal, setShowBankModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
-  const [showAddList, setShowAddList] = useState(false);
-  const [newListName, setNewListName] = useState("");
+  const [addingList, setAddingList] = useState(false);
   const [editingList, setEditingList] = useState<ExpenseList | null>(null);
   const [editListName, setEditListName] = useState("");
   const [editListEmoji, setEditListEmoji] = useState("📋");
@@ -927,7 +926,9 @@ export default function Settings() {
     editingList &&
     (listEditTrim !== editingList.name.trim() || editListEmojiNorm !== storedListEmojiNorm)
   );
-  const listEditSaveReady = !!(editingList && listEditValid && listEditDirty && !savingListEdit && !deletingList);
+  const listEditSaveReady = addingList
+    ? listEditValid && !savingListEdit
+    : !!(editingList && listEditValid && listEditDirty && !savingListEdit && !deletingList);
 
   const editListExpenseCount = useMemo(() => {
     if (!editingList) return 0;
@@ -941,7 +942,7 @@ export default function Settings() {
     editListExpenseCount === 0;
 
   const handleSaveListEdit = async () => {
-    if (!editingList) return;
+    if (!editingList && !addingList) return;
     const name = editListName.trim();
     if (!name) {
       showAlert(t("common.error"), t("settings.listNameRequired"));
@@ -951,13 +952,21 @@ export default function Settings() {
     try {
       const rawEmoji = editListEmoji.trim();
       const emojiForStore = rawEmoji === "" || rawEmoji === "📋" ? "" : rawEmoji;
-      await updateList(editingList.id, name, emojiForStore);
-      setEditingList(null);
+      if (addingList) {
+        await addList(name, emojiForStore);
+        setAddingList(false);
+      } else if (editingList) {
+        await updateList(editingList.id, name, emojiForStore);
+        setEditingList(null);
+      }
       setEditListName("");
       setEditListEmoji("📋");
       setListEmojiPickerOpen(false);
     } catch {
-      showAlert(t("common.error"), t("settings.listUpdateFailed"));
+      showAlert(
+        t("common.error"),
+        addingList ? t("settings.listSaveFailed") : t("settings.listUpdateFailed"),
+      );
     } finally {
       setSavingListEdit(false);
     }
@@ -1192,82 +1201,20 @@ export default function Settings() {
               />
             );
           })}
-          {showAddList ? (
-            <View
-              style={{
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: divider,
-                paddingTop: 14,
-                paddingBottom: 16,
-                paddingHorizontal: GUTTER,
-                paddingLeft: CONTENT_INSET,
-              }}
-            >
-              <TextInput
-                value={newListName}
-                onChangeText={setNewListName}
-                placeholder={t("settings.listNamePlaceholder")}
-                placeholderTextColor={mutedColor}
-                autoFocus
-                style={{
-                  color: textColor,
-                  fontSize: 16,
-                  backgroundColor: inputBg,
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor,
-                  marginBottom: 14,
-                }}
-              />
-              <View style={{ flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 18 }}>
-                <Pressable
-                  onPress={() => {
-                    setShowAddList(false);
-                    setNewListName("");
-                  }}
-                  hitSlop={8}
-                >
-                  <Text style={{ color: mutedColor, fontSize: 16, fontWeight: "500" }}>{t("common.cancel")}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    void (async () => {
-                      const name = newListName.trim();
-                      if (!name) return;
-                      try {
-                        await addList(name);
-                        setNewListName("");
-                        setShowAddList(false);
-                      } catch {
-                        showAlert(t("common.error"), t("settings.listSaveFailed"));
-                      }
-                    })();
-                  }}
-                  style={({ pressed }) => ({
-                    backgroundColor: PURPLE,
-                    paddingHorizontal: 20,
-                    paddingVertical: 11,
-                    borderRadius: 12,
-                    opacity: pressed ? 0.88 : 1,
-                  })}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("settings.addList")}</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <SettingsRow
-              isDark={isDark}
-              icon="add-circle-outline"
-              iconTint={PURPLE}
-              title={t("settings.newList")}
-              dividerTop={lists.length > 0}
-              onPress={() => setShowAddList(true)}
-              right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
-            />
-          )}
+          <SettingsRow
+            isDark={isDark}
+            icon="add-circle-outline"
+            iconTint={PURPLE}
+            title={t("settings.newList")}
+            dividerTop={lists.length > 0}
+            onPress={() => {
+              setEditListName("");
+              setEditListEmoji("📋");
+              setListEmojiPickerOpen(false);
+              setAddingList(true);
+            }}
+            right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+          />
         </Card>
 
         {/* BANK AUTOMATION */}
@@ -1636,7 +1583,7 @@ export default function Settings() {
       />
       ) : null}
 
-      {editingList != null ? (
+      {editingList != null || addingList ? (
       <Modal
         visible
         animationType="slide"
@@ -1644,6 +1591,7 @@ export default function Settings() {
         onRequestClose={() => {
           if (savingListEdit || deletingList) return;
           setEditingList(null);
+          setAddingList(false);
           setEditListName("");
           setEditListEmoji("📋");
           setListEmojiPickerOpen(false);
@@ -1660,6 +1608,7 @@ export default function Settings() {
                 onPress={() => {
                   if (savingListEdit || deletingList) return;
                   setEditingList(null);
+                  setAddingList(false);
                   setEditListName("");
                   setEditListEmoji("📋");
                   setListEmojiPickerOpen(false);
@@ -1753,7 +1702,7 @@ export default function Settings() {
                 }}
               />
 
-              {!canDeleteEditedList && editingList.id !== "private" && !editingList.isDefault ? (
+              {editingList && !canDeleteEditedList && editingList.id !== "private" && !editingList.isDefault ? (
                 <Text
                   style={{
                     marginTop: 8,

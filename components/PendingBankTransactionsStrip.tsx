@@ -118,30 +118,38 @@ export default function PendingBankTransactionsStrip({
                   </View>
                 </View>
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("dashboard.pendingBankDismissA11y")}
-                hitSlop={{ top: 6, bottom: 6, left: 8, right: 10 }}
-                android_ripple={
-                  Platform.OS === "android"
-                    ? { color: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)", foreground: true }
-                    : undefined
-                }
-                onPress={() => onDismiss(item.id)}
-                style={({ pressed }) => [
-                  styles.dismissBtn,
-                  {
-                    borderColor: isDark ? "#3a3a3c" : "#d8d8dc",
-                    backgroundColor: isDark ? "#2a2a2c" : "#f2f2f7",
-                  },
-                  pressed && {
-                    backgroundColor: isDark ? "#3d3d40" : "#e6e6eb",
-                    borderColor: isDark ? "#48484a" : "#c8c8cc",
-                  },
-                ]}
-              >
-                <Ionicons name="close" size={20} color={isDark ? "#c4c4c8" : "#48484a"} />
-              </Pressable>
+              <View style={styles.dismissSlot}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("dashboard.pendingBankDismissA11y")}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  android_ripple={
+                    Platform.OS === "android"
+                      ? {
+                          color: isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)",
+                          borderless: true,
+                          radius: 22,
+                        }
+                      : undefined
+                  }
+                  onPress={() => onDismiss(item.id)}
+                  style={({ pressed }) => [
+                    styles.dismissBtn,
+                    {
+                      borderColor: isDark ? "#3a3a3c" : "#d8d8dc",
+                      backgroundColor: isDark ? "#2a2a2c" : "#f2f2f7",
+                    },
+                    pressed && {
+                      backgroundColor: isDark ? "#48484a" : "#dcdce1",
+                      borderColor: isDark ? "#5a5a5c" : "#b8b8bc",
+                      transform: [{ scale: 0.88 }],
+                      opacity: 0.95,
+                    },
+                  ]}
+                >
+                  <Ionicons name="close" size={18} color={isDark ? "#c4c4c8" : "#48484a"} />
+                </Pressable>
+              </View>
             </View>
           );
         })}
@@ -163,15 +171,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingVertical: 14,
     paddingLeft: 14,
-    paddingRight: 6,
+    paddingRight: 4,
+  },
+  dismissSlot: {
+    width: 52,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dismissBtn: {
-    alignSelf: "center",
-    marginRight: 10,
-    marginVertical: 10,
-    minWidth: 40,
-    minHeight: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
     alignItems: "center",

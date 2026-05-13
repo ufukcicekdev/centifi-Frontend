@@ -5,6 +5,9 @@
  */
 import { Platform } from "react-native";
 
+/** Aynı kullanıcı için tekrar `configure` çağrılmasını önler (Subscribe ile Bridge yarışını azaltır). */
+let lastConfiguredUserId: string | null = null;
+
 function publicApiKey(): string {
   const ios = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY?.trim() ?? "";
   const android = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY?.trim() ?? "";
@@ -21,9 +24,11 @@ export async function configureRevenueCatForUser(appUserId: string): Promise<voi
   if (Platform.OS === "web") return;
   const apiKey = publicApiKey();
   if (!apiKey) return;
+  if (lastConfiguredUserId === appUserId) return;
   const Purchases = (await import("react-native-purchases")).default;
   await Purchases.configure({ apiKey });
   await Purchases.logIn(appUserId);
+  lastConfiguredUserId = appUserId;
 }
 
 export async function logoutRevenueCat(): Promise<void> {
@@ -33,5 +38,7 @@ export async function logoutRevenueCat(): Promise<void> {
     await Purchases.logOut();
   } catch {
     /* anonim veya yapılandırılmamış */
+  } finally {
+    lastConfiguredUserId = null;
   }
 }
