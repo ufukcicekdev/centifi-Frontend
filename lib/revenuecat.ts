@@ -1,7 +1,7 @@
 /**
  * RevenueCat — mağaza (Play / App Store) abonelikleri.
  * Anahtarlar: EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY, EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
- * Dashboard’da ``pro`` entitlement + aylık/yıllık paketler; 7 günlük deneme ürünü Play / App Store’da tanımlanır.
+ * Entitlement identifier: EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID (RC paneliyle aynı; backend REVENUECAT_ENTITLEMENT_ID ile eşleşmeli). Yoksa ``pro``.
  */
 import { Platform } from "react-native";
 
@@ -18,6 +18,12 @@ function publicApiKey(): string {
 
 export function isRevenueCatConfigured(): boolean {
   return Platform.OS !== "web" && !!publicApiKey();
+}
+
+/** RC → Entitlements → Identifier ile birebir aynı (backend ``REVENUECAT_ENTITLEMENT_ID``). */
+export function revenueCatEntitlementId(): string {
+  const id = process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID?.trim();
+  return id || "pro";
 }
 
 export async function configureRevenueCatForUser(appUserId: string): Promise<void> {

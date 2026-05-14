@@ -291,22 +291,6 @@ export default function Onboarding() {
             <Text style={{ color: muted, fontSize: 14, marginBottom: 16 }}>
               {t("onboarding.chooseCategoriesBody")}
             </Text>
-            <Pressable
-              onPress={() => setManageListOpen(true)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                alignSelf: "flex-start",
-                gap: 8,
-                marginBottom: 20,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Ionicons name="create-outline" size={20} color={PURPLE} />
-              <Text style={{ color: PURPLE, fontSize: 15, fontWeight: "700" }}>
-                {t("onboarding.editCategories")}
-              </Text>
-            </Pressable>
             {categoryRows.map((row, rowIdx) => (
               <View
                 key={`row-${rowIdx}`}

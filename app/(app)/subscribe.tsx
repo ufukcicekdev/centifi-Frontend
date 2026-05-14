@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Pressable,
+  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
   Platform,
@@ -10,6 +11,7 @@ import {
   RefreshControl,
   BackHandler,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -18,12 +20,95 @@ import { useTranslation } from "react-i18next";
 import { useStore } from "../../store/useStore";
 import { syncSubscriptionFromRevenueCat } from "../../lib/backend";
 import { useAppDialog } from "../../context/AppDialogContext";
-import { isRevenueCatConfigured } from "../../lib/revenuecat";
+import { isRevenueCatConfigured, revenueCatEntitlementId } from "../../lib/revenuecat";
 
 const PURPLE = "#6C63FF";
 const GOLD = "#FFB800";
+/** Paywall ana CTA (Monai tarzı — canlı kırmızı) */
+const CTA_RED = "#FF3B30";
 const GUTTER = 16;
-const FOOTER_CTA_HEIGHT = 76;
+const FOOTER_CTA_HEIGHT = 88;
+const MONAI_CARD_GREEN = "#22c55e";
+
+const ctaShadow =
+  Platform.OS === "android"
+    ? { elevation: 8 }
+    : {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 6,
+      };
+
+/** Aktif entitlement anahtarı — ``revenueCatEntitlementId()`` (RC paneli Identifier). */
+function proFromRevenueCatCustomerInfo(
+  customerInfo: { entitlements: { active: Record<string, { expirationDate?: string | null } | null> } } | null | undefined,
+): { isPro: boolean; expiresAt: string | null } {
+  if (!customerInfo?.entitlements?.active) return { isPro: false, expiresAt: null };
+  const key = revenueCatEntitlementId();
+  const pro = customerInfo.entitlements.active[key];
+  if (!pro) return { isPro: false, expiresAt: null };
+  const exp = pro.expirationDate ?? null;
+  if (exp == null) return { isPro: true, expiresAt: null };
+  const t = Date.parse(exp);
+  if (Number.isNaN(t)) return { isPro: true, expiresAt: exp };
+  return { isPro: t > Date.now(), expiresAt: exp };
+}
+
+async function sleepMs(ms: number) {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function syncSubscriptionFromRevenueCatWithRetry(
+  maxAttempts = 4,
+): Promise<Awaited<ReturnType<typeof syncSubscriptionFromRevenueCat>> | null> {
+  let last: Awaited<ReturnType<typeof syncSubscriptionFromRevenueCat>> | null = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      last = await syncSubscriptionFromRevenueCat();
+      if (last.is_pro) return last;
+    } catch {
+      /* RC REST veya ağ gecikmesi */
+    }
+    if (attempt < maxAttempts - 1) await sleepMs(1200 * (attempt + 1));
+  }
+  return last;
+}
+
+/**
+ * Play faturaları → RevenueCat → backend. ``restorePurchases`` mevcut Google hesabındaki
+ * makbuzları bu Centifi kullanıcısının RC ``app_user_id`` kaydına bağlar.
+ */
+async function reconcileProWithPlayAndRc(): Promise<{ isProNow: boolean; expiresAt: string | null }> {
+  if (Platform.OS === "web" || !isRevenueCatConfigured()) return { isProNow: false, expiresAt: null };
+  const uid = useStore.getState().user?.uid;
+  if (!uid) return { isProNow: false, expiresAt: null };
+
+  const rc = await import("../../lib/revenuecat");
+  await rc.configureRevenueCatForUser(uid);
+  const Purchases = (await import("react-native-purchases")).default;
+
+  await Purchases.syncPurchases().catch(() => {});
+  await Purchases.invalidateCustomerInfoCache().catch(() => {});
+
+  let customerInfo = await Purchases.restorePurchases();
+  await Purchases.syncPurchases().catch(() => {});
+
+  let local = proFromRevenueCatCustomerInfo(customerInfo);
+  let me = await syncSubscriptionFromRevenueCatWithRetry();
+  let isProNow = !!(me?.is_pro || local.isPro);
+
+  if (!isProNow) {
+    await sleepMs(800);
+    customerInfo = await Purchases.getCustomerInfo();
+    local = proFromRevenueCatCustomerInfo(customerInfo);
+    me = await syncSubscriptionFromRevenueCatWithRetry();
+    isProNow = !!(me?.is_pro || local.isPro);
+  }
+
+  const expiresAt = me?.pro_entitlement_expires_at ?? local.expiresAt ?? null;
+  return { isProNow, expiresAt };
+}
 
 function isLikelyAnnualPackage(id: string, title: string): boolean {
   const s = `${id} ${title}`.toLowerCase();
@@ -151,12 +236,13 @@ export default function SubscribeScreen() {
     }, [loadOfferings, router]),
   );
 
+  const { width: windowWidth } = useWindowDimensions();
   const bg = isDark ? "#000000" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#000";
   const mutedColor = isDark ? "#8e8e93" : "#666";
-  const cardBg = isDark ? "#1c1c1e" : "#fff";
-  const borderColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
   const divider = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
+  /** Seçili plan çerçevesi: açık temada beyaz kaybolmasın */
+  const planSelectedBorder = isDark ? "#ffffff" : PURPLE;
   const showPaywallCta =
     isRevenueCatConfigured() && !loading && packages.length > 0 && !isPro && !!selectedPkg;
 
@@ -178,22 +264,46 @@ export default function SubscribeScreen() {
         showAlert(t("common.error"), t("subscribe.packageGone"));
         return;
       }
-      await Purchases.purchasePackage(full);
-      const me = await syncSubscriptionFromRevenueCat();
+      const { customerInfo } = await Purchases.purchasePackage(full);
+      await Purchases.syncPurchases().catch(() => {});
+
+      const localPro = proFromRevenueCatCustomerInfo(customerInfo);
+      const me = await syncSubscriptionFromRevenueCatWithRetry();
+
+      const isProNow = !!(me?.is_pro || localPro.isPro);
+      const expiresAt = me?.pro_entitlement_expires_at ?? localPro.expiresAt ?? null;
+
       useStore.setState({
-        isPro: !!me.is_pro,
-        proEntitlementExpiresAt: me.pro_entitlement_expires_at ?? null,
+        isPro: isProNow,
+        proEntitlementExpiresAt: expiresAt,
       });
-      if (me.is_pro) {
+
+      if (isProNow) {
         router.replace("/(app)" as any);
         showAlert(t("subscribe.thanksTitle"), t("subscribe.thanksBody"));
       } else {
-        showAlert(t("common.error"), t("subscribe.purchaseFailed"));
+        showAlert(t("common.error"), t("subscribe.purchaseFailedMaybeRestore"));
       }
     } catch (e: unknown) {
-      const err = e as { userCancelled?: boolean; message?: string };
+      const err = e as { userCancelled?: boolean; message?: string; code?: string };
       if (err?.userCancelled) return;
-      showAlert(t("common.error"), err?.message ?? t("subscribe.purchaseFailed"));
+      const msg = err?.message ?? t("subscribe.purchaseFailed");
+      if (/already|owned|Item already|zaten|exist/i.test(msg)) {
+        try {
+          const { isProNow, expiresAt } = await reconcileProWithPlayAndRc();
+          useStore.setState({ isPro: isProNow, proEntitlementExpiresAt: expiresAt });
+          if (isProNow) {
+            router.replace("/(app)" as any);
+            showAlert(t("subscribe.thanksTitle"), t("subscribe.thanksBody"));
+          } else {
+            showAlert(t("subscribe.playSubscriptionAlreadyOwnedTitle"), t("subscribe.restoreMismatchBody"));
+          }
+        } catch {
+          showAlert(t("subscribe.playSubscriptionAlreadyOwnedTitle"), t("subscribe.playSubscriptionAlreadyOwnedBody"));
+        }
+      } else {
+        showAlert(t("common.error"), msg);
+      }
     } finally {
       setBuyingId(null);
     }
@@ -203,22 +313,16 @@ export default function SubscribeScreen() {
     if (Platform.OS === "web" || !isRevenueCatConfigured()) return;
     setLoading(true);
     try {
-      const rc = await import("../../lib/revenuecat");
-      const uid = useStore.getState().user?.uid;
-      if (uid) await rc.configureRevenueCatForUser(uid);
-
-      const Purchases = (await import("react-native-purchases")).default;
-      await Purchases.restorePurchases();
-      const me = await syncSubscriptionFromRevenueCat();
+      const { isProNow, expiresAt } = await reconcileProWithPlayAndRc();
       useStore.setState({
-        isPro: !!me.is_pro,
-        proEntitlementExpiresAt: me.pro_entitlement_expires_at ?? null,
+        isPro: isProNow,
+        proEntitlementExpiresAt: expiresAt,
       });
-      if (me.is_pro) {
+      if (isProNow) {
         router.replace("/(app)" as any);
         showAlert(t("subscribe.restoredTitle"), t("subscribe.restoredBody"));
       } else {
-        showAlert(t("subscribe.restoreNoneTitle"), t("subscribe.restoreNoneBody"));
+        showAlert(t("subscribe.restoreMismatchTitle"), t("subscribe.restoreMismatchBody"));
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -257,7 +361,7 @@ export default function SubscribeScreen() {
 
       <View style={{ flex: 1 }}>
         <ScrollView
-          style={{ flex: 1 }}
+          style={{ flex: 1, backgroundColor: bg }}
           contentContainerStyle={{
             paddingHorizontal: GUTTER,
             paddingBottom: (showPaywallCta ? FOOTER_CTA_HEIGHT + 24 : 32) + insets.bottom,
@@ -355,90 +459,121 @@ export default function SubscribeScreen() {
             ) : null}
           </View>
         ) : (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 8, gap: 12 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              marginBottom: 8,
+              gap: 12,
+              justifyContent: packages.length === 1 ? "center" : "flex-start",
+            }}
+          >
             {packages.map((pkg) => {
               const selected = pkg.identifier === selectedPackageId;
               const annual = isLikelyAnnualPackage(pkg.identifier, pkg.product.title);
-              const flexStyle = packages.length > 1 ? { flex: 1, minWidth: 0 } : { width: "100%" as const };
+              const multi = packages.length > 1;
+              const monaiCardSurface = isDark ? "#252527" : "#ffffff";
+              const emojiTileBg = isDark ? "#121213" : "#e8e8ec";
+              const planCardBorderIdle = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
+              const singleCardW = Math.min(Math.max(windowWidth * 0.42, 158), 204);
+              const outerWidth = multi ? ({ flex: 1, minWidth: 0 } as const) : ({ width: singleCardW } as const);
+              const emojiSize = multi ? 44 : 52;
+              const priceFont = multi ? 21 : 26;
+              const planEmoji = annual ? "🤓" : "🤌";
+
               return (
                 <Pressable
                   key={pkg.identifier}
                   onPress={() => setSelectedPackageId(pkg.identifier)}
                   disabled={!!buyingId}
                   style={({ pressed }) => [
-                    flexStyle,
-                    {
-                      backgroundColor: cardBg,
-                      borderRadius: 16,
-                      padding: 16,
-                      paddingTop: annual ? 36 : 16,
-                      borderWidth: 2,
-                      borderColor: selected ? PURPLE : borderColor,
-                      opacity: pressed ? 0.92 : 1,
-                      minHeight: 132,
-                      justifyContent: "space-between",
-                    },
+                    outerWidth,
+                    { opacity: pressed ? 0.92 : 1 },
                   ]}
                 >
-                  {annual ? (
-                    <View
-                      style={{
-                        position: "absolute",
-                        top: 10,
-                        right: 10,
-                        backgroundColor: isDark ? "#1a3d2e" : "#dcfce7",
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ color: isDark ? "#86efac" : "#166534", fontSize: 11, fontWeight: "800" }}>
-                        {t("subscribe.annualSaveBadge")}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Text style={{ color: mutedColor, fontSize: 13, fontWeight: "700", letterSpacing: 0.3 }}>
-                    {(pkg.product.title || pkg.identifier).trim()}
-                  </Text>
                   <View
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      width: "100%",
-                      marginTop: 14,
-                      gap: 12,
+                      borderRadius: 18,
+                      padding: multi ? 12 : 14,
+                      paddingTop: annual ? 32 : 14,
+                      backgroundColor: monaiCardSurface,
+                      borderWidth: selected ? 2 : 1,
+                      borderColor: selected ? planSelectedBorder : planCardBorderIdle,
+                      minHeight: multi ? 148 : 168,
                     }}
                   >
-                    <Text
+                    {annual ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 10,
+                          right: 10,
+                          backgroundColor: isDark ? "#bbf7d0" : "#bbf7d0",
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 20,
+                        }}
+                      >
+                        <Text style={{ color: "#14532d", fontSize: 11, fontWeight: "800" }}>
+                          {t("subscribe.annualSaveBadge")}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <View
                       style={{
-                        color: textColor,
-                        fontSize: 22,
-                        fontWeight: "800",
-                        flex: 1,
-                        minWidth: 0,
+                        width: emojiSize,
+                        height: emojiSize,
+                        borderRadius: 12,
+                        backgroundColor: emojiTileBg,
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
                     >
-                      {pkg.product.priceString}
-                    </Text>
-                    <View style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: multi ? 24 : 28 }}>{planEmoji}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 }}>
                       {selected ? (
-                        <Ionicons name="checkmark-circle" size={30} color={PURPLE} />
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: MONAI_CARD_GREEN,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Ionicons name="checkmark" size={13} color="#fff" />
+                        </View>
                       ) : (
                         <View
                           style={{
-                            width: 26,
-                            height: 26,
-                            borderRadius: 13,
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
                             borderWidth: 2,
                             borderColor: mutedColor,
                           }}
                         />
                       )}
+                      <Text style={{ color: textColor, fontSize: multi ? 14 : 15, fontWeight: "700" }}>
+                        {annual ? t("subscribe.yearlyPlanLabel") : t("subscribe.monthlyPlanLabel")}
+                      </Text>
                     </View>
+                    <Text
+                      style={{
+                        color: textColor,
+                        fontSize: priceFont,
+                        fontWeight: "800",
+                        marginTop: 16,
+                        letterSpacing: -0.3,
+                      }}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.72}
+                    >
+                      {pkg.product.priceString}
+                    </Text>
                   </View>
                 </Pressable>
               );
@@ -478,7 +613,8 @@ export default function SubscribeScreen() {
               paddingHorizontal: GUTTER,
               paddingTop: 14,
               paddingBottom: Math.max(insets.bottom, 16),
-              backgroundColor: isDark ? "#0a0a0a" : "#fafafa",
+              backgroundColor: isDark ? "#0a0a0a" : "#f0f0f2",
+              alignItems: "stretch",
               ...(Platform.OS === "android"
                 ? { elevation: 12 }
                 : {
@@ -489,35 +625,72 @@ export default function SubscribeScreen() {
                   }),
             }}
           >
-            <Pressable
-              onPress={() => void handlePurchase(selectedPkg)}
-              disabled={!!buyingId}
-              style={({ pressed }) => ({
-                backgroundColor: PURPLE,
-                borderRadius: 16,
-                minHeight: 54,
-                paddingVertical: 16,
-                paddingHorizontal: 20,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed || buyingId ? 0.88 : 1,
-                ...(Platform.OS === "android" ? { elevation: 3 } : {}),
-              })}
-            >
-              {buyingId ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={{ color: "#fff", fontSize: 17, fontWeight: "800" }}>{t("subscribe.continueCta")}</Text>
-              )}
-            </Pressable>
-            <Text style={{ color: mutedColor, fontSize: 11, textAlign: "center", marginTop: 10, lineHeight: 16 }}>
-              {t("subscribe.continueCtaHint")}
-            </Text>
-            {Platform.OS === "android" ? (
-              <Text style={{ color: mutedColor, fontSize: 11, textAlign: "center", marginTop: 8, lineHeight: 16 }}>
-                {t("subscribe.androidPlayBuildHint")}
+            <View style={{ width: "100%", maxWidth: 440, alignSelf: "center" }}>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                disabled={!!buyingId}
+                onPress={() => void handlePurchase(selectedPkg)}
+                style={[
+                  {
+                    width: "100%",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: CTA_RED,
+                    borderRadius: 28,
+                    minHeight: 58,
+                    paddingVertical: 17,
+                    paddingHorizontal: 22,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: "rgba(255,255,255,0.35)",
+                  },
+                  ctaShadow,
+                ]}
+              >
+                {buyingId ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="lock-closed-outline" size={22} color="#fff" style={{ marginRight: 10 }} />
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 18,
+                        fontWeight: "800",
+                        letterSpacing: 0.2,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {t("subscribe.continueCta")}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <Text
+                style={{
+                  color: mutedColor,
+                  fontSize: 11,
+                  textAlign: "center",
+                  marginTop: 10,
+                  lineHeight: 16,
+                }}
+              >
+                {t("subscribe.continueCtaHint")}
               </Text>
-            ) : null}
+              {Platform.OS === "android" ? (
+                <Text
+                  style={{
+                    color: mutedColor,
+                    fontSize: 11,
+                    textAlign: "center",
+                    marginTop: 8,
+                    lineHeight: 16,
+                  }}
+                >
+                  {t("subscribe.androidPlayBuildHint")}
+                </Text>
+              ) : null}
+            </View>
           </View>
         ) : null}
       </View>
