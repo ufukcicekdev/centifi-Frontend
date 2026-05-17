@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Expense, getCategoryMeta } from "../constants/mockData";
+import CategoryGlyph from "./CategoryGlyph";
 import { useStore } from "../store/useStore";
 import type { Language } from "../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../lib/formatMoney";
@@ -61,7 +62,7 @@ export default function ExpenseCard({
           marginRight: 12,
         }}
       >
-        <Text style={{ fontSize: 20 }}>{meta.emoji}</Text>
+        <CategoryGlyph emoji={meta.emoji} size={20} color={meta.color} categoryId={expense.category} />
       </View>
 
       {/* Info */}

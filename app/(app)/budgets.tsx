@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store/useStore";
 import { BUILTIN_CATEGORIES, getCategoryMeta } from "../../constants/mockData";
+import CategoryGlyph from "../../components/CategoryGlyph";
 import { formatMoneyAmount } from "../../lib/formatMoney";
 import { BudgetThresholdSlider } from "../../components/BudgetThresholdSlider";
 import type { Language } from "../../i18n";
@@ -98,7 +99,7 @@ export default function BudgetsScreen() {
               flexShrink: 0,
             }}
           >
-            <Text style={{ fontSize: 22 }}>{meta.emoji}</Text>
+            <CategoryGlyph emoji={meta.emoji} size={22} color={meta.color} categoryId={id} />
           </View>
           <View style={{ flex: 1, minWidth: 0, justifyContent: "center" }}>
             <Text style={{ color: textColor, fontSize: 16, fontWeight: "600" }} numberOfLines={1}>

@@ -21,6 +21,7 @@ import {
   CustomCategory,
   getCategoryMeta,
 } from "../../constants/mockData";
+import CategoryGlyph from "../CategoryGlyph";
 import { EmojiPickerSheet } from "../CategoryEditorModal";
 import { useStore } from "../../store/useStore";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset";
@@ -254,7 +255,7 @@ export function OnboardingCategoryGridModal({
                                 justifyContent: "center",
                               }}
                             >
-                              <Text style={{ fontSize: 28 }}>{meta.emoji}</Text>
+                              <CategoryGlyph emoji={meta.emoji} size={28} color={meta.color} categoryId={cat.id} />
                             </View>
                             <Text
                               style={{
@@ -433,8 +434,9 @@ export function OnboardingCategoryEditModal({
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ fontSize: 56 }}>{emoji}</Text>
+                <CategoryGlyph emoji={emoji} size={56} color={colorPair.color} categoryId={categoryId} />
               </View>
+              {!isBuiltin ? (
               <Pressable
                 onPress={() => setEmojiOpen(true)}
                 style={{
@@ -453,6 +455,7 @@ export function OnboardingCategoryEditModal({
               >
                 <Ionicons name="pencil" size={16} color={text} />
               </Pressable>
+              ) : null}
             </View>
 
             {isBuiltin ? (
@@ -579,7 +582,13 @@ export function OnboardingCategoryEditModal({
           </View>
         </KeyboardAvoidingView>
 
-        <EmojiPickerSheet visible={emojiOpen} onSelect={setEmoji} onClose={() => setEmojiOpen(false)} isDark={isDark} />
+        <EmojiPickerSheet
+          visible={emojiOpen}
+          onSelect={setEmoji}
+          onClose={() => setEmojiOpen(false)}
+          isDark={isDark}
+          accentColor={colorPair.color}
+        />
 
         {deleteConfirmOpen ? (
           <View

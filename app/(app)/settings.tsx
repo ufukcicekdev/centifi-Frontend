@@ -35,7 +35,7 @@ import {
   PRESET_BANK_PACKAGES,
   type ExpenseList,
 } from "../../constants/mockData";
-import { EmojiPickerSheet } from "../../components/CategoryEditorModal";
+import { EmojiPickerSheet, ListEmojiPickerSheet } from "../../components/CategoryEditorModal";
 import {
   OnboardingCategoryGridModal,
   OnboardingCategoryEditModal,
@@ -44,6 +44,7 @@ import {
 import { OnboardingAddCategoryFullScreenModal } from "../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 import { CurrencyPickerModal } from "../../components/CurrencyPickerModal";
 import { getCurrencyLabel } from "../../lib/currencies";
+import EmojiText from "../../components/EmojiText";
 import { currencySymbolFor } from "../../lib/formatMoney";
 import { lookupPlayStoreMeta, updateMe, type BackendUser } from "../../lib/backend";
 import { extractPlayStorePackageId, playStoreDetailsUrl } from "../../lib/playStoreUrl";
@@ -53,6 +54,9 @@ import { ensureLocalNotificationPermissions } from "../../lib/localNotifications
 import { clearRouterPushCooldown } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
+import ListGlyph from "../../components/ListGlyph";
+import { EmojiPreviewBadge } from "../../components/EmojiPickerCell";
+import LanguageFlag from "../../components/LanguageFlag";
 import {
   actionBarInnerBottomPad,
   keyboardLiftPaddingBottom,
@@ -142,7 +146,7 @@ function SettingsRow({
   leading?: React.ReactNode;
   iconTint?: string;
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   right?: React.ReactNode;
   onPress?: () => void;
   /** İlk satırda üst çizgi yok */
@@ -175,10 +179,14 @@ function SettingsRow({
         <Text style={{ color: titleColor, fontSize: 16, fontWeight: "500" }} numberOfLines={1}>
           {title}
         </Text>
-        {subtitle ? (
-          <Text style={{ color: mutedColor, fontSize: 13, marginTop: 3 }} numberOfLines={2}>
-            {subtitle}
-          </Text>
+        {subtitle != null && subtitle !== "" ? (
+          typeof subtitle === "string" ? (
+            <Text style={{ color: mutedColor, fontSize: 13, marginTop: 3 }} numberOfLines={2}>
+              {subtitle}
+            </Text>
+          ) : (
+            <View style={{ marginTop: 3, flexDirection: "row", alignItems: "center", gap: 6 }}>{subtitle}</View>
+          )
         ) : null}
       </View>
       {rightSlot}
@@ -208,13 +216,7 @@ function SettingsRow({
   );
 }
 
-function EmojiLeading({
-  emoji,
-  isDark,
-}: {
-  emoji: string;
-  isDark: boolean;
-}) {
+function EmojiLeading({ emoji, isDark }: { emoji: string; isDark: boolean }) {
   return (
     <View
       style={{
@@ -233,7 +235,7 @@ function EmojiLeading({
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 20 }}>{emoji}</Text>
+        <EmojiText emoji={emoji} size={22} />
       </View>
     </View>
   );
@@ -1126,7 +1128,14 @@ export default function Settings() {
             isDark={isDark}
             icon="language-outline"
             title={t("settings.language")}
-            subtitle={`${langMeta.flag} ${langMeta.nativeLabel}`}
+            subtitle={
+              <>
+                <LanguageFlag language={language as Language} size={18} isDark={isDark} />
+                <Text style={{ color: mutedColor, fontSize: 13 }} numberOfLines={1}>
+                  {langMeta.nativeLabel}
+                </Text>
+              </>
+            }
             dividerTop
             onPress={() => setShowLangModal(true)}
             right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
@@ -1183,7 +1192,20 @@ export default function Settings() {
               <SettingsRow
                 key={list.id}
                 isDark={isDark}
-                leading={<EmojiLeading emoji={displayListEmoji(list)} isDark={isDark} />}
+                leading={
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: isDark ? "#2c2c2e" : "#f2f2f7",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <ListGlyph list={list} size={20} isDark={isDark} />
+                  </View>
+                }
                 title={displayExpenseListName(list.name, t)}
                 dividerTop={idx !== 0}
                 onPress={
@@ -1290,6 +1312,7 @@ export default function Settings() {
             <Ionicons name="chevron-forward" size={20} color={mutedColor} />
           </Pressable>
         ) : null}
+        {Platform.OS === "android" ? (
         <Card isDark={isDark}>
           {bankAutomations.map((bank, idx) => (
             <View
@@ -1355,6 +1378,7 @@ export default function Settings() {
             right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
           />
         </Card>
+        ) : null}
 
         {/* REPORT */}
         <SectionLabel label={t("settings.reportSection")} isDark={isDark} />
@@ -1504,7 +1528,7 @@ export default function Settings() {
                       }}
                     >
                       <View style={{ width: 36, alignItems: "center", justifyContent: "center" }}>
-                        <Text style={{ fontSize: 22, lineHeight: 26 }}>{meta.flag}</Text>
+                        <LanguageFlag language={code} size={22} isDark={isDark} />
                       </View>
                       <Text
                         style={{
@@ -1573,7 +1597,7 @@ export default function Settings() {
           isDark={isDark}
         />
       ) : null}
-      {showBankModal ? (
+      {Platform.OS === "android" && showBankModal ? (
       <AddBankModal
         visible
         onSave={(data) => addBankAutomation(data)}
@@ -1656,12 +1680,12 @@ export default function Settings() {
                     width: 120,
                     height: 120,
                     borderRadius: 28,
-                    backgroundColor: isDark ? "#1c1c1e" : "#efefef",
+                    backgroundColor: isDark ? "rgba(108,99,255,0.18)" : `${PURPLE}18`,
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <Text style={{ fontSize: 56 }}>{editListEmoji.trim() || "📋"}</Text>
+                  <EmojiPreviewBadge emoji={editListEmoji.trim() || "📋"} isDark={isDark} size={56} />
                 </View>
                 <Pressable
                   onPress={() => setListEmojiPickerOpen(true)}
@@ -1796,7 +1820,7 @@ export default function Settings() {
               </View>
             </View>
           </KeyboardAvoidingView>
-          <EmojiPickerSheet
+          <ListEmojiPickerSheet
             visible={listEmojiPickerOpen}
             onSelect={setEditListEmoji}
             onClose={() => setListEmojiPickerOpen(false)}

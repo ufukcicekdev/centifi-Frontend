@@ -3,7 +3,7 @@
     "name": "Centifi",
     "slug": "centifi",
     "owner": "centifi",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.centifi",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Used for voice expense entry",
         "NSCameraUsageDescription": "Used to capture receipts",
@@ -33,7 +33,7 @@
         "backgroundColor": "#6C63FF"
       },
       "package": "centifi.app",
-      "versionCode": 11,
+      "versionCode": 12,
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",
@@ -47,6 +47,8 @@
       "expo-image-picker",
       "expo-system-ui",
       "expo-notifications",
+      "expo-localization",
+      "expo-secure-store",
       "@react-native-community/datetimepicker",
       "@react-native-google-signin/google-signin"
     ],

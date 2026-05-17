@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import type { CustomCategory } from "../constants/mockData";
+import CategoryGlyph from "./CategoryGlyph";
 import type { Expense } from "../constants/mockData";
 
 /** Tallest bar (px). Shortest non-zero scales up from BAR_MIN. */
@@ -96,6 +97,7 @@ export default function CategorySpendScroller({
                 paddingHorizontal: 4,
                 paddingTop: 10,
                 paddingBottom: 10,
+                alignItems: "center",
                 borderWidth: selected ? 2 : 0,
                 borderColor: selected ? "rgba(255,255,255,0.72)" : "transparent",
                 borderStyle: selected ? "dashed" : "solid",
@@ -110,6 +112,7 @@ export default function CategorySpendScroller({
             >
               <View
                 style={{
+                  width: "100%",
                   height: BAR_MAX,
                   justifyContent: "flex-end",
                   alignItems: "center",
@@ -126,9 +129,10 @@ export default function CategorySpendScroller({
                   }}
                 />
               </View>
-              <Text style={{ fontSize: 26, textAlign: "center" }}>{cat.emoji}</Text>
+              <CategoryGlyph emoji={cat.emoji} size={26} color={cat.color} categoryId={cat.id} />
               <Text
                 style={{
+                  alignSelf: "stretch",
                   textAlign: "center",
                   marginTop: 4,
                   fontSize: 13,

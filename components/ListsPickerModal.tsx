@@ -15,7 +15,8 @@ import type { Language } from "../i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 import { useAppDialog } from "../context/AppDialogContext";
-import { displayExpenseListName, displayListEmoji } from "../lib/listDisplayName";
+import { displayExpenseListName } from "../lib/listDisplayName";
+import ListGlyph from "./ListGlyph";
 
 const COPY: Record<
   Language,
@@ -303,7 +304,7 @@ export default function ListsPickerModal({
                         marginRight: 14,
                       }}
                     >
-                      <Text style={{ fontSize: 24 }}>{displayListEmoji(list)}</Text>
+                      <ListGlyph list={list} size={24} isDark={isDark} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: text, fontSize: 17, fontWeight: "700" }}>

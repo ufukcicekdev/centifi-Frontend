@@ -21,10 +21,12 @@ import ListsPickerModal from "../../../components/ListsPickerModal";
 import MonthPickerModal from "../../../components/MonthPickerModal";
 import ExpenseTxRow from "../../../components/ExpenseTxRow";
 import { getCategoryMeta } from "../../../constants/mockData";
+import CategoryGlyph from "../../../components/CategoryGlyph";
 import type { Language } from "../../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useTranslation } from "react-i18next";
-import { displayExpenseListName, displayListEmoji } from "../../../lib/listDisplayName";
+import { displayExpenseListName } from "../../../lib/listDisplayName";
+import ListGlyph from "../../../components/ListGlyph";
 import { currencySymbolFor, formatAmountDigits } from "../../../lib/formatMoney";
 
 const CORAL = "#FF6B6B";
@@ -252,7 +254,7 @@ export default function CategoryDetailScreen() {
                 }}
               >
                 <Text style={{ color: mutedColor, fontSize: 15, fontWeight: "700" }}>×</Text>
-                <Text style={{ fontSize: 16 }}>{meta.emoji}</Text>
+                <CategoryGlyph emoji={meta.emoji} size={16} color={meta.color} categoryId={categoryId} />
                 <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
                   {meta.name}
                 </Text>
@@ -264,7 +266,7 @@ export default function CategoryDetailScreen() {
               <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
               <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
                 {activeList ? (
-                  <Text style={{ fontSize: 15 }}>{displayListEmoji(activeList)}</Text>
+                  <ListGlyph list={activeList} size={15} isDark={isDark} />
                 ) : null}
                 <Text
                   style={{ color: textColor, fontSize: 14, fontWeight: "600", flexShrink: 1 }}

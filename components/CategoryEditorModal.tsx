@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { View, Text, Pressable, Modal, TextInput } from "react-native";
+import { View, Text, Pressable, Modal, TextInput, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { CustomCategory } from "../constants/mockData";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 import { useAppDialog } from "../context/AppDialogContext";
+import { EDITOR_EMOJI_ICON_GRID } from "../lib/categoryEditorEmojiIconGrid";
+import EmojiPickerCell from "./EmojiPickerCell";
+import CategoryGlyph from "./CategoryGlyph";
 import {
   SafeAreaProvider,
   SafeAreaView,
@@ -12,25 +16,30 @@ import {
 
 const PURPLE = "#6C63FF";
 
-const EMOJI_LIST = [
-  "📋", "📝", "💼", "✈️",
-  "🍔", "🍕", "🍜", "☕", "🍺", "🥗", "🚗", "🚌", "🚂", "🛵", "⛽",
-  "🛍️", "👗", "👟", "💻", "📱", "🎮", "💊", "🏥", "🏋️", "🧘", "🎬", "🎵", "🎯", "📚",
-  "⚡", "💧", "🔥", "🏠", "📦", "💰", "💎", "🌟", "🎁", "🐾",
-];
+type EmojiPickerSheetProps = {
+  visible: boolean;
+  onSelect: (e: string) => void;
+  onClose: () => void;
+  isDark: boolean;
+  /** iOS grid ikon rengi (yalnızca `gridMode="hybrid"`). */
+  accentColor?: string;
+  /**
+   * `emoji` — seçicide renkli emoji (liste ekleme; Android ile aynı).
+   * `hybrid` — iOS’ta Ionicons (kategori; ana ekran tofu riski).
+   */
+  gridMode?: "emoji" | "hybrid";
+};
 
 export function EmojiPickerSheet({
   visible,
   onSelect,
   onClose,
   isDark,
-}: {
-  visible: boolean;
-  onSelect: (e: string) => void;
-  onClose: () => void;
-  isDark: boolean;
-}) {
+  accentColor = PURPLE,
+  gridMode = "hybrid",
+}: EmojiPickerSheetProps) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   /** İç içe Modal’da kök SafeAreaProvider inset vermez; bu sheet için yerel provider + SafeAreaView şart. */
   const keyboardInset = useKeyboardInset();
   return (
@@ -48,7 +57,7 @@ export function EmojiPickerSheet({
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
             paddingTop: 16,
-            paddingBottom: keyboardInset,
+            paddingBottom: Math.max(keyboardInset + 12, insets.bottom + 12),
           }}
         >
           <View
@@ -73,11 +82,11 @@ export function EmojiPickerSheet({
             {t("common.chooseEmoji")}
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 6 }}>
-            {EMOJI_LIST.map((em) => (
+            {EDITOR_EMOJI_ICON_GRID.map(({ emoji, ion }, gridIndex) => (
               <Pressable
-                key={em}
+                key={emoji}
                 onPress={() => {
-                  onSelect(em);
+                  onSelect(emoji);
                   onClose();
                 }}
                 style={({ pressed }) => ({
@@ -90,7 +99,14 @@ export function EmojiPickerSheet({
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                <Text style={{ fontSize: 26 }}>{em}</Text>
+                <EmojiPickerCell
+                  emoji={emoji}
+                  ion={ion}
+                  gridIndex={gridIndex}
+                  isDark={isDark}
+                  iconSize={26}
+                  nativeEmojiOnAndroid={gridMode === "emoji" && Platform.OS === "android"}
+                />
               </Pressable>
             ))}
           </View>
@@ -98,6 +114,11 @@ export function EmojiPickerSheet({
       </SafeAreaProvider>
     </Modal>
   );
+}
+
+/** Liste ekleme / düzenleme — seçicide her zaman renkli emoji. */
+export function ListEmojiPickerSheet(props: EmojiPickerSheetProps) {
+  return <EmojiPickerSheet {...props} gridMode="emoji" accentColor={props.accentColor ?? PURPLE} />;
 }
 
 export type CategoryEditorPayload = {
@@ -205,7 +226,7 @@ export default function CategoryEditorModal({
             marginBottom: 20,
           }}
         >
-          <Text style={{ fontSize: 32 }}>{emoji}</Text>
+          <CategoryGlyph emoji={emoji} size={36} color={existing?.color ?? PURPLE} />
         </Pressable>
 
         <View
@@ -252,6 +273,7 @@ export default function CategoryEditorModal({
         onSelect={setEmoji}
         onClose={() => setShowEmojiPicker(false)}
         isDark={isDark}
+        accentColor={existing?.color ?? PURPLE}
       />
     </Modal>
   );

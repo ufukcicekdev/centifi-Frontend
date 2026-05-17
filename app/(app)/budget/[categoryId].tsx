@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../../store/useStore";
 import { getCategoryMeta } from "../../../constants/mockData";
+import CategoryGlyph from "../../../components/CategoryGlyph";
 import { BUDGET_COLOR_PALETTE } from "../../../constants/budgetColors";
 import { hexToRgba } from "../../../lib/colorUi";
 import { currencySymbolFor, formatMoneyAmount } from "../../../lib/formatMoney";
@@ -227,7 +228,7 @@ export default function CategoryBudgetScreen() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 56 }}>{meta.emoji}</Text>
+              <CategoryGlyph emoji={meta.emoji} size={56} color={meta.color} categoryId={categoryId} />
             </View>
             <View
               style={{

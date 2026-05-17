@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { buildCategoriesForHome, useStore } from "../../../store/useStore";
 import { getCategoryMeta } from "../../../constants/mockData";
+import CategoryGlyph from "../../../components/CategoryGlyph";
 import AddExpenseDatePickerModal from "../../../components/AddExpenseDatePickerModal";
 import ListsPickerModal from "../../../components/ListsPickerModal";
 import { OnboardingAddCategoryFullScreenModal } from "../../../components/onboarding/OnboardingAddCategoryFullScreenModal";
@@ -25,7 +26,8 @@ import BlockingOverlay from "../../../components/BlockingOverlay";
 import type { Language } from "../../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../../context/AppDialogContext";
-import { displayExpenseListName, displayListEmoji } from "../../../lib/listDisplayName";
+import { displayExpenseListName } from "../../../lib/listDisplayName";
+import ListGlyph from "../../../components/ListGlyph";
 import {
   actionBarInnerBottomPad,
   expenseFormMainKeyboardLiftPad,
@@ -363,7 +365,7 @@ export default function ExpenseDetailScreen() {
                 <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
                 <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
                   {activeList ? (
-                    <Text style={{ fontSize: 15 }}>{displayListEmoji(activeList)}</Text>
+                    <ListGlyph list={activeList} size={15} isDark={isDark} />
                   ) : null}
                   <Text
                     style={{ color: textColor, fontSize: 14, fontWeight: "600", flexShrink: 1 }}
@@ -413,7 +415,7 @@ export default function ExpenseDetailScreen() {
                   marginTop: 4,
                 }}
               >
-                <Text style={{ fontSize: 22 }}>{catMeta.emoji}</Text>
+                <CategoryGlyph emoji={catMeta.emoji} size={22} color={catMeta.color} categoryId={expense.category} />
                 <Text style={{ color: textColor, fontSize: 15, fontWeight: "600" }}>{catMeta.name}</Text>
                 <Ionicons name="chevron-forward" size={16} color={mutedColor} />
               </Pressable>
@@ -605,7 +607,7 @@ export default function ExpenseDetailScreen() {
                     borderColor: sel ? m.color : "transparent",
                   }}
                 >
-                  <Text style={{ fontSize: 20 }}>{m.emoji}</Text>
+                  <CategoryGlyph emoji={m.emoji} size={20} color={m.color} categoryId={cat.id} />
                   <Text style={{ color: textColor, fontWeight: sel ? "700" : "600", fontSize: 14 }}>{m.name}</Text>
                 </Pressable>
               );

@@ -53,6 +53,8 @@ export default function PendingBankTransactionsStrip({
   onPressItem,
   onDismiss,
 }: Props) {
+  if (Platform.OS !== "android") return null;
+
   const { t } = useTranslation();
   const cardBg = isDark ? "#1a1a1a" : "#fff";
   const textColor = isDark ? "#fff" : "#111";
@@ -82,7 +84,6 @@ export default function PendingBankTransactionsStrip({
         {items.map((item) => {
           const bank = bankByPkg.get(item.packageName);
           const label = bank?.name ?? item.packageName.split(".").pop() ?? item.packageName;
-          const emoji = bank?.emoji ?? "🏦";
           const iconU = bank?.iconUrl?.trim();
           return (
             <View key={item.id} style={[styles.card, { backgroundColor: cardBg, borderColor: isDark ? "#2c2c2e" : "#e8e8ec" }]}>
@@ -100,7 +101,18 @@ export default function PendingBankTransactionsStrip({
                     accessibilityIgnoresInvertColors
                   />
                 ) : (
-                  <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      backgroundColor: isDark ? "#2c2c2e" : "#f2f2f7",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="business-outline" size={22} color={muted} />
+                  </View>
                 )}
                 <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
                   <Text style={{ color: muted, fontSize: 11 }} numberOfLines={1}>

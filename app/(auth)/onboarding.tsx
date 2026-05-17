@@ -21,7 +21,9 @@ import {
   isBuiltinCategoryId,
 } from "../../components/onboarding/OnboardingCategoryManageModals";
 import { OnboardingAddCategoryFullScreenModal } from "../../components/onboarding/OnboardingAddCategoryFullScreenModal";
+import CategoryGlyph from "../../components/CategoryGlyph";
 const PURPLE = "#6C63FF";
+
 /** Categories grid: 3 columns; horizontal padding must match ScrollView `paddingHorizontal` */
 const CAT_GRID_GAP = 12;
 const CAT_GRID_COLS = 3;
@@ -202,7 +204,7 @@ export default function Onboarding() {
           alignItems: "center",
           justifyContent: "center",
         }}>
-          <Text style={{ fontSize: 28 }}>{meta.emoji}</Text>
+          <CategoryGlyph emoji={meta.emoji} size={28} color={meta.color} categoryId={cat.id} />
           {sel ? (
             <View style={{
               position: "absolute",
@@ -255,25 +257,52 @@ export default function Onboarding() {
         {/* ── STEP 0: Welcome ── */}
         {step === 0 && (
           <View style={{ paddingTop: 24 }}>
-            <Text style={{ fontSize: 56, textAlign: "center", marginBottom: 20 }}>👋</Text>
+            <View style={{ alignItems: "center", marginBottom: 20 }}>
+              <View
+                style={{
+                  width: 88,
+                  height: 88,
+                  borderRadius: 28,
+                  backgroundColor: `${PURPLE}22`,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="hand-left-outline" size={44} color={PURPLE} />
+              </View>
+            </View>
             <Text style={{ color: text, fontSize: 26, fontWeight: "800", textAlign: "center", marginBottom: 10 }}>
               {t("onboarding.welcomeTitle")}
             </Text>
             <Text style={{ color: muted, fontSize: 15, textAlign: "center", lineHeight: 22, marginBottom: 36 }}>
               {t("onboarding.welcomeBody")}
             </Text>
-            {[
-              { emoji: "📊", title: t("onboarding.welcomeCard1Title"), desc: t("onboarding.welcomeCard1Desc") },
-              { emoji: "🏦", title: t("onboarding.welcomeCard2Title"), desc: t("onboarding.welcomeCard2Desc") },
-              { emoji: "🤖", title: t("onboarding.welcomeCard3Title"), desc: t("onboarding.welcomeCard3Desc") },
-            ].map((item) => (
+            {(
+              [
+                { icon: "stats-chart-outline" as const, title: t("onboarding.welcomeCard1Title"), desc: t("onboarding.welcomeCard1Desc") },
+                { icon: "business-outline" as const, title: t("onboarding.welcomeCard2Title"), desc: t("onboarding.welcomeCard2Desc") },
+                { icon: "hardware-chip-outline" as const, title: t("onboarding.welcomeCard3Title"), desc: t("onboarding.welcomeCard3Desc") },
+              ] as const
+            ).map((item) => (
               <View key={item.title} style={{
                 flexDirection: "row", alignItems: "center",
                 backgroundColor: card, borderRadius: 16, padding: 16,
                 borderWidth: 1, borderColor: border, marginBottom: 12,
               }}>
-                <Text style={{ fontSize: 26, marginRight: 14 }}>{item.emoji}</Text>
-                <View>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    backgroundColor: iconBg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 14,
+                  }}
+                >
+                  <Ionicons name={item.icon} size={26} color={PURPLE} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ color: text, fontSize: 15, fontWeight: "600" }}>{item.title}</Text>
                   <Text style={{ color: muted, fontSize: 13, marginTop: 2 }}>{item.desc}</Text>
                 </View>

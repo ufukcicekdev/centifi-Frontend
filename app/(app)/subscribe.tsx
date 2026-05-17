@@ -12,7 +12,9 @@ import {
   BackHandler,
   Image,
   useWindowDimensions,
+  Linking,
 } from "react-native";
+import Constants from "expo-constants";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -108,6 +110,20 @@ async function reconcileProWithPlayAndRc(): Promise<{ isProNow: boolean; expires
 
   const expiresAt = me?.pro_entitlement_expires_at ?? local.expiresAt ?? null;
   return { isProNow, expiresAt };
+}
+
+function playSubscriptionsManageUrl(): string {
+  const pkg = (Constants.expoConfig as { android?: { package?: string } } | null)?.android?.package ?? "centifi.app";
+  const sku = process.env.EXPO_PUBLIC_PLAY_SUBSCRIPTION_PRODUCT_ID?.trim() || "centifi_aylik_pro";
+  return `https://play.google.com/store/account/subscriptions?package=${encodeURIComponent(pkg)}&sku=${encodeURIComponent(sku)}`;
+}
+
+function openStoreSubscriptionSettings(): void {
+  if (Platform.OS === "android") {
+    void Linking.openURL(playSubscriptionsManageUrl());
+  } else if (Platform.OS === "ios") {
+    void Linking.openURL("https://apps.apple.com/account/subscriptions");
+  }
 }
 
 function isLikelyAnnualPackage(id: string, title: string): boolean {
@@ -473,13 +489,16 @@ export default function SubscribeScreen() {
               const annual = isLikelyAnnualPackage(pkg.identifier, pkg.product.title);
               const multi = packages.length > 1;
               const monaiCardSurface = isDark ? "#252527" : "#ffffff";
-              const emojiTileBg = isDark ? "#121213" : "#e8e8ec";
+              const iconTileBg = isDark ? "#121213" : "#e8e8ec";
               const planCardBorderIdle = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
               const singleCardW = Math.min(Math.max(windowWidth * 0.42, 158), 204);
               const outerWidth = multi ? ({ flex: 1, minWidth: 0 } as const) : ({ width: singleCardW } as const);
-              const emojiSize = multi ? 44 : 52;
+              const iconTileSize = multi ? 44 : 52;
               const priceFont = multi ? 21 : 26;
-              const planEmoji = annual ? "🤓" : "🤌";
+              /** Emoji yerine vektör: iOS’ta 🤌/🤓 tofu veriyordu. */
+              const planIconName = annual ? ("trending-down-outline" as const) : ("calendar-outline" as const);
+              const planIconGlyph = multi ? 26 : 30;
+              const planIconColor = isDark ? "#a8a8ac" : "#555";
 
               return (
                 <Pressable
@@ -521,15 +540,15 @@ export default function SubscribeScreen() {
                     ) : null}
                     <View
                       style={{
-                        width: emojiSize,
-                        height: emojiSize,
+                        width: iconTileSize,
+                        height: iconTileSize,
                         borderRadius: 12,
-                        backgroundColor: emojiTileBg,
+                        backgroundColor: iconTileBg,
                         alignItems: "center",
                         justifyContent: "center",
                       }}
                     >
-                      <Text style={{ fontSize: multi ? 24 : 28 }}>{planEmoji}</Text>
+                      <Ionicons name={planIconName} size={planIconGlyph} color={planIconColor} />
                     </View>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 }}>
                       {selected ? (
@@ -587,6 +606,18 @@ export default function SubscribeScreen() {
             style={{ marginTop: 8, paddingVertical: 14, alignItems: "center" }}
           >
             <Text style={{ color: PURPLE, fontSize: 15, fontWeight: "600" }}>{t("subscribe.restore")}</Text>
+          </Pressable>
+        ) : null}
+
+        {isRevenueCatConfigured() && !loading && Platform.OS !== "web" ? (
+          <Pressable
+            onPress={() => openStoreSubscriptionSettings()}
+            style={{ marginTop: 4, paddingVertical: 12, alignItems: "center" }}
+            hitSlop={8}
+          >
+            <Text style={{ color: PURPLE, fontSize: 15, fontWeight: "600" }}>
+              {Platform.OS === "android" ? t("subscribe.manageInPlayStore") : t("subscribe.manageInAppStore")}
+            </Text>
           </Pressable>
         ) : null}
 

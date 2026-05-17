@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "../store/useStore";
 import { getCategoryMeta, type Expense } from "../constants/mockData";
+import CategoryGlyph from "./CategoryGlyph";
 import type { Language } from "../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../lib/formatMoney";
 
@@ -36,7 +37,7 @@ export default function ExpenseTxRow({
         justifyContent: "center",
         marginRight: 14,
       }}>
-        <Text style={{ fontSize: 22 }}>{meta.emoji}</Text>
+        <CategoryGlyph emoji={meta.emoji} size={22} color={meta.color} categoryId={expense.category} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: mutedColor, fontSize: 12, marginBottom: 1 }}>{meta.name}</Text>

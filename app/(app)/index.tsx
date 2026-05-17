@@ -51,7 +51,8 @@ import {
 import { formatApiErrorDetailBody, type ApiError } from "../../lib/api";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { useTranslation } from "react-i18next";
-import { displayExpenseListName, displayListEmoji } from "../../lib/listDisplayName";
+import { displayExpenseListName } from "../../lib/listDisplayName";
+import ListGlyph from "../../components/ListGlyph";
 import { flushBudgetThresholdCheck } from "../../lib/budgetThresholdNotifications";
 import type { Language } from "../../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../../lib/formatMoney";
@@ -545,7 +546,7 @@ export default function Dashboard() {
               }}
             >
               {activeList ? (
-                <Text style={{ fontSize: 14 }}>{displayListEmoji(activeList)}</Text>
+                <ListGlyph list={activeList} size={14} isDark={isDark} />
               ) : null}
               <Text
                 style={{ color: textColor, fontSize: 13, fontWeight: "600", flexShrink: 1 }}

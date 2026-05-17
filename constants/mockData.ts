@@ -74,6 +74,31 @@ export function isBuiltinCategoryId(id: string): boolean {
   return BUILTIN_CATEGORIES.some((b) => b.id === id);
 }
 
+/**
+ * Ionicons `name` — yalnızca eski / yedek kullanım; UI rozetleri `EmojiText` ile çizilir.
+ * Özel kategoriler: `pricetag-outline`.
+ */
+export function categoryGridIonName(categoryId: string): string {
+  switch (categoryId) {
+    case "food":
+      return "restaurant-outline";
+    case "transport":
+      return "car-outline";
+    case "shopping":
+      return "bag-handle-outline";
+    case "health":
+      return "medical-outline";
+    case "entertainment":
+      return "film-outline";
+    case "utilities":
+      return "flash-outline";
+    case "other":
+      return "cube-outline";
+    default:
+      return "pricetag-outline";
+  }
+}
+
 // Legacy compat map — used by old components
 export const CATEGORY_META: Record<string, { emoji: string; color: string; bgColor: string }> =
   Object.fromEntries(BUILTIN_CATEGORIES.map((c) => [c.id, { emoji: c.emoji, color: c.color, bgColor: c.bgColor }]));

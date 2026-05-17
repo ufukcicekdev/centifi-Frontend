@@ -1,4 +1,5 @@
 import type { ExpenseList } from "../constants/mockData";
+import { editorPresetIonForEmoji, type EditorEmojiIon } from "./categoryEditorEmojiIconGrid";
 
 /** Varsayılan liste adı — backend `signals` / migration ile oluşturulur. */
 export const BACKEND_DEFAULT_PRIVATE_LIST_NAME = "Private list";
@@ -13,7 +14,15 @@ export function displayExpenseListName(name: string, t: (key: string) => string)
 
 /** Özel / varsayılan liste satırı ve seçicide gösterilen emoji. */
 export function displayListEmoji(list: ExpenseList): string {
-  if (list.id === "private" || list.isDefault) return "🤫";
+  if (list.id === "private" || list.isDefault) return "🔒";
   const e = list.emoji?.trim();
   return e && e.length > 0 ? e : "📋";
+}
+
+/** iOS liste rozeti — Ionicons (Android’de `displayListEmoji` + EmojiText). */
+export function listLeadingIon(list: ExpenseList): EditorEmojiIon {
+  if (list.id === "private" || list.isDefault) return "lock-closed-outline";
+  const e = list.emoji?.trim();
+  if (!e) return "clipboard-outline";
+  return editorPresetIonForEmoji(e);
 }

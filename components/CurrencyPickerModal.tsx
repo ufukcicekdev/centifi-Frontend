@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -26,7 +26,17 @@ type Props = {
 export function CurrencyPickerModal({ visible, onClose, onSelect, selectedCode, isDark }: Props) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
+  const searchRef = useRef<TextInput>(null);
   const keyboardInset = useKeyboardInset();
+
+  useEffect(() => {
+    if (!visible) {
+      setQuery("");
+      return;
+    }
+    const focusTimer = setTimeout(() => searchRef.current?.focus(), 320);
+    return () => clearTimeout(focusTimer);
+  }, [visible]);
 
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
@@ -55,7 +65,12 @@ export function CurrencyPickerModal({ visible, onClose, onSelect, selectedCode, 
   const pillBorder = isDark ? "#3a3a3c" : "#d1d1d6";
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? "#000" : "#f5f5f5" }} edges={["top"]}>
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10 }}>
           <Pressable onPress={onClose} hitSlop={12} style={{ padding: 8 }}>
@@ -82,13 +97,18 @@ export function CurrencyPickerModal({ visible, onClose, onSelect, selectedCode, 
           >
             <Ionicons name="search" size={20} color={muted} style={{ marginRight: 8 }} />
             <TextInput
+              ref={searchRef}
               value={query}
               onChangeText={setQuery}
               placeholder={t("settings.searchCurrency")}
               placeholderTextColor={muted}
               autoCorrect={false}
               autoCapitalize="none"
-              style={{ flex: 1, color: textColor, fontSize: 16, padding: 0 }}
+              autoFocus={visible}
+              returnKeyType="search"
+              clearButtonMode={Platform.OS === "ios" ? "while-editing" : undefined}
+              keyboardType="default"
+              style={{ flex: 1, color: textColor, fontSize: 16, padding: 0, minHeight: 22 }}
             />
             {query.length > 0 ? (
               <Pressable onPress={() => setQuery("")} hitSlop={8}>

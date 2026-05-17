@@ -17,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { getCategoryMeta, type Expense } from "../constants/mockData";
+import CategoryGlyph from "./CategoryGlyph";
 import { createExpense, expenseListIdForApi, type ParsedExpenseItem } from "../lib/backend";
 import { formatApiErrorDetailBody, type ApiError } from "../lib/api";
 import { currencySymbolFor } from "../lib/formatMoney";
@@ -485,7 +486,7 @@ export default function ReviewExpenseModal({
                               marginBottom: 14,
                             }}
                           >
-                            <Text style={{ fontSize: 30 }}>{meta.emoji}</Text>
+                            <CategoryGlyph emoji={meta.emoji} size={30} color={meta.color} categoryId={row.category} />
                           </View>
                           <View
                             style={{
@@ -521,9 +522,10 @@ export default function ReviewExpenseModal({
                               accessibilityLabel={t("review.amount")}
                             />
                           </View>
-                          <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600", marginTop: 6 }}>
-                            {meta.emoji} {meta.name}
-                          </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
+                            <CategoryGlyph emoji={meta.emoji} size={16} color={meta.color} categoryId={row.category} />
+                            <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600" }}>{meta.name}</Text>
+                          </View>
                           </View>
                         </View>
 
@@ -628,7 +630,7 @@ export default function ReviewExpenseModal({
                                     borderColor: sel ? m.color : "transparent",
                                   }}
                                 >
-                                  <Text style={{ fontSize: 20 }}>{m.emoji}</Text>
+                                  <CategoryGlyph emoji={m.emoji} size={20} color={m.color} categoryId={cat.id} />
                                   <Text
                                     style={{
                                       color: textColor,

@@ -65,7 +65,10 @@ export default function ExpenseAmountSignRow({
           minWidth: 80,
         }}
       />
-      <View style={{ position: "absolute", left: 8, width: leftSlotWidth, alignItems: "flex-start" }}>
+      <View
+        pointerEvents="box-none"
+        style={{ position: "absolute", left: 8, width: leftSlotWidth, alignItems: "flex-start" }}
+      >
         <Pressable
           onPress={onSelectExpense}
           accessibilityRole="button"
@@ -82,6 +85,7 @@ export default function ExpenseAmountSignRow({
       </View>
 
       <View
+        pointerEvents="box-none"
         style={{
           position: "absolute",
           right: 8,
@@ -92,7 +96,9 @@ export default function ExpenseAmountSignRow({
           gap: 10,
         }}
       >
-        <Text style={{ color: mutedColor, fontSize: 17, fontWeight: "600" }}>{currencySuffix}</Text>
+        <Text pointerEvents="none" style={{ color: mutedColor, fontSize: 17, fontWeight: "600" }}>
+          {currencySuffix}
+        </Text>
         <Pressable
           onPress={onSelectIncome}
           accessibilityRole="button"

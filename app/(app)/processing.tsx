@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 
 import { useStore } from "../../store/useStore";
 import { getCategoryMeta } from "../../constants/mockData";
+import CategoryGlyph from "../../components/CategoryGlyph";
 import AILoadingAnimation from "../../components/AILoadingAnimation";
 import { createExpense, expenseListIdForApi } from "../../lib/backend";
 import { useAppDialog } from "../../context/AppDialogContext";
@@ -59,7 +60,7 @@ function CategoryPicker({ selected, onSelect, isDark }: { selected: string; onSe
                 borderColor: isSelected ? meta.color : "transparent",
                 opacity: pressed ? 0.7 : 1,
               })}>
-              <Text style={{ fontSize: 14 }}>{meta.emoji}</Text>
+              <CategoryGlyph emoji={meta.emoji} size={14} color={meta.color} categoryId={cat.id} />
               <Text style={{ fontSize: 12, fontWeight: isSelected ? "600" : "400", color: isSelected ? meta.color : mutedColor }}>
                 {meta.name}
               </Text>
@@ -201,16 +202,17 @@ export default function Processing() {
             <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
               <View style={{ backgroundColor: cardBg, borderRadius: 24, padding: 24, marginBottom: 16, borderWidth: 1, borderColor, alignItems: "center" }}>
                 <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: meta.bgColor, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                  <Text style={{ fontSize: 32 }}>{meta.emoji}</Text>
+                  <CategoryGlyph emoji={meta.emoji} size={32} color={meta.color} categoryId={category} />
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                   <Text style={{ color: mutedColor, fontSize: 18, fontWeight: "600", marginTop: 6, marginRight: 2 }}>$</Text>
                   <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad"
                     style={{ color: textColor, fontSize: 48, fontWeight: "800", letterSpacing: -2, minWidth: 80, padding: 0, textAlign: "center" }} />
                 </View>
-                <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600", marginTop: 4 }}>
-                  {meta.emoji} {category.charAt(0).toUpperCase() + category.slice(1)}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}>
+                  <CategoryGlyph emoji={meta.emoji} size={16} color={meta.color} categoryId={category} />
+                  <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600" }}>{meta.name}</Text>
+                </View>
               </View>
               <EditableField label={t("processing.description")} value={description} onChangeText={setDescription} isDark={isDark} />
               <EditableField label={t("processing.date")} value={date} onChangeText={setDate} isDark={isDark} />

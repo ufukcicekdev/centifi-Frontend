@@ -1,0 +1,14 @@
+LOGIN (email)
+- Open the app → tap “Continue with email” (not Google or Apple — simplest path for review).
+- Use the username and password in the “Sign-In Information” fields above (dedicated App Store review account: appstore.review@centifi.app).
+
+REVIEW ACCOUNT
+- This account is for App Store review only. Onboarding is already completed on the server.
+- Centifi Pro is enabled on our backend (pro entitlement) so the paywall does not block core features during review.
+
+SUBSCRIPTIONS (IAP — optional)
+- If you need to test subscription purchase or restore via the App Store, use a Sandbox Apple ID (Settings → App Store → Sandbox Account on the device). Production Apple IDs cannot complete sandbox purchases.
+
+OTHER
+- Main flows: expense list, add expense, categories, budgets, and Settings.
+- Support: info@centifi.app | https://centifi.app

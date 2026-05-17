@@ -11,7 +11,7 @@ import {
   Platform,
   Keyboard,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useKeyboardInset, keyboardHeightFromEvent } from "../../hooks/useKeyboardInset";
@@ -20,12 +20,9 @@ import {
   keyboardLiftPaddingBottom,
 } from "../../lib/keyboardFooterChrome";
 import { useAppDialog } from "../../context/AppDialogContext";
-
-const PURPLE = "#6C63FF";
-
-const EMOJI_OPTIONS = [
-  "🎯", "🎮", "🍕", "✈️", "🏋️", "📚", "🐶", "💄", "🎸", "🏠", "🌿", "💡", "🎁", "👗", "🚀", "⚽",
-];
+import { ONBOARDING_ADD_CATEGORY_ICON_PRESETS } from "../../lib/categoryEditorEmojiIconGrid";
+import { EmojiPickerSheet } from "../CategoryEditorModal";
+import CategoryGlyph from "../CategoryGlyph";
 
 const COLORS = [
   { color: "#FF6B6B", bg: "#FF6B6B22" },
@@ -37,6 +34,8 @@ const COLORS = [
   { color: "#FD79A8", bg: "#FD79A822" },
   { color: "#6C63FF", bg: "#6C63FF22" },
 ];
+
+const PURPLE = "#6C63FF";
 
 export type OnboardingAddCategoryPayload = {
   name: string;
@@ -63,15 +62,17 @@ export function OnboardingAddCategoryFullScreenModal({ visible, onClose, onCreat
   const keyboardInset = useKeyboardInset();
 
   const [newName, setNewName] = useState("");
-  const [newEmoji, setNewEmoji] = useState("🎯");
+  const [pickedEmoji, setPickedEmoji] = useState(ONBOARDING_ADD_CATEGORY_ICON_PRESETS[0].emoji);
   const [newColor, setNewColor] = useState(COLORS[0]);
+  const [emojiSheetOpen, setEmojiSheetOpen] = useState(false);
   const [addCategoryKeyboardH, setAddCategoryKeyboardH] = useState(0);
 
   useEffect(() => {
     if (visible) {
       setNewName("");
-      setNewEmoji("🎯");
+      setPickedEmoji(ONBOARDING_ADD_CATEGORY_ICON_PRESETS[0].emoji);
       setNewColor(COLORS[0]);
+      setEmojiSheetOpen(false);
     }
   }, [visible]);
 
@@ -128,7 +129,7 @@ export function OnboardingAddCategoryFullScreenModal({ visible, onClose, onCreat
       await Promise.resolve(
         onCreate({
           name: newName.trim(),
-          emoji: newEmoji,
+          emoji: pickedEmoji,
           color: newColor.color,
           bgColor: newColor.bg,
         }),
@@ -146,22 +147,52 @@ export function OnboardingAddCategoryFullScreenModal({ visible, onClose, onCreat
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top", "left", "right"]}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: bg,
+          paddingTop: insets.top,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        }}
+      >
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 8,
+            paddingHorizontal: 12,
+            paddingTop: 4,
+            paddingBottom: 12,
           }}
         >
-          <Pressable onPress={onClose} hitSlop={12}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.close")}
+            style={{
+              width: 44,
+              height: 44,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <Ionicons name="close" size={28} color={text} />
           </Pressable>
-          <Text style={{ color: text, fontSize: 17, fontWeight: "700" }}>{t("onboarding.newCategory")}</Text>
-          <View style={{ width: 28 }} />
+          <Text
+            style={{
+              flex: 1,
+              textAlign: "center",
+              color: text,
+              fontSize: 17,
+              fontWeight: "700",
+              marginHorizontal: 8,
+            }}
+            numberOfLines={1}
+          >
+            {t("onboarding.newCategory")}
+          </Text>
+          <View style={{ width: 44, height: 44 }} />
         </View>
 
         <View style={{ flex: 1, paddingBottom: addCategoryModalPadBottom }}>
@@ -179,18 +210,38 @@ export function OnboardingAddCategoryFullScreenModal({ visible, onClose, onCreat
             }}
           >
             <View style={{ alignItems: "center", marginBottom: 24 }}>
-              <View
-                style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: 24,
-                  backgroundColor: newColor.bg,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontSize: 48 }}>{newEmoji}</Text>
+              <View style={{ position: "relative", marginBottom: 12 }}>
+                <View
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: 24,
+                    backgroundColor: newColor.bg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CategoryGlyph emoji={pickedEmoji} size={48} color={newColor.color} />
+                </View>
+                <Pressable
+                  onPress={() => setEmojiSheetOpen(true)}
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: isDark ? "#2c2c2e" : "#e8e8ec",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 2,
+                    borderColor: bg,
+                  }}
+                  accessibilityLabel={t("common.chooseEmoji")}
+                >
+                  <Ionicons name="pencil" size={16} color={text} />
+                </Pressable>
               </View>
               <Text style={{ color: newColor.color, fontSize: 15, fontWeight: "700" }}>
                 {newName || t("onboarding.categoryNamePlaceholder")}
@@ -235,25 +286,28 @@ export function OnboardingAddCategoryFullScreenModal({ visible, onClose, onCreat
               keyboardShouldPersistTaps="handled"
               nestedScrollEnabled
             >
-              {EMOJI_OPTIONS.map((em) => (
+              {ONBOARDING_ADD_CATEGORY_ICON_PRESETS.map((row) => {
+                const selected = row.emoji === pickedEmoji;
+                return (
                 <Pressable
-                  key={em}
-                  onPress={() => setNewEmoji(em)}
+                  key={row.emoji}
+                  onPress={() => setPickedEmoji(row.emoji)}
                   style={{
                     width: 46,
                     height: 46,
                     borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: em === newEmoji ? `${PURPLE}22` : inputBg,
-                    borderWidth: em === newEmoji ? 2 : 1,
-                    borderColor: em === newEmoji ? PURPLE : border,
+                    backgroundColor: selected ? `${PURPLE}22` : inputBg,
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? PURPLE : border,
                     marginRight: 8,
                   }}
                 >
-                  <Text style={{ fontSize: 22 }}>{em}</Text>
+                  <CategoryGlyph emoji={row.emoji} size={26} color={selected ? PURPLE : text} />
                 </Pressable>
-              ))}
+                );
+              })}
             </ScrollView>
 
             <Text
@@ -320,7 +374,14 @@ export function OnboardingAddCategoryFullScreenModal({ visible, onClose, onCreat
             </Pressable>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
+      <EmojiPickerSheet
+        visible={emojiSheetOpen}
+        onSelect={setPickedEmoji}
+        onClose={() => setEmojiSheetOpen(false)}
+        isDark={isDark}
+        accentColor={newColor.color}
+      />
     </Modal>
   );
 }

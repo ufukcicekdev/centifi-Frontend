@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, Text, Animated } from "react-native";
 import { CategorySummary } from "../constants/mockData";
+import CategoryGlyph from "./CategoryGlyph";
 
 interface CategoryBarProps {
   categories: CategorySummary[];
@@ -37,7 +38,7 @@ function Bar({ item, maxValue, currency, isDark, delay }: {
     <View style={{ marginBottom: 16 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+          <CategoryGlyph emoji={item.emoji} size={16} color={item.color} categoryId={item.category} />
           <Text style={{ color: textColor, fontSize: 13, fontWeight: "500" }}>
             {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
           </Text>

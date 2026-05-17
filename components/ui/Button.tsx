@@ -104,7 +104,16 @@ export default function Button({
       {loading ? (
         <ActivityIndicator size="small" color={colors.text} />
       ) : (
-        <>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            width: fullWidth ? "100%" : undefined,
+            direction: "ltr",
+          }}
+        >
           {left ? <View style={{ marginLeft: -2 }}>{left}</View> : null}
           <Text
             style={{
@@ -112,6 +121,7 @@ export default function Button({
               fontSize: sizing.fontSize,
               fontWeight: "800",
               textAlign: "center",
+              flexShrink: 0,
               ...(labelStyle ?? {}),
             }}
             numberOfLines={2}
@@ -119,7 +129,7 @@ export default function Button({
             {title}
           </Text>
           {right ? <View style={{ marginRight: -2 }}>{right}</View> : null}
-        </>
+        </View>
       )}
     </Pressable>
   );
