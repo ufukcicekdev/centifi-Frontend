@@ -3,7 +3,7 @@
     "name": "Centifi",
     "slug": "centifi",
     "owner": "centifi",
-    "version": "1.0.11",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.centifi",
-      "buildNumber": "12",
+      "buildNumber": "15",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Used for voice expense entry",
         "NSCameraUsageDescription": "Used to capture receipts",
@@ -33,7 +33,7 @@
         "backgroundColor": "#6C63FF"
       },
       "package": "centifi.app",
-      "versionCode": 12,
+      "versionCode": 15,
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",

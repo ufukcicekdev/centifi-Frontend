@@ -46,7 +46,8 @@ import { CurrencyPickerModal } from "../../components/CurrencyPickerModal";
 import { getCurrencyLabel } from "../../lib/currencies";
 import EmojiText from "../../components/EmojiText";
 import { currencySymbolFor } from "../../lib/formatMoney";
-import { lookupPlayStoreMeta, updateMe, type BackendUser } from "../../lib/backend";
+import { deleteMe, lookupPlayStoreMeta, updateMe, type BackendUser } from "../../lib/backend";
+import { accountDeletionMailto, centifiLegalUrls } from "../../lib/legalUrls";
 import { extractPlayStorePackageId, playStoreDetailsUrl } from "../../lib/playStoreUrl";
 import type { ApiError } from "../../lib/api";
 import { isValidEmail } from "../../lib/isValidEmail";
@@ -1073,8 +1074,16 @@ export default function Settings() {
             icon="document-text-outline"
             title={t("settings.privacyPolicy")}
             dividerTop
-            onPress={() => setShowPrivacyModal(true)}
-            right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
+            onPress={() => void Linking.openURL(centifiLegalUrls(language).privacy)}
+            right={<Ionicons name="open-outline" size={18} color={mutedColor} />}
+          />
+          <SettingsRow
+            isDark={isDark}
+            icon="reader-outline"
+            title={t("settings.termsOfUse")}
+            dividerTop
+            onPress={() => void Linking.openURL(centifiLegalUrls(language).terms)}
+            right={<Ionicons name="open-outline" size={18} color={mutedColor} />}
           />
           <SettingsRow
             isDark={isDark}
@@ -1084,6 +1093,47 @@ export default function Settings() {
             onPress={() => setShowAboutModal(true)}
             right={<Ionicons name="chevron-forward" size={20} color={mutedColor} />}
           />
+          {isAuthenticated ? (
+            <SettingsRow
+              isDark={isDark}
+              icon="trash-outline"
+              title={t("settings.deleteAccount")}
+              subtitle={t("settings.deleteAccountSubtitle")}
+              dividerTop
+              destructive
+              onPress={() => {
+                void (async () => {
+                  const ok = await showConfirm({
+                    title: t("settings.deleteAccountConfirmTitle"),
+                    message: t("settings.deleteAccountConfirmMessage"),
+                    confirmText: t("settings.deleteAccountConfirmButton"),
+                    cancelText: t("common.cancel"),
+                    destructive: true,
+                    confirmIcon: "trash-outline",
+                  });
+                  if (!ok) return;
+                  try {
+                    await deleteMe();
+                    showAlert(t("settings.deleteAccountSuccessTitle"), t("settings.deleteAccountSuccessBody"));
+                    logout();
+                  } catch {
+                    showAlert(t("common.error"), t("settings.deleteAccountFailed"));
+                  }
+                })();
+              }}
+            />
+          ) : null}
+          {isAuthenticated ? (
+            <SettingsRow
+              isDark={isDark}
+              icon="mail-outline"
+              title={t("settings.deleteAccountByEmail")}
+              subtitle={t("settings.deleteAccountByEmailSubtitle")}
+              dividerTop
+              onPress={() => void Linking.openURL(accountDeletionMailto(user?.email))}
+              right={<Ionicons name="open-outline" size={18} color={mutedColor} />}
+            />
+          ) : null}
           <SettingsRow
             isDark={isDark}
             icon="log-out-outline"

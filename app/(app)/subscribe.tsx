@@ -23,6 +23,7 @@ import { useStore } from "../../store/useStore";
 import { syncSubscriptionFromRevenueCat } from "../../lib/backend";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { isRevenueCatConfigured, revenueCatEntitlementId } from "../../lib/revenuecat";
+import { centifiLegalUrls } from "../../lib/legalUrls";
 
 const PURPLE = "#6C63FF";
 const GOLD = "#FFB800";
@@ -124,6 +125,42 @@ function openStoreSubscriptionSettings(): void {
   } else if (Platform.OS === "ios") {
     void Linking.openURL("https://apps.apple.com/account/subscriptions");
   }
+}
+
+function PaywallLegalLinks({ mutedColor, compact }: { mutedColor: string; compact?: boolean }) {
+  const { t, i18n } = useTranslation();
+  const urls = centifiLegalUrls(i18n.language);
+  const open = (url: string) => void Linking.openURL(url);
+
+  return (
+    <View style={{ marginTop: compact ? 8 : 20, alignItems: compact ? "center" : "stretch" }}>
+      {compact ? null : (
+        <Text style={{ color: mutedColor, fontSize: 12, lineHeight: 17 }}>{t("subscribe.legalHint")}</Text>
+      )}
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          marginTop: compact ? 0 : 10,
+          gap: 8,
+          justifyContent: compact ? "center" : "flex-start",
+          alignItems: "center",
+        }}
+      >
+        <Pressable onPress={() => open(urls.privacy)} hitSlop={8}>
+          <Text style={{ color: PURPLE, fontSize: compact ? 11 : 13, fontWeight: "600", textDecorationLine: "underline" }}>
+            {t("subscribe.legalPrivacy")}
+          </Text>
+        </Pressable>
+        <Text style={{ color: mutedColor, fontSize: compact ? 11 : 13 }}>·</Text>
+        <Pressable onPress={() => open(urls.terms)} hitSlop={8}>
+          <Text style={{ color: PURPLE, fontSize: compact ? 11 : 13, fontWeight: "600", textDecorationLine: "underline" }}>
+            {t("subscribe.legalTerms")}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 function isLikelyAnnualPackage(id: string, title: string): boolean {
@@ -621,9 +658,7 @@ export default function SubscribeScreen() {
           </Pressable>
         ) : null}
 
-        <Text style={{ color: mutedColor, fontSize: 12, lineHeight: 17, marginTop: 20 }}>
-          {t("subscribe.legalHint")}
-        </Text>
+        {!showPaywallCta ? <PaywallLegalLinks mutedColor={mutedColor} /> : null}
 
         {mandatory && !isPro ? (
           <Pressable
@@ -697,6 +732,26 @@ export default function SubscribeScreen() {
                   </>
                 )}
               </TouchableOpacity>
+              {selectedPkg ? (
+                <Text
+                  style={{
+                    color: mutedColor,
+                    fontSize: 11,
+                    textAlign: "center",
+                    marginTop: 10,
+                    lineHeight: 16,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  {t("subscribe.subscriptionSummary", {
+                    plan: selectedPkg.product.title || "Centifi Pro",
+                    period: isLikelyAnnualPackage(selectedPkg.identifier, selectedPkg.product.title)
+                      ? t("subscribe.periodYearly")
+                      : t("subscribe.periodMonthly"),
+                    price: selectedPkg.product.priceString,
+                  })}
+                </Text>
+              ) : null}
               <Text
                 style={{
                   color: mutedColor,
@@ -708,6 +763,7 @@ export default function SubscribeScreen() {
               >
                 {t("subscribe.continueCtaHint")}
               </Text>
+              <PaywallLegalLinks mutedColor={mutedColor} compact />
               {Platform.OS === "android" ? (
                 <Text
                   style={{

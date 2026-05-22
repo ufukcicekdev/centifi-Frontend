@@ -110,7 +110,9 @@ export default function Button({
             alignItems: "center",
             justifyContent: "center",
             gap: 10,
-            width: fullWidth ? "100%" : undefined,
+            alignSelf: "center",
+            maxWidth: "100%",
+            flexShrink: 1,
             direction: "ltr",
           }}
         >
@@ -120,8 +122,8 @@ export default function Button({
               color: colors.text,
               fontSize: sizing.fontSize,
               fontWeight: "800",
-              textAlign: "center",
-              flexShrink: 0,
+              flexGrow: 0,
+              flexShrink: 1,
               ...(labelStyle ?? {}),
             }}
             numberOfLines={2}

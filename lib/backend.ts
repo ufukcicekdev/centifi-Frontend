@@ -191,6 +191,11 @@ export async function updateMe(patch: Partial<BackendUser>) {
   });
 }
 
+/** Permanently deletes the signed-in user and server-synced data (CASCADE). */
+export async function deleteMe() {
+  await apiFetch<null>("/api/users/me/", { method: "DELETE", auth: true });
+}
+
 export async function requestPasswordReset(email: string) {
   return apiFetch<{ detail: string }>("/api/users/password/forgot/", {
     method: "POST",

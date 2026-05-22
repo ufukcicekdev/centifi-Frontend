@@ -1,3 +1,5 @@
+VERSION: 1.0.14 (iOS build 15) — resubmission for Guideline 3.1.2(c) and 5.1.1(v).
+
 LOGIN (email)
 - Open the app → tap “Continue with email” (not Google or Apple — simplest path for review).
 - Use the username and password in the “Sign-In Information” fields above (dedicated App Store review account: appstore.review@centifi.app).
@@ -8,6 +10,20 @@ REVIEW ACCOUNT
 
 SUBSCRIPTIONS (IAP — optional)
 - If you need to test subscription purchase or restore via the App Store, use a Sandbox Apple ID (Settings → App Store → Sandbox Account on the device). Production Apple IDs cannot complete sandbox purchases.
+
+ACCOUNT DELETION (Guideline 5.1.1(v)) — IN-APP, PERMANENT
+Step-by-step for reviewers:
+1. Sign in with the review account above (or any account you create for testing).
+2. From the main app, open Settings (gear icon on the home screen).
+3. In the Account section, tap “Delete account” (red/destructive row, above “Log out”).
+4. Read the confirmation dialog, then tap “Delete account” again to confirm.
+5. The app deletes the account on our server, shows a success message, and signs you out to the login screen.
+6. Optional alternative (same Settings screen): “Request deletion by email” opens the device Mail app with a pre-filled message to info@centifi.app — the primary path is in-app deletion in step 3–5.
+
+LEGAL (subscriptions — Guideline 3.1.2(c))
+- Centifi Pro paywall: subscription title, duration (1 month / 1 year), and price are shown before purchase.
+- Tappable links on the paywall (below Continue): Privacy Policy https://centifi.app/privacy.html and Terms of Use https://centifi.app/terms.html
+- Same URLs in App Store metadata / Privacy Policy field.
 
 OTHER
 - Main flows: expense list, add expense, categories, budgets, and Settings.
