@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   StyleSheet,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -23,6 +24,10 @@ import ListsPickerModal from "../../../components/ListsPickerModal";
 import { OnboardingAddCategoryFullScreenModal } from "../../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 import ExpenseAmountSignRow from "../../../components/ExpenseAmountSignRow";
 import BlockingOverlay from "../../../components/BlockingOverlay";
+import FormInlineError, {
+  FORM_INLINE_ERROR_COLOR,
+  type ExpenseFormFieldError,
+} from "../../../components/FormInlineError";
 import type { Language } from "../../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../../context/AppDialogContext";
@@ -185,6 +190,7 @@ export default function ExpenseDetailScreen() {
   const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isIncome, setIsIncome] = useState(false);
+  const [fieldError, setFieldError] = useState<ExpenseFormFieldError>(null);
 
   useLayoutEffect(() => {
     const ex = useStore.getState().expenses.find((e) => e.id === expenseId);
@@ -262,13 +268,15 @@ export default function ExpenseDetailScreen() {
     if (!expense) return;
     const num = parseFloat(amount.replace(",", "."));
     if (!num || num <= 0) {
-      showAlert(t("common.error"), t("forms.validAmount"));
+      setFieldError("amount");
       return;
     }
     if (!description.trim()) {
-      showAlert(t("common.formValidationTitle"), t("forms.descriptionRequired"));
+      setFieldError("description");
       return;
     }
+
+    setFieldError(null);
     setSaving(true);
     try {
       await updateExpense(expense.id, {
@@ -286,10 +294,12 @@ export default function ExpenseDetailScreen() {
       } catch {
         /* noop */
       }
-      router.back();
+      setSaving(false);
+      InteractionManager.runAfterInteractions(() => {
+        router.back();
+      });
     } catch {
       showAlert(t("common.error"), t("forms.saveFailed"));
-    } finally {
       setSaving(false);
     }
   };
@@ -379,7 +389,10 @@ export default function ExpenseDetailScreen() {
 
               <TextInput
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(text) => {
+                  setDescription(text);
+                  if (fieldError === "description") setFieldError(null);
+                }}
                 placeholder={t("expenseDetail.descriptionPlaceholder")}
                 placeholderTextColor={mutedColor}
                 style={{
@@ -388,17 +401,31 @@ export default function ExpenseDetailScreen() {
                   fontWeight: "700",
                   paddingVertical: 10,
                   minHeight: 44,
+                  ...(fieldError === "description"
+                    ? { borderBottomWidth: 2, borderBottomColor: FORM_INLINE_ERROR_COLOR }
+                    : {}),
                 }}
               />
+              <FormInlineError message={fieldError === "description" ? t("forms.inlineDescriptionRequired") : null} />
 
               <ExpenseAmountSignRow
                 isIncome={isIncome}
                 onSelectExpense={() => setIsIncome(false)}
                 onSelectIncome={() => setIsIncome(true)}
                 amount={amount}
-                onChangeAmount={setAmount}
+                onChangeAmount={(text) => {
+                  setAmount(text);
+                  if (fieldError === "amount") setFieldError(null);
+                }}
                 currencySuffix={currencySymbolFor(displayCurrency, lang)}
+                amountPlaceholder={t("forms.amountPlaceholder")}
+                decimalSeparatorA11y={t("forms.insertDecimalA11y")}
+                language={lang}
                 isDark={isDark}
+              />
+              <FormInlineError
+                message={fieldError === "amount" ? t("forms.inlineAmountRequired") : null}
+                style={{ marginTop: 6 }}
               />
 
               <Pressable

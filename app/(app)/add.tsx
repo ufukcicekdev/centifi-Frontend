@@ -11,11 +11,13 @@ import {
   Modal,
   useWindowDimensions,
   StyleSheet,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { buildCategoriesForHome, useStore } from "../../store/useStore";
 import { getCategoryMeta } from "../../constants/mockData";
 import CategoryGlyph from "../../components/CategoryGlyph";
@@ -31,6 +33,10 @@ import ListsPickerModal from "../../components/ListsPickerModal";
 import { OnboardingAddCategoryFullScreenModal } from "../../components/onboarding/OnboardingAddCategoryFullScreenModal";
 import ExpenseAmountSignRow from "../../components/ExpenseAmountSignRow";
 import BlockingOverlay from "../../components/BlockingOverlay";
+import FormInlineError, {
+  FORM_INLINE_ERROR_COLOR,
+  type ExpenseFormFieldError,
+} from "../../components/FormInlineError";
 import type { Language } from "../../i18n";
 import { useThrottledRouter, navigateToSettings } from "../../hooks/useThrottledRouter";
 import { useAppDialog } from "../../context/AppDialogContext";
@@ -182,7 +188,24 @@ export default function AddExpense() {
     addCategory,
     categoryDisplayOverrides,
     pendingBankTransactions,
-  } = useStore();
+  } = useStore(
+    useShallow((s) => ({
+      isDark: s.isDark,
+      activeListId: s.activeListId,
+      setActiveList: s.setActiveList,
+      lists: s.lists,
+      addList: s.addList,
+      addExpense: s.addExpense,
+      removePendingBankTransaction: s.removePendingBankTransaction,
+      customCategories: s.customCategories,
+      enabledCategoryIds: s.enabledCategoryIds,
+      language: s.language,
+      displayCurrency: s.displayCurrency,
+      addCategory: s.addCategory,
+      categoryDisplayOverrides: s.categoryDisplayOverrides,
+      pendingBankTransactions: s.pendingBankTransactions,
+    })),
+  );
 
   const activeList = lists.find((l) => l.id === activeListId);
   const keyboardInset = useKeyboardInset();
@@ -211,6 +234,8 @@ export default function AddExpense() {
   const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isIncome, setIsIncome] = useState(false);
+  /** Satır içi doğrulama (iOS modal + Android — dialog arkada kalmasın). */
+  const [fieldError, setFieldError] = useState<ExpenseFormFieldError>(null);
 
   useEffect(() => {
     setSelectedCategory((prev) =>
@@ -248,14 +273,15 @@ export default function AddExpense() {
   const handleSave = async () => {
     const num = parseFloat(amount.replace(",", "."));
     if (!num || num <= 0) {
-      showAlert(t("common.error"), t("forms.validAmount"));
+      setFieldError("amount");
       return;
     }
     if (!description.trim()) {
-      showAlert(t("common.formValidationTitle"), t("forms.descriptionRequired"));
+      setFieldError("description");
       return;
     }
 
+    setFieldError(null);
     setSaving(true);
     try {
       const list_id = expenseListIdForApi(activeListId);
@@ -292,7 +318,10 @@ export default function AddExpense() {
       } catch {
         /* noop */
       }
-      router.back();
+      setSaving(false);
+      InteractionManager.runAfterInteractions(() => {
+        router.back();
+      });
     } catch {
       showAlert(t("common.error"), t("forms.saveFailedRetry"));
       setSaving(false);
@@ -376,7 +405,10 @@ export default function AddExpense() {
 
               <TextInput
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(text) => {
+                  setDescription(text);
+                  if (fieldError === "description") setFieldError(null);
+                }}
                 placeholder={t("expenseDetail.descriptionPlaceholder")}
                 placeholderTextColor={mutedColor}
                 style={{
@@ -385,17 +417,31 @@ export default function AddExpense() {
                   fontWeight: "700",
                   paddingVertical: 6,
                   minHeight: 46,
+                  ...(fieldError === "description"
+                    ? { borderBottomWidth: 2, borderBottomColor: FORM_INLINE_ERROR_COLOR }
+                    : {}),
                 }}
               />
+              <FormInlineError message={fieldError === "description" ? t("forms.inlineDescriptionRequired") : null} />
 
               <ExpenseAmountSignRow
                 isIncome={isIncome}
                 onSelectExpense={() => setIsIncome(false)}
                 onSelectIncome={() => setIsIncome(true)}
                 amount={amount}
-                onChangeAmount={setAmount}
+                onChangeAmount={(text) => {
+                  setAmount(text);
+                  if (fieldError === "amount") setFieldError(null);
+                }}
                 currencySuffix={currencySymbolFor(displayCurrency, lang)}
+                amountPlaceholder={t("forms.amountPlaceholder")}
+                decimalSeparatorA11y={t("forms.insertDecimalA11y")}
+                language={lang}
                 isDark={isDark}
+              />
+              <FormInlineError
+                message={fieldError === "amount" ? t("forms.inlineAmountRequired") : null}
+                style={{ marginTop: 6 }}
               />
 
               <ScrollView

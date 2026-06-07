@@ -12,6 +12,7 @@ import { useStore } from "../../store/useStore";
 import { getCategoryMeta } from "../../constants/mockData";
 import CategoryGlyph from "../../components/CategoryGlyph";
 import AILoadingAnimation from "../../components/AILoadingAnimation";
+import { sanitizeAmountInput } from "../../lib/amountInput";
 import { createExpense, expenseListIdForApi } from "../../lib/backend";
 import { useAppDialog } from "../../context/AppDialogContext";
 
@@ -206,7 +207,7 @@ export default function Processing() {
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                   <Text style={{ color: mutedColor, fontSize: 18, fontWeight: "600", marginTop: 6, marginRight: 2 }}>$</Text>
-                  <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad"
+                  <TextInput value={amount} onChangeText={(text) => setAmount(sanitizeAmountInput(text))} keyboardType="decimal-pad" inputMode="decimal"
                     style={{ color: textColor, fontSize: 48, fontWeight: "800", letterSpacing: -2, minWidth: 80, padding: 0, textAlign: "center" }} />
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}>

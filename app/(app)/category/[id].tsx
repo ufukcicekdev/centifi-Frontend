@@ -403,6 +403,7 @@ export default function CategoryDetailScreen() {
         expenses={expenses}
         activeListId={activeListId}
         language={language}
+        displayCurrency={displayCurrency}
         isDark={isDark}
       />
 

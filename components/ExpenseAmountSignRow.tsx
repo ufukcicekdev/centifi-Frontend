@@ -1,5 +1,19 @@
-import React from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+import React, { useCallback } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from "react-native";
+import type { Language } from "../i18n";
+import {
+  decimalSeparatorForLanguage,
+  hasDecimalSeparator,
+  insertDecimalSeparator,
+  sanitizeAmountInput,
+} from "../lib/amountInput";
 
 const CORAL = "#FF6B6B";
 const INCOME_GREEN = "#55efc4";
@@ -14,6 +28,9 @@ export default function ExpenseAmountSignRow({
   amount,
   onChangeAmount,
   currencySuffix,
+  amountPlaceholder,
+  decimalSeparatorA11y,
+  language,
   isDark,
 }: {
   isIncome: boolean;
@@ -22,19 +39,40 @@ export default function ExpenseAmountSignRow({
   amount: string;
   onChangeAmount: (v: string) => void;
   currencySuffix: string;
+  amountPlaceholder?: string;
+  decimalSeparatorA11y?: string;
+  language: Language;
   isDark: boolean;
 }) {
   const stepperBg = isDark ? "#2c2c2e" : "#e8e8ec";
   const mutedColor = isDark ? "#6b6b70" : "#888";
+  const decSep = decimalSeparatorForLanguage(language);
+  const labelColor = isDark ? "#fff" : "#111";
 
   const expenseSel = !isIncome;
   const incomeSel = isIncome;
   const amtColor = isIncome ? INCOME_GREEN : CORAL;
 
   const segPad = { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 } as const;
-  // Keep the amount visually centered regardless of suffix/button width.
   const leftSlotWidth = 64;
-  const rightSlotWidth = 110;
+  /** TRY + kuruş [,] + gelir [+] */
+  const rightSlotWidth = 138;
+
+  const insertSep = useCallback(() => {
+    onChangeAmount(insertDecimalSeparator(amount, decSep));
+  }, [amount, decSep, onChangeAmount]);
+
+  const handleKeyPress = useCallback(
+    (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      const key = e.nativeEvent.key;
+      if (key !== "," && key !== ".") return;
+      if (hasDecimalSeparator(amount)) return;
+      onChangeAmount(insertDecimalSeparator(amount, key === "." ? "." : ","));
+    },
+    [amount, onChangeAmount],
+  );
+
+  const showSepButton = !hasDecimalSeparator(amount);
 
   return (
     <View
@@ -51,8 +89,12 @@ export default function ExpenseAmountSignRow({
     >
       <TextInput
         value={amount}
-        onChangeText={onChangeAmount}
+        onChangeText={(text) => onChangeAmount(sanitizeAmountInput(text))}
+        onKeyPress={handleKeyPress}
+        placeholder={amountPlaceholder}
+        placeholderTextColor={mutedColor}
         keyboardType="decimal-pad"
+        inputMode="decimal"
         style={{
           width: "100%",
           color: amtColor,
@@ -93,9 +135,27 @@ export default function ExpenseAmountSignRow({
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "flex-end",
-          gap: 10,
+          gap: 6,
         }}
       >
+        {showSepButton ? (
+          <Pressable
+            onPress={insertSep}
+            accessibilityRole="button"
+            accessibilityLabel={decimalSeparatorA11y ?? `Insert ${decSep}`}
+            hitSlop={8}
+            style={{
+              minWidth: 34,
+              height: 34,
+              borderRadius: 10,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: isDark ? "#3a3a40" : "#d8d8de",
+            }}
+          >
+            <Text style={{ color: labelColor, fontSize: 20, fontWeight: "800" }}>{decSep}</Text>
+          </Pressable>
+        ) : null}
         <Text pointerEvents="none" style={{ color: mutedColor, fontSize: 17, fontWeight: "600" }}>
           {currencySuffix}
         </Text>

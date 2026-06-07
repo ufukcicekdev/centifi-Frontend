@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { NativeModules, Pressable, StyleSheet, Text, View } from "react-native";
 import Constants from "expo-constants";
 import { useTranslation } from "react-i18next";
 import { useAppDialog } from "../context/AppDialogContext";
@@ -12,9 +12,23 @@ import type { GoogleSignInButtonProps } from "./GoogleSignInButton.native.impl";
 type ImplComponent = React.ComponentType<GoogleSignInButtonProps>;
 
 let cachedImpl: ImplComponent | null | undefined;
+
+function nativeGoogleSignInLinked(): boolean {
+  if (NativeModules.RNGoogleSignin || NativeModules.RNGoogleSignIn) return true;
+  try {
+    const { TurboModuleRegistry } = require("react-native") as typeof import("react-native");
+    if (typeof TurboModuleRegistry.get === "function") {
+      return !!TurboModuleRegistry.get("RNGoogleSignin");
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 function resolveImpl(): ImplComponent | null {
   if (cachedImpl !== undefined) return cachedImpl;
-  if (Constants.appOwnership === "expo") {
+  if (Constants.appOwnership === "expo" || !nativeGoogleSignInLinked()) {
     cachedImpl = null;
     return null;
   }

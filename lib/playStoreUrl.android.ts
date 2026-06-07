@@ -1,4 +1,4 @@
-/** Google Play mağaza bağlantısından veya düz `com.foo.bar` metninden Android paket adını çıkarır. */
+/** Play Store link or plain `com.foo.bar` → Android package id. */
 export function extractPlayStorePackageId(input: string): string | null {
   const t = input.trim();
   if (!t) return null;

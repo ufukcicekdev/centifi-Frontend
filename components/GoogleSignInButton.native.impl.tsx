@@ -63,7 +63,7 @@ function formatBackendOrNetworkError(e: unknown): string {
 }
 
 /**
- * Google Play Services / iOS GoogleSignIn — native modül bu dosyada yüklenir (Expo Go’da yüklenmez).
+ * Native Google Sign-In (Android GMS / iOS) — loaded here; not in Expo Go.
  */
 export default function GoogleSignInButtonNativeImpl(props: GoogleSignInButtonProps) {
   const { showAlert } = useAppDialog();
@@ -86,17 +86,21 @@ export default function GoogleSignInButtonNativeImpl(props: GoogleSignInButtonPr
   useEffect(() => {
     const check = googleIdsForCurrentPlatform(ids);
     if (!check.ok || !ids.web) return;
-    GoogleSignin.configure({
-      webClientId: ids.web,
-      ...(ids.ios ? { iosClientId: ids.ios } : {}),
-    });
-    configured.current = true;
+    try {
+      GoogleSignin.configure({
+        webClientId: ids.web,
+        ...(ids.ios ? { iosClientId: ids.ios } : {}),
+      });
+      configured.current = true;
+    } catch {
+      configured.current = false;
+    }
   }, [ids.web, ids.ios, ids.android]);
 
   const onPress = async () => {
     const check = googleIdsForCurrentPlatform(ids);
     if (!check.ok) {
-      showAlert(t("auth.googleSetupTitle"), t("auth.googleEnvMissing", { missing: check.missing }));
+      showAlert(t("auth.googleSignInTitle"), t("auth.googleEnvMissing"));
       return;
     }
     if (!configured.current) {

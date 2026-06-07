@@ -15,7 +15,9 @@ import {
   StyleSheet,
   ScrollView,
   useWindowDimensions,
+  Platform,
 } from "react-native";
+import { FullWindowOverlay } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "../store/useStore";
 import i18n from "../i18n";
@@ -121,86 +123,97 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const dialogVisible = open && !!payload;
+
+  const dialogBody = dialogVisible ? (
+    <View style={styles.modalRoot}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.overlay }]} onPress={onRequestClose} accessibilityRole="button" />
+      <View
+        style={[
+          styles.center,
+          {
+            paddingTop: Math.max(12, insets.top + 8),
+            paddingBottom: Math.max(20, insets.bottom + 12),
+            paddingLeft: Math.max(24, insets.left + 8),
+            paddingRight: Math.max(24, insets.right + 8),
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <View style={styles.cardOuter}>
+          {payload?.kind === "alert" ? (
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.cardBg,
+                  borderColor: theme.border,
+                },
+              ]}
+              accessibilityRole="alert"
+            >
+              <Text style={[styles.title, { color: theme.title }]}>{payload.title}</Text>
+              {payload.message ?
+                <ScrollView
+                  style={{ maxHeight: maxCardHeight }}
+                  showsVerticalScrollIndicator={payload.message.length > 280}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <Text style={[styles.message, { color: theme.body }]}>{payload.message}</Text>
+                </ScrollView>
+              : null}
+              <Button
+                title={String(i18n.t("common.ok"))}
+                onPress={hideAlert}
+                variant="secondary"
+                fullWidth
+                size="md"
+                style={{
+                  backgroundColor: theme.secondaryBtnBg,
+                  borderColor: theme.secondaryBtnBorder,
+                  borderWidth: 1,
+                }}
+                labelStyle={{ color: theme.secondaryBtnLabel, fontWeight: "800" }}
+                accessibilityLabel={String(i18n.t("common.ok"))}
+              />
+            </View>
+          ) : payload?.kind === "confirm" ? (
+            <ConfirmDialogCard
+              isDark={isDark}
+              themeOverride={theme}
+              title={payload.title}
+              message={payload.message}
+              cancelText={payload.cancelText}
+              confirmText={payload.confirmText}
+              destructive={payload.destructive}
+              confirmIcon={payload.confirmIcon}
+              maxMessageHeight={maxCardHeight}
+              onCancel={() => finishConfirm(false)}
+              onConfirm={() => finishConfirm(true)}
+            />
+          ) : null}
+        </View>
+      </View>
+    </View>
+  ) : null;
+
   return (
     <AppDialogContext.Provider value={value}>
       {children}
-      <Modal
-        visible={open && !!payload}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={onRequestClose}
-      >
-        <View style={styles.modalRoot}>
-          <Pressable style={[styles.backdrop, { backgroundColor: theme.overlay }]} onPress={onRequestClose} accessibilityRole="button" />
-          <View
-            style={[
-              styles.center,
-              {
-                paddingTop: Math.max(12, insets.top + 8),
-                paddingBottom: Math.max(20, insets.bottom + 12),
-                paddingLeft: Math.max(24, insets.left + 8),
-                paddingRight: Math.max(24, insets.right + 8),
-              },
-            ]}
-            pointerEvents="box-none"
-          >
-            <View style={styles.cardOuter}>
-              {payload?.kind === "alert" ? (
-                <View
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: theme.cardBg,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  accessibilityRole="alert"
-                >
-                  <Text style={[styles.title, { color: theme.title }]}>{payload.title}</Text>
-                  {payload.message ?
-                    <ScrollView
-                      style={{ maxHeight: maxCardHeight }}
-                      showsVerticalScrollIndicator={payload.message.length > 280}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      <Text style={[styles.message, { color: theme.body }]}>{payload.message}</Text>
-                    </ScrollView>
-                  : null}
-                  <Button
-                    title={String(i18n.t("common.ok"))}
-                    onPress={hideAlert}
-                    variant="secondary"
-                    fullWidth
-                    size="md"
-                    style={{
-                      backgroundColor: theme.secondaryBtnBg,
-                      borderColor: theme.secondaryBtnBorder,
-                      borderWidth: 1,
-                    }}
-                    labelStyle={{ color: theme.secondaryBtnLabel, fontWeight: "800" }}
-                    accessibilityLabel={String(i18n.t("common.ok"))}
-                  />
-                </View>
-              ) : payload?.kind === "confirm" ? (
-                <ConfirmDialogCard
-                  isDark={isDark}
-                  themeOverride={theme}
-                  title={payload.title}
-                  message={payload.message}
-                  cancelText={payload.cancelText}
-                  confirmText={payload.confirmText}
-                  destructive={payload.destructive}
-                  confirmIcon={payload.confirmIcon}
-                  maxMessageHeight={maxCardHeight}
-                  onCancel={() => finishConfirm(false)}
-                  onConfirm={() => finishConfirm(true)}
-                />
-              ) : null}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {Platform.OS === "ios" ?
+        dialogVisible ?
+          <FullWindowOverlay unstable_accessibilityContainerViewIsModal>{dialogBody}</FullWindowOverlay>
+        : null
+      : <Modal
+          visible={dialogVisible}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={onRequestClose}
+        >
+          {dialogBody}
+        </Modal>
+      }
     </AppDialogContext.Provider>
   );
 }

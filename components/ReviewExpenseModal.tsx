@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { getCategoryMeta, type Expense } from "../constants/mockData";
 import CategoryGlyph from "./CategoryGlyph";
+import ExpenseAmountSignRow from "./ExpenseAmountSignRow";
 import { createExpense, expenseListIdForApi, type ParsedExpenseItem } from "../lib/backend";
 import { formatApiErrorDetailBody, type ApiError } from "../lib/api";
 import { currencySymbolFor } from "../lib/formatMoney";
@@ -32,6 +33,9 @@ import { OnboardingAddCategoryFullScreenModal } from "./onboarding/OnboardingAdd
 import { useAppDialog } from "../context/AppDialogContext";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
+const CORAL = "#FF6B6B";
+const INCOME_GREEN = "#55efc4";
+
 export type ReviewParsingKind = "receipt" | "voice" | "text";
 
 type EditRow = {
@@ -41,6 +45,7 @@ type EditRow = {
   category: string;
   occurredAt: Date;
   currency: string;
+  isIncome: boolean;
 };
 
 interface Props {
@@ -238,6 +243,7 @@ export default function ReviewExpenseModal({
           category: String(p.category || "other"),
           occurredAt: defaultDate,
           currency: cur,
+          isIncome: !!p.is_income,
         };
       }),
     );
@@ -305,7 +311,7 @@ export default function ReviewExpenseModal({
           category: row.category,
           date,
           currency: cur,
-          is_income: false,
+          is_income: row.isIncome,
           ...(list_id != null ? { list_id } : {}),
         });
         inserted.push({
@@ -316,7 +322,7 @@ export default function ReviewExpenseModal({
           date,
           currency: dto.currency ?? cur,
           listId: activeListId,
-          isIncome: false,
+          isIncome: row.isIncome,
         });
       }
       addExpensesBatch(inserted);
@@ -433,6 +439,7 @@ export default function ReviewExpenseModal({
                   {rows.map((row, i) => {
                     const meta = getCategoryMeta(row.category, customCategories, categoryDisplayOverrides);
                     const rowSym = currencySymbolFor(row.currency || expenseCurrency, lang);
+                    const flowColor = row.isIncome ? INCOME_GREEN : CORAL;
                     return (
                       <React.Fragment key={row.key}>
                       <View style={{ marginBottom: i < rows.length - 1 ? 20 : 0 }}>
@@ -490,44 +497,47 @@ export default function ReviewExpenseModal({
                           </View>
                           <View
                             style={{
-                              flexDirection: "row",
-                              alignItems: "flex-start",
-                              justifyContent: "center",
+                              paddingHorizontal: 12,
+                              paddingVertical: 5,
+                              borderRadius: 999,
+                              backgroundColor: row.isIncome ? `${INCOME_GREEN}22` : `${CORAL}22`,
+                              marginBottom: 12,
                             }}
                           >
-                            <Text
-                              style={{
-                                color: mutedColor,
-                                fontSize: 20,
-                                fontWeight: "700",
-                                marginTop: 14,
-                                marginRight: 4,
-                              }}
-                            >
-                              {rowSym}
+                            <Text style={{ color: flowColor, fontSize: 13, fontWeight: "800" }}>
+                              {row.isIncome ? t("review.incomeLabel") : t("review.expenseLabel")}
                             </Text>
-                            <TextInput
-                              value={row.amount}
-                              onChangeText={(text) => patchRow(i, { amount: text })}
-                              keyboardType="decimal-pad"
-                              style={{
-                                color: textColor,
-                                fontSize: 44,
-                                fontWeight: "800",
-                                letterSpacing: -2,
-                                minWidth: 100,
-                                padding: 0,
-                                textAlign: "center",
-                              }}
-                              accessibilityLabel={t("review.amount")}
-                            />
                           </View>
-                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
                             <CategoryGlyph emoji={meta.emoji} size={16} color={meta.color} categoryId={row.category} />
                             <Text style={{ color: meta.color, fontSize: 13, fontWeight: "600" }}>{meta.name}</Text>
                           </View>
                           </View>
                         </View>
+
+                        <ExpenseAmountSignRow
+                          isIncome={row.isIncome}
+                          onSelectExpense={() => patchRow(i, { isIncome: false })}
+                          onSelectIncome={() => patchRow(i, { isIncome: true })}
+                          amount={row.amount}
+                          onChangeAmount={(text) => patchRow(i, { amount: text })}
+                          currencySuffix={rowSym}
+                          amountPlaceholder={t("forms.amountPlaceholder")}
+                          decimalSeparatorA11y={t("forms.insertDecimalA11y")}
+                          language={lang}
+                          isDark={isDark}
+                        />
+                        <Text
+                          style={{
+                            color: mutedColor,
+                            fontSize: 12,
+                            textAlign: "center",
+                            marginTop: 6,
+                            marginBottom: 12,
+                          }}
+                        >
+                          {t("review.flowTypeHint")}
+                        </Text>
 
                         <View style={{ marginBottom: 12 }}>
                           <Pressable onPress={() => setDateModalRow(i)} style={pillStyle}>

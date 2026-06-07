@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { useShallow } from "zustand/react/shallow";
 import {
   View,
   Text,
@@ -48,7 +49,8 @@ import {
   type ParseResult,
   type ParsedExpenseItem,
 } from "../../lib/backend";
-import { formatApiErrorDetailBody, type ApiError } from "../../lib/api";
+import { type ApiError } from "../../lib/api";
+import { userFacingApiMessage } from "../../lib/userFacingApiMessage";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { useTranslation } from "react-i18next";
 import { displayExpenseListName } from "../../lib/listDisplayName";
@@ -108,7 +110,30 @@ export default function Dashboard() {
     pendingBankTransactions,
     removePendingBankTransaction,
     bankAutomations,
-  } = useStore();
+  } = useStore(
+    useShallow((s) => ({
+      isDark: s.isDark,
+      expenses: s.expenses,
+      lists: s.lists,
+      activeListId: s.activeListId,
+      setActiveList: s.setActiveList,
+      addList: s.addList,
+      periodFilter: s.periodFilter,
+      setPeriodFilter: s.setPeriodFilter,
+      language: s.language,
+      displayCurrency: s.displayCurrency,
+      enabledCategoryIds: s.enabledCategoryIds,
+      customCategories: s.customCategories,
+      categoryDisplayOverrides: s.categoryDisplayOverrides,
+      isAuthenticated: s.isAuthenticated,
+      expensesNextPagePath: s.expensesNextPagePath,
+      expensesLoadingMore: s.expensesLoadingMore,
+      loadMoreExpenses: s.loadMoreExpenses,
+      pendingBankTransactions: s.pendingBankTransactions,
+      removePendingBankTransaction: s.removePendingBankTransaction,
+      bankAutomations: s.bankAutomations,
+    })),
+  );
   const { isRecording, startRecording, stopRecording } = useVoiceRecorder();
   const keyboardInset = useKeyboardInset();
 
@@ -336,12 +361,12 @@ export default function Dashboard() {
     } catch (e) {
       setReviewVisible(false);
       resetReviewFlow();
-      const detail = formatApiErrorDetailBody(
-        e && typeof e === "object" && "details" in e ? (e as ApiError).details : null,
-      );
+      const details = e && typeof e === "object" && "details" in e ? (e as ApiError).details : null;
       showAlert(
         t("dashboard.voiceAnalysisFailedTitle"),
-        detail ?? t("dashboard.voiceAnalysisFailedFallback"),
+        userFacingApiMessage(details, t, "dashboard.voiceAnalysisFailedFallback", {
+          unavailableKey: "errors.aiServiceUnavailable",
+        }),
       );
     }
   };
@@ -1069,6 +1094,7 @@ export default function Dashboard() {
         expenses={expenses}
         activeListId={activeListId}
         language={language}
+        displayCurrency={displayCurrency}
         isDark={isDark}
       />
 

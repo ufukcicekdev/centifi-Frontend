@@ -1,4 +1,4 @@
-VERSION: 1.0.14 (iOS build 15) — resubmission for Guideline 3.1.2(c) and 5.1.1(v).
+VERSION: 1.0.15 (iOS build 16) — resubmission for Guideline 3.1.2(c) and 2.3.10.
 
 LOGIN (email)
 - Open the app → tap “Continue with email” (not Google or Apple — simplest path for review).
@@ -22,9 +22,34 @@ Step-by-step for reviewers:
 
 LEGAL (subscriptions — Guideline 3.1.2(c))
 - Centifi Pro paywall: subscription title, duration (1 month / 1 year), and price are shown before purchase.
-- Tappable links on the paywall (below Continue): Privacy Policy https://centifi.app/privacy.html and Terms of Use https://centifi.app/terms.html
-- Same URLs in App Store metadata / Privacy Policy field.
+- Tappable links on the paywall (below Continue): Privacy Policy https://centifi.app/privacy.html and Terms of Use (EULA) https://centifi.app/terms.html
+- App Store Connect: Privacy Policy URL field = https://centifi.app/privacy.html
+- App Store Connect: Terms of Use (EULA) — either upload custom EULA or add this link in the App Description: https://centifi.app/terms.html (required for auto-renewable subscriptions).
+- App Review Information → Notes: repeat both URLs above for reviewers.
 
 OTHER
 - Main flows: expense list, add expense, categories, budgets, and Settings.
 - Support: info@centifi.app | https://centifi.app
+
+APP STORE DESCRIPTION (paste into App Store Connect → version → Description)
+---
+Centifi helps you see where your money goes—without the clutter.
+
+WHAT YOU CAN DO
+• Log expenses and income in seconds
+• Organize spending with categories you can customize
+• Set budgets and keep an eye on progress
+• Review history and patterns so you can adjust habits
+• Use Centifi on your phone with a clean, focused interface
+
+CENTIFI PRO
+Unlock the full experience with a Centifi Pro subscription: advanced features and cross-device sync so your data stays with you where you need it. Subscription is billed through your App Store account and renews unless cancelled at least 24 hours before the end of the period.
+
+PRIVACY & YOU
+Your financial data matters. Centifi is built to help you track spending on your terms. See the in-app privacy information for details on what is processed and how to manage your account.
+
+Questions? Reach us at info@centifi.app
+
+Privacy Policy: https://centifi.app/privacy.html
+Terms of Use: https://centifi.app/terms.html
+---

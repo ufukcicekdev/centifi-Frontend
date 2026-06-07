@@ -1,4 +1,4 @@
-import { AppState, DeviceEventEmitter, Platform } from "react-native";
+import { AppState, DeviceEventEmitter, InteractionManager, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Expense } from "../constants/mockData";
 import type { CategoryBudgetEntry } from "../constants/budgetTypes";
@@ -71,17 +71,23 @@ function emitBudgetAlertOrSchedule(
       title: payload.title,
       body: payload.body,
     });
-    // Ön plandayken de yerel bildirim zamanla: gölge / bildirim geçmişi ve izin kontrolü için.
-    // (Yalnızca diyalog kullanılırsa sistem “Bildirimler” ekranında hiçbir şey görünmez.)
+    // Ön plandayken diyalog yeterli; bildirim izni + schedule ek JS yükü UI’ı kitler.
+    return Promise.resolve();
   }
   return presentLocalNotificationIfEnabled(notificationsEnabled, payload);
+}
+
+function scheduleBudgetThresholdCheck(getState: () => BudgetNotificationStateSlice): void {
+  InteractionManager.runAfterInteractions(() => {
+    void runBudgetThresholdCheck(getState());
+  });
 }
 
 export function queueBudgetThresholdCheck(getState: () => BudgetNotificationStateSlice): void {
   if (Platform.OS === "web") return;
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    void runBudgetThresholdCheck(getState());
+    scheduleBudgetThresholdCheck(getState);
   }, 280);
 }
 
@@ -90,7 +96,7 @@ export function flushBudgetThresholdCheck(getState: () => BudgetNotificationStat
   if (Platform.OS === "web") return;
   clearTimeout(debounceTimer);
   debounceTimer = undefined;
-  void runBudgetThresholdCheck(getState());
+  scheduleBudgetThresholdCheck(getState);
 }
 
 async function runBudgetThresholdCheck(s: BudgetNotificationStateSlice): Promise<void> {

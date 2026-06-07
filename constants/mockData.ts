@@ -144,30 +144,11 @@ export const DEFAULT_LISTS: ExpenseList[] = [
   { id: "private", name: "Private list", isDefault: true },
 ];
 
-export const PRESET_BANK_AUTOMATIONS: BankAutomation[] = [
-  {
-    id: "google_wallet",
-    name: "Google Wallet",
-    emoji: "👛",
-    storeUrl: "https://play.google.com/store/apps/details?id=com.google.android.apps.walletnfcrel",
-    packageName: "com.google.android.apps.walletnfcrel",
-    enabled: false,
-  },
-  {
-    id: "google_play",
-    name: "Google Play",
-    emoji: "▶️",
-    storeUrl: "https://play.google.com/store/apps/details?id=com.android.vending",
-    packageName: "com.android.vending",
-    enabled: false,
-  },
-];
-
-/** Ayarlarda silinemez hazır banka / cüzdan satırları */
-export const PRESET_BANK_APP_IDS = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.id));
-
-/** Backend ile birleşince `id` `ubank_*` olabilir; paket adı sabit kalır. */
-export const PRESET_BANK_PACKAGES = new Set(PRESET_BANK_AUTOMATIONS.map((b) => b.packageName));
+export {
+  PRESET_BANK_AUTOMATIONS,
+  PRESET_BANK_APP_IDS,
+  PRESET_BANK_PACKAGES,
+} from "./presetBankAutomations";
 
 export const MOCK_EXPENSES: Expense[] = [
   { id: "1", amount: 24.5,  description: "Starbucks coffee",     category: "food",          date: "2026-05-01", currency: "USD", listId: "private" },

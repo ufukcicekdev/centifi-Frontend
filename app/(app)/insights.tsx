@@ -17,7 +17,8 @@ import { useTranslation } from "react-i18next";
 import { useStore } from "../../store/useStore";
 import { expenseListIdForApi, fetchSpendingInsights } from "../../lib/backend";
 import { displayExpenseListName } from "../../lib/listDisplayName";
-import { formatApiErrorDetailBody, getApiErrorStatus, type ApiError } from "../../lib/api";
+import { getApiErrorStatus, type ApiError } from "../../lib/api";
+import { userFacingApiMessage } from "../../lib/userFacingApiMessage";
 import { useAppDialog } from "../../context/AppDialogContext";
 
 const PURPLE = "#6C63FF";
@@ -215,7 +216,9 @@ export default function InsightsScreen() {
     } catch (e: unknown) {
       const status = getApiErrorStatus(e);
       const details = e && typeof e === "object" && "details" in e ? (e as ApiError).details : undefined;
-      const msg = formatApiErrorDetailBody(details) ?? t("insights.errorGeneric");
+      const msg = userFacingApiMessage(details, t, "insights.errorGeneric", {
+        unavailableKey: "errors.aiServiceUnavailable",
+      });
       const title = status === 503 ? t("insights.errorAiTitle") : t("common.error");
       showAlert(title, msg);
     } finally {

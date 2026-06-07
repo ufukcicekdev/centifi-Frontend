@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "bankAutomationStepsAndroid": "1) Bankanı Play Store bağlantısıyla ekleyin ve aşağıdaki listede AÇIK konuma getirin.\n\n2) “Bildirim erişimi ayarlarını aç”a dokunun ve sistemde Centifi için bildirim erişimini (Notification listener) açın.\n\n3) Yalnızca Play bağlantısındaki paket adıyla aynı uygulamadan gelen bildirimler yakalanır — hiçbir şey görünmüyorsa anahtarı ve yüklediğiniz uygulamanın bağlantıyla eşleştiğini kontrol edin.",
+    "addBankModalBody": "Play Store bağlantısını veya Android paket adını (ör. com.bank.app) yapıştırın. Uygulama adı ve ikon otomatik yüklenir; isterseniz adı düzenleyebilirsiniz.",
+    "bankStoreUrlPlaceholder": "https://play.google.com/store/apps/details?id=…",
+    "bankInvalidStoreUrl": "?id=… içeren bir Play Store bağlantısı veya com.mybank.app gibi bir paket adı girin.",
+    "centifiProSubtitle": "Aylık veya yıllık — ödeme App Store veya Google Play üzerinden"
+  },
+  "subscribe": {
+    "manageInPlayStore": "Aboneliği Google Play'de yönet",
+    "playSubscriptionAlreadyOwnedTitle": "Google Play’de zaten abonelik var",
+    "playSubscriptionAlreadyOwnedBody": "Bu Google hesabında bu abonelik zaten tanımlı. Centifi ile eşitlemek için Satın alımları geri yükle’ye basın.",
+    "restoreMismatchBody": "Google Play’de abonelik görünüyor olabilir ama Pro henüz bu Centifi kullanıcısına bağlanmadı. Cihazda Play → Abonelikler’dekiyle aynı Google hesabını kullanın; RevenueCat’in bu Play uygulamasına bağlı ve SDK anahtarının doğru projeye ait olduğundan emin olun. Birkaç dakika sonra Satın alımları geri yükle’yi tekrar deneyin.",
+    "androidPlayBuildHint": "Play’de “bu sürüm faturalandırılmaya yapılandırılmadı” hatası: Yerel debug APK yerine Google Play’in imzaladığı sürümü yükleyin (iç test / kapalı test kanalından AAB veya dahili paylaşım).",
+    "notConfigured": "Bu sürümde uygulama içi satın alma yok. Centifi’yi App Store veya Google Play’den yükleyin ya da güncelleyin.",
+    "emptyPackagesHint": "Sürekli boşsa: EAS/CI ortamına Android için EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY (iOS için ilgili anahtar) ekleyip yeniden derleyin. RevenueCat’te mağaza uygulamasını bağlayın, ürünleri ekleyin ve paketleri olan bir Current offering seçin. Android’de yalnızca Play ile imzalı sürümlerde (iç test / üretim) ürünler gelir.",
+    "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. App Store veya Google Play’de iptal edene kadar otomatik yenilenir.",
+    "trialManagedByStore": "Örneğin 7 günlük ücretsiz deneme sunuyorsanız, bunu Google Play veya App Store’daki abonelik ürününüzde tanımlayın. Deneme bitince kullanıcı mağazada iptal etmediyse ücretlendirme mağaza tarafından otomatik başlar.",
+    "continueCtaHint": "Sonraki adımda Google Play veya App Store ödeme ekranını açar. Deneme ve yenileme kuralları mağazadadır."
+  },
+  "onboarding": {
+    "bankStep1Desc": "Play Store veya App Store’da bul"
+  }
+}

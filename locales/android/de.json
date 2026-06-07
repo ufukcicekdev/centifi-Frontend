@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "bankAutomationStepsAndroid": "1) Bank-App mit Play-Store-Link hinzufügen und in der Liste unten EINSCHALTEN.\n\n2) „Einstellungen für Benachrichtigungszugriff öffnen“ antippen und Centifi unter „Benachrichtigungszugriff“ (Notification Listener) aktivieren.\n\n3) Es werden nur Benachrichtigungen derselben Android-Paket-ID wie im Play-Link erfasst — wenn nichts erscheint, Schalter prüfen und ob der Link zur installierten App passt.",
+    "addBankModalBody": "Play-Store-Link oder Android-Paketnamen (z. B. com.bank.app) einfügen. Name und Symbol werden automatisch geladen; der Name ist optional anpassbar.",
+    "bankStoreUrlPlaceholder": "https://play.google.com/store/apps/details?id=…",
+    "bankInvalidStoreUrl": "Play-Store-Link mit ?id=… oder Paketnamen wie com.mybank.app verwenden.",
+    "centifiProSubtitle": "Monatlich oder jährlich — Abrechnung über App Store oder Google Play"
+  },
+  "subscribe": {
+    "manageInPlayStore": "Abo in Google Play verwalten",
+    "playSubscriptionAlreadyOwnedTitle": "Bereits bei Google Play abonniert",
+    "playSubscriptionAlreadyOwnedBody": "Dieses Google‑Konto hat dieses Abo bereits. Tippe auf „Käufe wiederherstellen“, um es mit Centifi zu synchronisieren.",
+    "restoreMismatchBody": "Google Play kann bereits ein Abo anzeigen, aber Pro ließ sich noch nicht mit diesem Centifi‑Nutzer verknüpfen. Nutze dasselbe Google‑Konto wie unter Play → Abonnements; prüfe RevenueCat ↔ Play‑App und den SDK‑Key. Nach einigen Minuten erneut „Käufe wiederherstellen“ tippen.",
+    "androidPlayBuildHint": "Play‑Abrechnungsfehler? Installiere ein von Google Play signiertes APK/AAB (interner oder geschlossener Test), nicht nur einen lokalen Debug‑Build.",
+    "notConfigured": "In dieser Version sind In-App-Käufe nicht verfügbar. Installiere oder aktualisiere Centifi aus dem App Store oder Google Play.",
+    "emptyPackagesHint": "Bleibt die Liste leer: EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY (Android) bzw. den iOS-Schlüssel vor dem Build in EAS/CI setzen. In RevenueCat Store-App verknüpfen, Produkte anhängen und ein Current offering mit Paketen wählen. Unter Android liefert Google Play Billing nur in Play-signierten Builds (interner Test oder Produktion) Produkte.",
+    "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. Verlängert sich automatisch bis zur Kündigung im Store.",
+    "trialManagedByStore": "Eine kostenlose Testphase (z. B. 7 Tage) legst du in Google Play oder App Store Connect beim Abo‑Produkt fest. Nach dem Ende der Testphase startet die Abrechnung im Store automatisch, sofern der Nutzer nicht kündigt.",
+    "continueCtaHint": "Als Nächstes öffnet Google Play oder der App Store die Zahlung. Testphase und Verlängerung richten sich nach den Store‑Regeln."
+  },
+  "onboarding": {
+    "bankStep1Desc": "Im Play Store oder App Store finden"
+  }
+}

@@ -15,6 +15,7 @@ import type { Language } from "../i18n";
 import type { PeriodFilter } from "../lib/expenseFilters";
 import {
   distinctExpenseYears,
+  formatDayNetTotal,
   monthShortLabels,
   sumExpensesForMonth,
 } from "../lib/expenseFilters";
@@ -37,6 +38,7 @@ export default function MonthPickerModal({
   expenses,
   activeListId,
   language,
+  displayCurrency,
   isDark,
 }: {
   visible: boolean;
@@ -46,6 +48,7 @@ export default function MonthPickerModal({
   expenses: Expense[];
   activeListId: string;
   language: Language;
+  displayCurrency: string;
   isDark: boolean;
 }) {
   const { width: winW } = useWindowDimensions();
@@ -180,9 +183,19 @@ export default function MonthPickerModal({
                   >
                     <Text style={{ color: sel ? "#fff" : text, fontWeight: "800", fontSize: 14 }}>{lab}</Text>
                     {sum !== 0 ? (
-                      <Text style={{ color: sel ? "rgba(255,255,255,0.85)" : muted, fontSize: 11, marginTop: 4, fontWeight: "600" }}>
-                        {sum > 0 ? "+" : sum < 0 ? "−" : ""}
-                        {Math.abs(sum).toFixed(2).replace(".", ",")} $
+                      <Text
+                        style={{
+                          color: sel ? "rgba(255,255,255,0.85)" : muted,
+                          fontSize: 11,
+                          marginTop: 4,
+                          fontWeight: "600",
+                          textAlign: "center",
+                        }}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}
+                      >
+                        {formatDayNetTotal(sum, language, displayCurrency)}
                       </Text>
                     ) : null}
                   </Pressable>

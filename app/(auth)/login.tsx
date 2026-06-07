@@ -171,11 +171,16 @@ export default function Login() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
+      const identityToken = credential.identityToken?.trim();
+      if (!identityToken) {
+        showAlert(t("auth.appleSignInFailedTitle"), t("auth.appleNoIdentityToken"));
+        return;
+      }
       const name = [credential.fullName?.givenName ?? "", credential.fullName?.familyName ?? ""]
         .filter(Boolean).join(" ");
       await socialAuth({
         provider: "apple",
-        token: credential.identityToken ?? "",
+        token: identityToken,
         name,
         email: credential.email ?? "",
         language: useStore.getState().language,
@@ -188,7 +193,12 @@ export default function Login() {
         }
       }
     } catch (e: any) {
-      if (e.code !== "ERR_REQUEST_CANCELED") showAlert(t("auth.appleSignInFailedTitle"), t("auth.appleSignInFailedBody"));
+      if (e?.code === "ERR_REQUEST_CANCELED") return;
+      const status = getApiErrorStatus(e);
+      let body = t("auth.appleSignInFailedBody");
+      if (status === 401) body = t("auth.appleInvalidToken");
+      else if (status == null || status === 0 || status >= 500) body = t("auth.appleNetworkError");
+      showAlert(t("auth.appleSignInFailedTitle"), body);
     }
   };
 
@@ -276,10 +286,7 @@ export default function Login() {
               ) : (
                 <Pressable
                   onPress={() =>
-                    showAlert(
-                      "Google Sign-In",
-                      "Android/iOS: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID (veya iOS), EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (idToken için Web application istemcisi) ve gerekirse iOS id. Google Cloud’da Android’e SHA-1 ekleyin. Sonra Expo’yu yeniden başlatın.",
-                    )
+                    showAlert(t("auth.googleSignInTitle"), t("auth.googleNotAvailableBody"))
                   }
                   style={({ pressed }) => [
                     styles.socialButton,

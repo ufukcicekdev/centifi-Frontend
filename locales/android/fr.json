@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "bankAutomationStepsAndroid": "1) Ajoutez votre banque avec le lien Play Store et activez-la dans la liste ci-dessous.\n\n2) Touchez « Ouvrir les réglages d’accès aux notifications » et autorisez Centifi (écouteur de notifications).\n\n3) Seules les notifications du même identifiant Android que dans le lien Play sont captées — si rien n’apparaît, vérifiez l’interrupteur et que le lien correspond à l’app installée.",
+    "addBankModalBody": "Collez le lien Play Store ou l’identifiant Android (ex. com.banque.app). Le nom et l’icône se chargent automatiquement ; vous pouvez modifier le nom.",
+    "bankStoreUrlPlaceholder": "https://play.google.com/store/apps/details?id=…",
+    "bankInvalidStoreUrl": "Utilisez un lien Play Store avec ?id=… ou un nom de package comme com.mybank.app.",
+    "centifiProSubtitle": "Mensuel ou annuel — facturé par l’App Store ou Google Play"
+  },
+  "subscribe": {
+    "manageInPlayStore": "Gérer l’abonnement dans Google Play",
+    "playSubscriptionAlreadyOwnedTitle": "Déjà abonné sur Google Play",
+    "playSubscriptionAlreadyOwnedBody": "Ce compte Google a déjà cet abonnement. Touche Restaurer les achats pour le synchroniser avec Centifi.",
+    "restoreMismatchBody": "Google Play peut déjà afficher un abonnement, mais nous n’avons pas pu synchroniser Pro avec cet utilisateur Centifi. Utilise le même compte Google que dans Play → Abonnements ; vérifie RevenueCat ↔ appli Play et la clé SDK. Réessaie Restaurer les achats après quelques minutes.",
+    "androidPlayBuildHint": "Erreur de facturation Play : installez un APK/AAB signé par Google Play (test interne/fermé), pas seulement un build debug local.",
+    "notConfigured": "Les achats intégrés ne sont pas disponibles dans cette version. Installez ou mettez à jour Centifi depuis l’App Store ou Google Play.",
+    "emptyPackagesHint": "Si la liste reste vide : ajoutez EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY (Android) ou la clé iOS dans l’environnement EAS/CI avant le build. Dans RevenueCat, liez l’app du store, attachez les produits et définissez un Current offering avec des paquets. Sur Android, seuls les builds signés Play (test interne/ouvert ou production) renvoient des produits.",
+    "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. Renouvellement automatique jusqu’à annulation dans le store.",
+    "trialManagedByStore": "Si vous proposez un essai gratuit (p. ex. 7 jours), configurez‑le sur l’abonnement dans Google Play ou App Store Connect. Après l’essai, la facturation démarre automatiquement dans le store sauf annulation.",
+    "continueCtaHint": "Google Play ou l’App Store s’ouvre ensuite pour confirmer le paiement. Essai et renouvellement selon les règles du store."
+  },
+  "onboarding": {
+    "bankStep1Desc": "La trouver sur Play Store ou App Store"
+  }
+}

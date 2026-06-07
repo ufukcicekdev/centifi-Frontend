@@ -1,5 +1,6 @@
 import type { BankAutomation } from "../constants/mockData";
 import { apiFetch, saveTokens, type AuthTokens } from "./api";
+import { getAppLanguage, normalizeAppLanguage } from "./appLanguage";
 
 export type BackendUser = {
   id: number;
@@ -32,6 +33,7 @@ export type ParsedExpenseItem = {
   category: string;
   date: string;
   currency: string;
+  is_income?: boolean;
 };
 
 export type ParseResult = {
@@ -173,10 +175,21 @@ export async function socialAuth(params: {
   email?: string;
   language?: string;
 }) {
+  const body: Record<string, string> = {
+    provider: params.provider,
+    token: params.token.trim(),
+  };
+  const name = params.name?.trim();
+  if (name) body.name = name;
+  const email = params.email?.trim();
+  if (email) body.email = email;
+  const lang = params.language?.trim();
+  if (lang) body.language = lang.split("-")[0].toLowerCase();
+
   const tokens = await apiFetch<AuthTokens>("/api/users/social-auth/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
+    body: JSON.stringify(body),
   });
   await saveTokens(tokens);
   return tokens;
@@ -347,6 +360,7 @@ export type SendExpenseReportResponse = {
   ok: boolean;
   sent_to: string;
   expense_count: number;
+  language_used?: string;
 };
 
 /** E-posta: HTML tablo + CSV ek; tarih YYYY-MM-DD, list_id opsiyonel (yalnızca sayısal API list id). */
@@ -354,10 +368,13 @@ export async function sendExpenseReportEmail(body: {
   start_date: string;
   end_date: string;
   list_id?: number | null;
+  language?: string;
 }) {
+  const lang = normalizeAppLanguage(body.language || getAppLanguage());
   const payload: Record<string, unknown> = {
     start_date: body.start_date,
     end_date: body.end_date,
+    language: lang,
   };
   if (body.list_id != null && Number.isFinite(body.list_id)) {
     payload.list_id = Math.floor(body.list_id);

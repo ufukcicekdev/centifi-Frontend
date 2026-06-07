@@ -20,6 +20,7 @@ import CategoryGlyph from "../../../components/CategoryGlyph";
 import { BUDGET_COLOR_PALETTE } from "../../../constants/budgetColors";
 import { hexToRgba } from "../../../lib/colorUi";
 import { currencySymbolFor, formatMoneyAmount } from "../../../lib/formatMoney";
+import { sanitizeAmountInput } from "../../../lib/amountInput";
 import { averageMonthlySpendForCategory } from "../../../lib/categoryBudgetStats";
 import type { Language } from "../../../i18n";
 import { useAppDialog } from "../../../context/AppDialogContext";
@@ -340,10 +341,11 @@ export default function CategoryBudgetScreen() {
             </Text>
             <TextInput
               value={amountStr}
-              onChangeText={setAmountStr}
+              onChangeText={(text) => setAmountStr(sanitizeAmountInput(text))}
               placeholder="0"
               placeholderTextColor={mutedColor}
               keyboardType="decimal-pad"
+              inputMode="decimal"
               style={{
                 flex: 1,
                 minWidth: 0,

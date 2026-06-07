@@ -10,6 +10,7 @@ import {
 } from "../constants/mockData";
 import type { CategoryBudgetEntry } from "../constants/budgetTypes";
 import i18n, { Language } from "../i18n";
+import { setAppLanguage } from "../lib/appLanguage";
 import { getApiErrorStatus, loadTokens, saveTokens } from "../lib/api";
 import {
   getMe,
@@ -303,6 +304,7 @@ export const useStore = create<AppState>((set, get) => {
         .split("-")[0];
       const serverLng = (["en", "tr", "de", "fr", "es"].includes(serverRaw) ? serverRaw : "en") as Language;
       const resolvedLang: Language = (savedPref ?? deviceLng ?? serverLng) as Language;
+      setAppLanguage(resolvedLang);
 
       const budgetPrefs = await loadBudgetPrefs(uid).catch(() => null);
 
@@ -572,6 +574,7 @@ export const useStore = create<AppState>((set, get) => {
   language: getDeviceAppLanguage() as Language,
   setLanguage: (lang) => {
     i18n.changeLanguage(lang);
+    setAppLanguage(lang);
     set({ language: lang });
     void saveLanguage(lang);
     if (get().isAuthenticated) {
@@ -588,6 +591,7 @@ export const useStore = create<AppState>((set, get) => {
       /* ignore */
     }
     set({ language: resolved });
+    setAppLanguage(resolved);
   },
 
   displayCurrency: "USD",

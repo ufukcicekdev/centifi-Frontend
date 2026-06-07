@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "bankAutomationStepsAndroid": "1) Add your bank with its Play Store link and turn it ON in the list below.\n\n2) Tap “Open notification access settings” and enable Centifi (Notification listener).\n\n3) Only notifications from the same Android app package as in your Play link are captured — if nothing shows up, check the toggle and that the link matches the app you installed.",
+    "addBankModalBody": "Paste your bank’s Play Store link (or the Android package id). We load the app name and icon automatically; you can adjust the name if needed.",
+    "bankStoreUrlPlaceholder": "https://play.google.com/store/apps/details?id=…",
+    "bankInvalidStoreUrl": "Use a Play Store link with ?id=… or a package name like com.mybank.app.",
+    "centifiProSubtitle": "Monthly or yearly — billed by the App Store or Google Play"
+  },
+  "subscribe": {
+    "notConfigured": "In-app purchases aren’t available in this build. Install or update Centifi from the App Store or Google Play.",
+    "emptyPackagesHint": "If this stays empty: add EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY (Android) or the iOS key to your EAS/CI env before building. In RevenueCat, link your store app, attach products, and set a Current offering with packages. On Android, use a Play-signed build (internal/open testing or production) so Google Play Billing can return products.",
+    "manageInPlayStore": "Manage subscription in Google Play",
+    "playSubscriptionAlreadyOwnedTitle": "Already subscribed on Google Play",
+    "playSubscriptionAlreadyOwnedBody": "This Google account already has this subscription. Tap Restore purchases to sync it with Centifi.",
+    "restoreMismatchBody": "Google Play may already show a subscription, but we couldn’t sync Pro to this Centifi user yet. Use the same Google account as in Play → Subscriptions; confirm RevenueCat is linked to this Play app and the SDK key matches your project. Wait a few minutes and tap Restore purchases again.",
+    "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. Auto-renews until you cancel in the App Store or Google Play.",
+    "trialManagedByStore": "If you offer a free trial (e.g. 7 days), set it on your subscription in Google Play or App Store Connect. Billing starts automatically after the trial unless the user cancels in the store.",
+    "continueCtaHint": "Google Play or the App Store opens next to confirm payment. Free trials and renewals follow the store’s rules.",
+    "androidPlayBuildHint": "If you see a Play billing error: install an APK/AAB signed by Google Play (internal or closed testing), not only a local debug build."
+  },
+  "onboarding": {
+    "bankStep1Desc": "Find it on Play Store or App Store"
+  }
+}

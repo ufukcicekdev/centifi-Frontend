@@ -409,13 +409,13 @@ function AddBankModal({
         setLookupLoading(true);
         try {
           if (isAuthenticated) {
-            const meta = trimmed.includes("play.google") ?
-              await lookupPlayStoreMeta({ store_url: trimmed }) :
-              await lookupPlayStoreMeta({ package: pkg });
+            const meta = trimmed.includes("http")
+              ? await lookupPlayStoreMeta({ store_url: trimmed })
+              : await lookupPlayStoreMeta({ package: pkg });
             setResolvedName((meta.name ?? "").trim() || fallbackAppLabelFromPackage(meta.package_name || pkg));
             setResolvedIcon((meta.icon_url ?? "").trim());
-          } else {
-            const { fetchPlayStoreMetaClient } = await import("../../lib/playStoreClientLookup");
+          } else if (Platform.OS === "android") {
+            const { fetchPlayStoreMetaClient } = await import("../../lib/playStoreClientLookup.android");
             const meta = await fetchPlayStoreMetaClient(pkg);
             setResolvedName((meta.name ?? "").trim() || fallbackAppLabelFromPackage(pkg));
             setResolvedIcon((meta.iconUrl ?? "").trim());

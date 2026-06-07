@@ -1,9 +1,29 @@
+import Constants from "expo-constants";
 import { Platform } from "react-native";
+
+type GoogleExtra = {
+  googleIosClientId?: string;
+  googleAndroidClientId?: string;
+  googleWebClientId?: string;
+};
+
+function readExtra(): GoogleExtra {
+  return (Constants.expoConfig?.extra ?? {}) as GoogleExtra;
+}
+
+function readGoogleEnv(
+  envKey: "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID" | "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID" | "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID",
+  extraKey: keyof GoogleExtra,
+): string | undefined {
+  const fromEnv = process.env[envKey]?.trim();
+  if (fromEnv) return fromEnv;
+  const fromExtra = readExtra()[extraKey]?.trim();
+  return fromExtra || undefined;
+}
 
 /**
  * Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs.
- * Değerler `frontend/.env` içinde EXPO_PUBLIC_* olarak; Expo bunları yükler (başka env dosyası yok).
- * EAS build’te aynı isimlerle ortam değişkeni verin.
+ * Kaynak: `frontend/.env` (EXPO_PUBLIC_*) + `app.config.js` → expo.extra (Xcode build yedek).
  */
 export function getGoogleOAuthClientIds(): {
   ios?: string;
@@ -11,9 +31,9 @@ export function getGoogleOAuthClientIds(): {
   web?: string;
   isConfigured: boolean;
 } {
-  const ios = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
-  const android = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim();
-  const web = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim();
+  const ios = readGoogleEnv("EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID", "googleIosClientId");
+  const android = readGoogleEnv("EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID", "googleAndroidClientId");
+  const web = readGoogleEnv("EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID", "googleWebClientId");
   const ids = { ios, android, web };
   const isConfigured = googleIdsForCurrentPlatform(ids).ok;
   return { ...ids, isConfigured };

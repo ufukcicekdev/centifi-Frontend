@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "bankAutomationStepsAndroid": "1) Añade tu banco con el enlace de Play Store y actívalo en la lista de abajo.\n\n2) Pulsa «Abrir ajustes de acceso a notificaciones» y permite Centifi (acceso a notificaciones / listener).\n\n3) Solo se captan notificaciones del mismo paquete Android que en el enlace de Play — si no ves nada, revisa el interruptor y que el enlace coincida con la app instalada.",
+    "addBankModalBody": "Pega el enlace de Play Store o el id del paquete Android (p. ej. com.banco.app). El nombre y el icono se cargan solos; puedes cambiar el nombre.",
+    "bankStoreUrlPlaceholder": "https://play.google.com/store/apps/details?id=…",
+    "bankInvalidStoreUrl": "Usa un enlace de Play Store con ?id=… o un nombre de paquete como com.mybank.app.",
+    "centifiProSubtitle": "Mensual o anual — cobro en App Store o Google Play"
+  },
+  "subscribe": {
+    "manageInPlayStore": "Gestionar suscripción en Google Play",
+    "playSubscriptionAlreadyOwnedTitle": "Ya estás suscrito en Google Play",
+    "playSubscriptionAlreadyOwnedBody": "Esta cuenta de Google ya tiene esta suscripción. Toca Restaurar compras para sincronizarla con Centifi.",
+    "restoreMismatchBody": "Google Play puede mostrar ya una suscripción, pero no pudimos sincronizar Pro con este usuario de Centifi. Usa la misma cuenta de Google que en Play → Suscripciones; comprueba RevenueCat ↔ app de Play y la clave SDK. Espera unos minutos y vuelve a pulsar Restaurar compras.",
+    "androidPlayBuildHint": "Si Play dice que la app no está configurada para facturación: instala un APK/AAB firmado por Google Play (prueba interna/cerrada), no solo un build de depuración local.",
+    "notConfigured": "Las compras dentro de la app no están disponibles en esta versión. Instala o actualiza Centifi desde App Store o Google Play.",
+    "emptyPackagesHint": "Si sigue vacío: añade EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY (Android) o la clave de iOS al entorno EAS/CI antes de compilar. En RevenueCat vincula la app de la tienda, adjunta productos y elige un Current offering con paquetes. En Android solo los builds firmados por Play (prueba interna/abierta o producción) devuelven productos.",
+    "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. Se renueva automáticamente hasta cancelar en la tienda.",
+    "trialManagedByStore": "Si ofreces una prueba gratuita (p. ej., 7 días), configúrala en la suscripción en Google Play o App Store Connect. Tras la prueba, el cobro en la tienda empieza automáticamente salvo que el usuario cancele.",
+    "continueCtaHint": "A continuación se abrirá Google Play o App Store para confirmar el pago. Prueba y renovación según las reglas de la tienda."
+  },
+  "onboarding": {
+    "bankStep1Desc": "Búscala en Play Store o App Store"
+  }
+}

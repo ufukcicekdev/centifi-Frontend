@@ -15,7 +15,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../../store/useStore";
-import { expenseListIdForApi, sendExpenseReportEmail } from "../../lib/backend";
+import { expenseListIdForApi, sendExpenseReportEmail, updateMe } from "../../lib/backend";
+import { normalizeAppLanguage, setAppLanguage } from "../../lib/appLanguage";
 import { displayExpenseListName } from "../../lib/listDisplayName";
 import { formatApiErrorDetailBody, getApiErrorStatus, type ApiError } from "../../lib/api";
 import { useAppDialog } from "../../context/AppDialogContext";
@@ -222,7 +223,7 @@ function ReportListRow({
 }
 
 export default function ReportScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { showAlert } = useAppDialog();
@@ -230,6 +231,7 @@ export default function ReportScreen() {
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const lists = useStore((s) => s.lists);
   const user = useStore((s) => s.user);
+  const language = useStore((s) => s.language);
 
   const [endDate, setEndDate] = useState(() => todayNoon());
   const [startDate, setStartDate] = useState(() => startOfMonth(todayNoon()));
@@ -323,12 +325,16 @@ export default function ReportScreen() {
     }
     setSending(true);
     try {
+      const lang = normalizeAppLanguage(language || i18n.resolvedLanguage || i18n.language);
+      setAppLanguage(lang);
+      await updateMe({ language: lang }).catch(() => {});
       const apiListId =
         selectedListKey === null ? undefined : expenseListIdForApi(selectedListKey);
       const res = await sendExpenseReportEmail({
         start_date: start,
         end_date: end,
         list_id: apiListId,
+        language: lang,
       });
       showAlert(
         t("report.successTitle"),

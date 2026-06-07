@@ -14,7 +14,6 @@ import {
   useWindowDimensions,
   Linking,
 } from "react-native";
-import Constants from "expo-constants";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +23,7 @@ import { syncSubscriptionFromRevenueCat } from "../../lib/backend";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { isRevenueCatConfigured, revenueCatEntitlementId } from "../../lib/revenuecat";
 import { centifiLegalUrls } from "../../lib/legalUrls";
+import { openStoreSubscriptionSettings } from "../../lib/storeSubscriptionSettings";
 
 const PURPLE = "#6C63FF";
 const GOLD = "#FFB800";
@@ -111,20 +111,6 @@ async function reconcileProWithPlayAndRc(): Promise<{ isProNow: boolean; expires
 
   const expiresAt = me?.pro_entitlement_expires_at ?? local.expiresAt ?? null;
   return { isProNow, expiresAt };
-}
-
-function playSubscriptionsManageUrl(): string {
-  const pkg = (Constants.expoConfig as { android?: { package?: string } } | null)?.android?.package ?? "centifi.app";
-  const sku = process.env.EXPO_PUBLIC_PLAY_SUBSCRIPTION_PRODUCT_ID?.trim() || "centifi_aylik_pro";
-  return `https://play.google.com/store/account/subscriptions?package=${encodeURIComponent(pkg)}&sku=${encodeURIComponent(sku)}`;
-}
-
-function openStoreSubscriptionSettings(): void {
-  if (Platform.OS === "android") {
-    void Linking.openURL(playSubscriptionsManageUrl());
-  } else if (Platform.OS === "ios") {
-    void Linking.openURL("https://apps.apple.com/account/subscriptions");
-  }
 }
 
 function PaywallLegalLinks({ mutedColor, compact }: { mutedColor: string; compact?: boolean }) {
@@ -222,6 +208,17 @@ export default function SubscribeScreen() {
     () => packages.find((p) => p.identifier === selectedPackageId) ?? null,
     [packages, selectedPackageId],
   );
+
+  /** Deneme metninde aylık fiyat — yıllık plan seçiliyken bile aylık paket gösterilir. */
+  const monthlyBillingPkg = useMemo(() => {
+    const monthly = packages.find((p) => !isLikelyAnnualPackage(p.identifier, p.product.title));
+    return monthly ?? packages[0] ?? null;
+  }, [packages]);
+
+  const billingStoreLabel =
+    Platform.OS === "android" ? t("subscribe.storeGooglePlay") : t("subscribe.storeAppStore");
+
+  const showTrialBanner = !isPro && isRevenueCatConfigured() && !loading && packages.length > 0;
 
   useFocusEffect(
     useCallback(() => {
@@ -349,11 +346,27 @@ export default function SubscribeScreen() {
             router.replace("/(app)" as any);
             showAlert(t("subscribe.thanksTitle"), t("subscribe.thanksBody"));
           } else {
-            showAlert(t("subscribe.playSubscriptionAlreadyOwnedTitle"), t("subscribe.restoreMismatchBody"));
+            const ownedTitle =
+              Platform.OS === "android"
+                ? t("subscribe.playSubscriptionAlreadyOwnedTitle")
+                : t("subscribe.subscriptionAlreadyOwnedTitle");
+            const mismatchBody =
+              Platform.OS === "android"
+                ? t("subscribe.restoreMismatchBody")
+                : t("subscribe.restoreMismatchBodyIos");
+            showAlert(ownedTitle, mismatchBody);
           }
         } catch {
-          showAlert(t("subscribe.playSubscriptionAlreadyOwnedTitle"), t("subscribe.playSubscriptionAlreadyOwnedBody"));
-        }
+          const ownedTitle =
+            Platform.OS === "android"
+              ? t("subscribe.playSubscriptionAlreadyOwnedTitle")
+              : t("subscribe.subscriptionAlreadyOwnedTitle");
+          const ownedBody =
+            Platform.OS === "android"
+              ? t("subscribe.playSubscriptionAlreadyOwnedBody")
+              : t("subscribe.subscriptionAlreadyOwnedBody");
+          showAlert(ownedTitle, ownedBody);
+          }
       } else {
         showAlert(t("common.error"), msg);
       }
@@ -375,7 +388,10 @@ export default function SubscribeScreen() {
         router.replace("/(app)" as any);
         showAlert(t("subscribe.restoredTitle"), t("subscribe.restoredBody"));
       } else {
-        showAlert(t("subscribe.restoreMismatchTitle"), t("subscribe.restoreMismatchBody"));
+        showAlert(
+          t("subscribe.restoreMismatchTitle"),
+          Platform.OS === "android" ? t("subscribe.restoreMismatchBody") : t("subscribe.restoreMismatchBodyIos"),
+        );
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -470,10 +486,48 @@ export default function SubscribeScreen() {
         <Text style={{ color: mutedColor, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>
           {t("subscribe.intro")}
         </Text>
-        {mandatory ? (
-          <Text style={{ color: mutedColor, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
-            {t("subscribe.trialManagedByStore")}
-          </Text>
+
+        {showTrialBanner && monthlyBillingPkg ? (
+          <View
+            style={{
+              backgroundColor: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.14)",
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 18,
+              borderWidth: 1,
+              borderColor: isDark ? "rgba(34, 197, 94, 0.35)" : "rgba(22, 163, 74, 0.35)",
+              flexDirection: "row",
+              gap: 12,
+              alignItems: "flex-start",
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: isDark ? "rgba(34, 197, 94, 0.22)" : "rgba(22, 163, 74, 0.18)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="gift-outline" size={22} color={MONAI_CARD_GREEN} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: textColor, fontSize: 16, fontWeight: "800", marginBottom: 6 }}>
+                {t("subscribe.freeTrialTitle")}
+              </Text>
+              <Text style={{ color: mutedColor, fontSize: 14, lineHeight: 21 }}>
+                {t("subscribe.freeTrialBody", {
+                  price: monthlyBillingPkg.product.priceString,
+                  store: billingStoreLabel,
+                })}
+              </Text>
+              <Text style={{ color: mutedColor, fontSize: 12, lineHeight: 18, marginTop: 8 }}>
+                {t("subscribe.freeTrialCancelHint", { store: billingStoreLabel })}
+              </Text>
+            </View>
+          </View>
         ) : null}
 
         {isPro ? (
@@ -727,12 +781,12 @@ export default function SubscribeScreen() {
                       }}
                       numberOfLines={1}
                     >
-                      {t("subscribe.continueCta")}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              {selectedPkg ? (
+                  {t("subscribe.continueCta")}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+              {selectedPkg && monthlyBillingPkg ? (
                 <Text
                   style={{
                     color: mutedColor,
@@ -743,12 +797,10 @@ export default function SubscribeScreen() {
                     paddingHorizontal: 4,
                   }}
                 >
-                  {t("subscribe.subscriptionSummary", {
-                    plan: selectedPkg.product.title || "Centifi Pro",
-                    period: isLikelyAnnualPackage(selectedPkg.identifier, selectedPkg.product.title)
-                      ? t("subscribe.periodYearly")
-                      : t("subscribe.periodMonthly"),
-                    price: selectedPkg.product.priceString,
+                  {t("subscribe.subscriptionSummaryTrial", {
+                    price: monthlyBillingPkg.product.priceString,
+                    period: t("subscribe.periodMonthly"),
+                    store: billingStoreLabel,
                   })}
                 </Text>
               ) : null}

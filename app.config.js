@@ -66,11 +66,22 @@ module.exports = ({ config }) => {
     return [entry];
   });
 
+  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() ?? "";
+  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() ?? "";
+  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ?? "";
+
   return {
     ...config,
     expo: {
       ...expo,
       plugins,
+      extra: {
+        ...(expo.extra ?? {}),
+        /** Xcode / Archive: process.env bazen bundle’a girmez; expo-constants.extra yedek kaynak. */
+        googleIosClientId,
+        googleAndroidClientId,
+        googleWebClientId,
+      },
     },
   };
 };

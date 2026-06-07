@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
+import { getAppLanguage } from "./appLanguage";
 
 const TOKEN_KEY = "auth_tokens_v1";
 
@@ -137,6 +138,7 @@ export async function apiFetch<T>(
   let tokens = init.auth ? await loadTokens() : null;
   if (init.auth && tokens?.access) {
     headers.Authorization = `Bearer ${tokens.access}`;
+    headers["X-Centifi-Language"] = getAppLanguage();
   }
 
   const doRequest = async () => {
