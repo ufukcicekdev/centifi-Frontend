@@ -12,6 +12,7 @@ import BudgetAlertForegroundListener from "../components/BudgetAlertForegroundLi
 import BankPendingBridge from "../components/BankPendingBridge";
 import RevenueCatBridge from "../components/RevenueCatBridge";
 import { isRevenueCatConfigured } from "../lib/revenuecat";
+import { GRACE_PERIOD_DAYS } from "../lib/api";
 
 const BOOTSTRAP_PURPLE = "#6C63FF";
 
@@ -22,6 +23,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const onboardingCompleted = useStore((s) => s.onboardingCompleted);
   const isPro = useStore((s) => s.isPro);
+  const gracePeriodStartDate = useStore((s) => s.gracePeriodStartDate);
   /** Until true, `isAuthenticated` is still the default — do not route or user briefly sees login. */
   const [sessionResolved, setSessionResolved] = useState(false);
 
@@ -44,14 +46,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     const onSubscribe = segments[1] === "subscribe";
     const onBankPending = segments[0] === "bank-pending";
 
-    /** Centifi Pro zorunlu: mağaza aboneliği yoksa ana uygulamaya sokma (RC yoksa / web’de kilitleme yok). */
+    /** In-app grace period: kullanıcıya onboarding bitişinden itibaren GRACE_PERIOD_DAYS gün ücretsiz erişim. */
+    const inGracePeriod = (() => {
+      if (!gracePeriodStartDate) return false;
+      const start = Date.parse(gracePeriodStartDate);
+      if (Number.isNaN(start)) return false;
+      const elapsedDays = (Date.now() - start) / 86_400_000;
+      return elapsedDays < GRACE_PERIOD_DAYS;
+    })();
+
+    /** Centifi Pro zorunlu: mağaza aboneliği yoksa ve grace period dolmuşsa ana uygulamaya sokma. */
     const proGateActive =
       Platform.OS !== "web" &&
       isRevenueCatConfigured() &&
       isAuthenticated &&
       onboardingCompleted &&
       inApp &&
-      !isPro;
+      !isPro &&
+      !inGracePeriod;
 
     if (proGateActive && !onSubscribe && !onBankPending) {
       router.replace({ pathname: "/(app)/subscribe", params: { gate: "pro" } } as any);
@@ -65,7 +77,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     } else if (isAuthenticated && onboardingCompleted && inAuthGroup && !onPasswordReset) {
       router.replace("/(app)");
     }
-  }, [sessionResolved, isAuthenticated, onboardingCompleted, isPro, segments, router]);
+  }, [sessionResolved, isAuthenticated, onboardingCompleted, isPro, gracePeriodStartDate, segments, router]);
 
   return (
     <>

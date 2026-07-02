@@ -5,17 +5,24 @@ import {
   View,
   Text,
   Pressable,
-  ScrollView,
-  Animated,
+  FlatList,
   Platform,
   Keyboard,
   TextInput,
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
+  TouchableOpacity,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+} from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,6 +39,7 @@ import {
 import ReviewExpenseModal, { type ReviewParsingKind } from "../../components/ReviewExpenseModal";
 import ListsPickerModal from "../../components/ListsPickerModal";
 import ExpenseTxRow from "../../components/ExpenseTxRow";
+import EmptyStateCard from "../../components/EmptyStateCard";
 import {
   filterByPeriod,
   formatDayNetTotal,
@@ -49,7 +57,7 @@ import {
   type ParseResult,
   type ParsedExpenseItem,
 } from "../../lib/backend";
-import { type ApiError } from "../../lib/api";
+import { type ApiError, GRACE_PERIOD_DAYS } from "../../lib/api";
 import { userFacingApiMessage } from "../../lib/userFacingApiMessage";
 import { useAppDialog } from "../../context/AppDialogContext";
 import { useTranslation } from "react-i18next";
@@ -59,6 +67,8 @@ import { flushBudgetThresholdCheck } from "../../lib/budgetThresholdNotification
 import type { Language } from "../../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../../lib/formatMoney";
 import { getCategoryMeta } from "../../constants/mockData";
+import ProactiveCoachCard from "../../components/ProactiveCoachCard";
+import { useProactiveCoach } from "../../hooks/useProactiveCoach";
 
 const PURPLE = "#6C63FF";
 const CORAL = "#FF6B6B";
@@ -107,9 +117,12 @@ export default function Dashboard() {
     expensesNextPagePath,
     expensesLoadingMore,
     loadMoreExpenses,
+    removeExpense,
     pendingBankTransactions,
     removePendingBankTransaction,
     bankAutomations,
+    isPro,
+    gracePeriodStartDate,
   } = useStore(
     useShallow((s) => ({
       isDark: s.isDark,
@@ -129,19 +142,34 @@ export default function Dashboard() {
       expensesNextPagePath: s.expensesNextPagePath,
       expensesLoadingMore: s.expensesLoadingMore,
       loadMoreExpenses: s.loadMoreExpenses,
+      removeExpense: s.removeExpense,
       pendingBankTransactions: s.pendingBankTransactions,
       removePendingBankTransaction: s.removePendingBankTransaction,
       bankAutomations: s.bankAutomations,
+      isPro: s.isPro,
+      gracePeriodStartDate: s.gracePeriodStartDate,
     })),
   );
   const { isRecording, startRecording, stopRecording } = useVoiceRecorder();
+  const { message: coachMessage, dismiss: dismissCoach } = useProactiveCoach(expenses, language, isAuthenticated);
   const keyboardInset = useKeyboardInset();
+
+  const trialDaysLeft = (() => {
+    console.log('[TRIAL] isPro:', isPro, 'gracePeriodStartDate:', gracePeriodStartDate);
+    if (isPro || !gracePeriodStartDate) return null;
+    const start = Date.parse(gracePeriodStartDate);
+    if (Number.isNaN(start)) return null;
+    const elapsed = (Date.now() - start) / 86_400_000;
+    const left = Math.ceil(GRACE_PERIOD_DAYS - elapsed);
+    console.log('[TRIAL] elapsed:', elapsed, 'left:', left);
+    return left > 0 ? left : 0;
+  })();
 
   /** Yerel işlem listesi araması (AI yok) */
   const [transactionSearch, setTransactionSearch] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
-  const searchAnim = useRef(new Animated.Value(0)).current;
+  const searchProgress = useSharedValue(0);
 
   /** + menüsü: manuel ekle / görsel yükle */
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
@@ -152,6 +180,7 @@ export default function Dashboard() {
   const [reviewExpenses, setReviewExpenses] = useState<ParsedExpenseItem[] | null>(null);
   const [monthModalOpen, setMonthModalOpen] = useState(false);
   const [listsModalOpen, setListsModalOpen] = useState(false);
+  const [imageSourceOpen, setImageSourceOpen] = useState(false);
   const [txCategoryFilter, setTxCategoryFilter] = useState<string | null>(null);
   /** Üstteki Harcama / Gelir kutularından liste + grafik filtresi */
   const [txFlowFilter, setTxFlowFilter] = useState<TxFlowFilter>("all");
@@ -177,17 +206,13 @@ export default function Dashboard() {
   const mutedColor = isDark ? "#888" : "#666";
   const divider = isDark ? "#222" : "#eee";
 
-  const periodExpenses = useMemo(() => {
+  const flowFilteredExpenses = useMemo(() => {
     let result = filterByPeriod(expenses, periodFilter);
     result = result.filter((e) => !e.listId || e.listId === activeListId);
+    if (txFlowFilter === "expense") return result.filter((e) => !e.isIncome);
+    if (txFlowFilter === "income") return result.filter((e) => !!e.isIncome);
     return result;
-  }, [expenses, periodFilter, activeListId]);
-
-  const flowFilteredExpenses = useMemo(() => {
-    if (txFlowFilter === "expense") return periodExpenses.filter((e) => !e.isIncome);
-    if (txFlowFilter === "income") return periodExpenses.filter((e) => !!e.isIncome);
-    return periodExpenses;
-  }, [periodExpenses, txFlowFilter]);
+  }, [expenses, periodFilter, activeListId, txFlowFilter]);
 
   const listFiltered = useMemo(() => {
     if (!txCategoryFilter) return flowFilteredExpenses;
@@ -262,25 +287,20 @@ export default function Dashboard() {
 
   const openSearchBar = useCallback(() => {
     setFabMenuOpen(false);
-    searchAnim.setValue(0);
+    searchProgress.value = 0;
     setShowSearchBar(true);
-    Animated.spring(searchAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 120,
-      friction: 14,
-    }).start();
+    searchProgress.value = withSpring(1, { stiffness: 120, damping: 14 });
     setTimeout(() => searchInputRef.current?.focus(), 80);
-  }, [searchAnim]);
+  }, [searchProgress]);
 
   /** Kapanışta layout’u animasyon sonuna bağlama — kategori şeridi / padding / toplamlar hemen dönsün (akıcılık). */
   const closeSearchBar = useCallback(() => {
     setFabMenuOpen(false);
     Keyboard.dismiss();
-    searchAnim.setValue(0);
+    searchProgress.value = 0;
     setTransactionSearch("");
     setShowSearchBar(false);
-  }, [searchAnim]);
+  }, [searchProgress]);
 
   const toggleSearchBar = useCallback(() => {
     if (showSearchBar) closeSearchBar();
@@ -301,19 +321,7 @@ export default function Dashboard() {
     setReviewParsingKind("receipt");
   }
 
-  const handleImagePick = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      showAlert(t("dashboard.photoPermissionTitle"), t("dashboard.photoPermissionBody"));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      base64: true,
-      quality: 0.8,
-      allowsMultipleSelection: false,
-      selectionLimit: 1,
-    });
+  const _processImageResult = async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled) return;
     const first = result.assets[0];
     if (!first?.base64) return;
@@ -329,6 +337,39 @@ export default function Dashboard() {
       resetReviewFlow();
       showAlert(t("common.error"), t("dashboard.receiptParseFailed"));
     }
+  };
+
+  const handleImagePick = () => setImageSourceOpen(true);
+
+  const _pickFromCamera = async () => {
+    setImageSourceOpen(false);
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      showAlert(t("dashboard.photoPermissionTitle"), t("dashboard.cameraPermissionBody"));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.8,
+    });
+    _processImageResult(result);
+  };
+
+  const _pickFromGallery = async () => {
+    setImageSourceOpen(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      showAlert(t("dashboard.photoPermissionTitle"), t("dashboard.photoPermissionBody"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.8,
+      allowsMultipleSelection: false,
+    });
+    _processImageResult(result);
   };
 
   /** Basılı tut: kayıt; bırak: durdur ve analiz et */
@@ -393,7 +434,10 @@ export default function Dashboard() {
     [],
   );
 
-  const searchTranslateY = searchAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+  const searchAnimStyle = useAnimatedStyle(() => ({
+    opacity: searchProgress.value,
+    transform: [{ translateY: interpolate(searchProgress.value, [0, 1], [16, 0]) }],
+  }));
 
   const langUi = language as Language;
   const currencySymbol = useMemo(
@@ -434,25 +478,41 @@ export default function Dashboard() {
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
         keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
       >
-      <ScrollView
-        style={{ flex: 1 }}
-        stickyHeaderIndices={[0]}
-        showsVerticalScrollIndicator={false}
-        keyboardDismissMode="interactive"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
-        onMomentumScrollEnd={onMomentumScrollEndLoadMore}
+      {/* Sabit başlık: net tutar + harcama/gelir kutuları + tarih/liste filtreleri */}
+      <View
+        style={{
+          backgroundColor: bg,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: divider,
+          paddingBottom: 12,
+          paddingTop: settingsHeaderReserve,
+        }}
       >
-        {/* Yapışkan: net tutar + harcama/gelir kutuları + tarih/liste filtreleri (ayarlar ScrollView dışında, dokunma çakışması yok) */}
-        <View
-          style={{
-            backgroundColor: bg,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: divider,
-            paddingBottom: 12,
-            paddingTop: settingsHeaderReserve,
-          }}
-        >
+      {/* Ücretsiz deneme kalan gün banner'ı */}
+      {trialDaysLeft !== null && (
+        <View style={{
+          backgroundColor: trialDaysLeft <= 1 ? "#FF3B3018" : "#6C63FF18",
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: trialDaysLeft <= 1 ? "#FF3B3040" : "#6C63FF40",
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+        }}>
+          <Ionicons
+            name={trialDaysLeft <= 1 ? "warning-outline" : "time-outline"}
+            size={15}
+            color={trialDaysLeft <= 1 ? "#FF3B30" : "#6C63FF"}
+          />
+          <Text style={{ color: trialDaysLeft <= 1 ? "#FF3B30" : "#6C63FF", fontSize: 13, fontWeight: "600", flex: 1 }}>
+            {trialDaysLeft === 0
+              ? t("dashboard.trialExpiredToday")
+              : t("dashboard.trialDaysLeft", { count: trialDaysLeft })}
+          </Text>
+        </View>
+      )}
           <View style={{ paddingHorizontal: 20 }}>
             <Text style={{ color: mutedColor, fontSize: 13, marginBottom: 2 }}>
               {t("dashboard.netBalanceCaption")}
@@ -584,45 +644,73 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {!searchNorm ? (
+      <FlatList
+        data={grouped}
+        keyExtractor={(item) => item.label}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        onMomentumScrollEnd={onMomentumScrollEndLoadMore}
+        ListHeaderComponent={
           <>
-            <Text style={{ color: mutedColor, fontSize: 12, paddingHorizontal: 20, marginBottom: 8 }}>
-              {txFlowFilter === "expense"
-                ? t("dashboard.txHintExpenseOnly")
-                : txFlowFilter === "income"
-                  ? t("dashboard.txHintIncomeOnly")
-                  : t("dashboard.txHintAll")}
-            </Text>
-            <CategorySpendScroller
-              categories={homeCats}
-              expenses={flowFilteredExpenses}
-              selectedCategoryId={null}
-              onSelectCategory={openCategoryDetail}
-              onLongPressCategory={openCategoryDetail}
+            {!searchNorm ? (
+              <>
+                {coachMessage ? (
+                  <ProactiveCoachCard
+                    message={coachMessage}
+                    isDark={isDark}
+                    onDismiss={dismissCoach}
+                    onOpenInsights={() => throttledPush("/insights")}
+                  />
+                ) : null}
+                <Text style={{ color: mutedColor, fontSize: 12, paddingHorizontal: 20, marginBottom: 8 }}>
+                  {txFlowFilter === "expense"
+                    ? t("dashboard.txHintExpenseOnly")
+                    : txFlowFilter === "income"
+                      ? t("dashboard.txHintIncomeOnly")
+                      : t("dashboard.txHintAll")}
+                </Text>
+                <CategorySpendScroller
+                  categories={homeCats}
+                  expenses={flowFilteredExpenses}
+                  selectedCategoryId={null}
+                  onSelectCategory={openCategoryDetail}
+                  onLongPressCategory={openCategoryDetail}
+                  isDark={isDark}
+                  currencySymbol={currencySymbol}
+                />
+              </>
+            ) : null}
+            <PendingBankTransactionsStrip
+              items={pendingBankTransactions}
+              bankAutomations={bankAutomations}
               isDark={isDark}
-              currencySymbol={currencySymbol}
+              language={language}
+              onPressItem={(item: PendingBankTransaction) => {
+                const desc = [item.title, item.body].filter(Boolean).join(" · ").slice(0, 450);
+                throttledPush({
+                  pathname: "/add",
+                  params: { pendingId: item.id, bankPrefill: desc },
+                });
+              }}
+              onDismiss={(id) => removePendingBankTransaction(id)}
             />
+            <View style={{ height: 24 }} />
           </>
-        ) : null}
-
-        <PendingBankTransactionsStrip
-          items={pendingBankTransactions}
-          bankAutomations={bankAutomations}
-          isDark={isDark}
-          language={language}
-          onPressItem={(item: PendingBankTransaction) => {
-            const desc = [item.title, item.body].filter(Boolean).join(" · ").slice(0, 450);
-            throttledPush({
-              pathname: "/add",
-              params: { pendingId: item.id, bankPrefill: desc },
-            });
-          }}
-          onDismiss={(id) => removePendingBankTransaction(id)}
-        />
-
-        {/* ── Transactions ── */}
-        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
-          {grouped.length === 0 ? (
+        }
+        ListEmptyComponent={
+          expenses.length === 0 ? (
+            <EmptyStateCard
+              icon="wallet-outline"
+              title={t("dashboard.emptyFirstTimeTitle")}
+              subtitle={t("dashboard.emptyFirstTimeSubtitle")}
+              actionLabel={t("dashboard.emptyFirstTimeCta")}
+              onAction={() => throttledPush("/add")}
+              isDark={isDark}
+            />
+          ) : (
             <View style={{ alignItems: "center", paddingTop: 40, paddingHorizontal: 20 }}>
               <Text style={{ color: mutedColor, fontSize: 15, textAlign: "center", paddingHorizontal: 24 }}>
                 {searchNorm && listFiltered.length > 0
@@ -650,72 +738,73 @@ export default function Dashboard() {
                 </Pressable>
               )}
             </View>
-          ) : (
-            grouped.map((group) => (
-              <View key={group.label} style={{ marginBottom: 8 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <Text style={{ color: mutedColor, fontSize: 13, fontWeight: "600" }}>{group.label}</Text>
-                  <Text style={{ color: mutedColor, fontSize: 13 }}>
-                    {formatDayNetTotal(group.total, langUi, displayCurrency)}
-                  </Text>
+          )
+        }
+        renderItem={({ item: group }) => (
+          <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <Text style={{ color: mutedColor, fontSize: 13, fontWeight: "600" }}>{group.label}</Text>
+              <Text style={{ color: mutedColor, fontSize: 13 }}>
+                {formatDayNetTotal(group.total, langUi, displayCurrency)}
+              </Text>
+            </View>
+            <View style={{ backgroundColor: cardBg, borderRadius: 18, overflow: "hidden" }}>
+              {group.items.map((exp, idx) => (
+                <View key={exp.id}>
+                  {idx > 0 && <View style={{ height: 1, backgroundColor: divider, marginHorizontal: 16 }} />}
+                  <View style={{ paddingHorizontal: 16 }}>
+                    <ExpenseTxRow
+                      expense={exp}
+                      isDark={isDark}
+                      onPress={() =>
+                        router.push({ pathname: "/expense/[id]" as const, params: { id: exp.id } })
+                      }
+                      onDelete={() => void removeExpense(exp.id)}
+                    />
+                  </View>
                 </View>
-                <View style={{ backgroundColor: cardBg, borderRadius: 18, overflow: "hidden" }}>
-                  {group.items.map((exp, idx) => (
-                    <View key={exp.id}>
-                      {idx > 0 && <View style={{ height: 1, backgroundColor: divider, marginHorizontal: 16 }} />}
-                      <View style={{ paddingHorizontal: 16 }}>
-                        <ExpenseTxRow
-                          expense={exp}
-                          isDark={isDark}
-                          onPress={() =>
-                            router.push({ pathname: "/expense/[id]" as const, params: { id: exp.id } })
-                          }
-                        />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
-        {isAuthenticated && expensesNextPagePath ? (
-          <View style={{ paddingHorizontal: 20, marginTop: 20, marginBottom: 8, alignItems: "stretch" }}>
-            <Pressable
-              onPress={() => void loadMoreExpenses()}
-              disabled={expensesLoadingMore}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: isDark ? "#333" : "#ddd",
-                backgroundColor: cardBg,
-                opacity: expensesLoadingMore ? 0.7 : 1,
-              }}
-            >
-              {expensesLoadingMore ? (
-                <ActivityIndicator color={PURPLE} />
-              ) : (
-                <>
-                  <Ionicons name="chevron-down-circle-outline" size={20} color={PURPLE} />
-                  <Text style={{ color: textColor, fontSize: 15, fontWeight: "600" }}>
-                    {t("dashboard.loadMoreTransactions")}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-            <Text style={{ color: mutedColor, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-              {t("dashboard.paginationHint")}
-            </Text>
+              ))}
+            </View>
           </View>
-        ) : null}
-      </ScrollView>
+        )}
+        ListFooterComponent={
+          isAuthenticated && expensesNextPagePath ? (
+            <View style={{ paddingHorizontal: 20, marginTop: 20, marginBottom: 8, alignItems: "stretch" }}>
+              <Pressable
+                onPress={() => void loadMoreExpenses()}
+                disabled={expensesLoadingMore}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isDark ? "#333" : "#ddd",
+                  backgroundColor: cardBg,
+                  opacity: expensesLoadingMore ? 0.7 : 1,
+                }}
+              >
+                {expensesLoadingMore ? (
+                  <ActivityIndicator color={PURPLE} />
+                ) : (
+                  <>
+                    <Ionicons name="chevron-down-circle-outline" size={20} color={PURPLE} />
+                    <Text style={{ color: textColor, fontSize: 15, fontWeight: "600" }}>
+                      {t("dashboard.loadMoreTransactions")}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+              <Text style={{ color: mutedColor, fontSize: 11, textAlign: "center", marginTop: 8 }}>
+                {t("dashboard.paginationHint")}
+              </Text>
+            </View>
+          ) : null
+        }
+      />
 
       </KeyboardAvoidingView>
 
@@ -762,14 +851,15 @@ export default function Dashboard() {
       >
         {showSearchBar ? (
           <Animated.View
-            style={{
-              marginHorizontal: 16,
-              marginTop: searchFloatMarginTop,
-              marginBottom: searchFloatMarginBottom,
-              paddingBottom: searchFloatPaddingBottom,
-              opacity: searchAnim,
-              transform: [{ translateY: searchTranslateY }],
-            }}
+            style={[
+              {
+                marginHorizontal: 16,
+                marginTop: searchFloatMarginTop,
+                marginBottom: searchFloatMarginBottom,
+                paddingBottom: searchFloatPaddingBottom,
+              },
+              searchAnimStyle,
+            ]}
           >
             <View
               style={{
@@ -1127,6 +1217,62 @@ export default function Dashboard() {
           }, 500);
         }}
       />
+      {/* Görsel kaynak seçimi — merkezi modal */}
+      <Modal
+        visible={imageSourceOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageSourceOpen(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", paddingHorizontal: 32 }}
+          onPress={() => setImageSourceOpen(false)}
+        >
+          <Pressable onPress={() => {}} style={{
+            backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF",
+            borderRadius: 20,
+            width: "100%",
+            overflow: "hidden",
+          }}>
+            <Text style={{ color: isDark ? "#8E8E93" : "#6B6B6B", fontSize: 13, textAlign: "center", paddingTop: 18, paddingBottom: 4, fontWeight: "600", letterSpacing: 0.2 }}>
+              {t("dashboard.imageSourceTitle")}
+            </Text>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: isDark ? "#38383A" : "#E5E5EA", marginTop: 12 }} />
+            <TouchableOpacity
+              onPress={_pickFromCamera}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 18 }}
+            >
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#6C63FF22", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="camera-outline" size={20} color="#6C63FF" />
+              </View>
+              <Text style={{ color: isDark ? "#FFFFFF" : "#000000", fontSize: 16, fontWeight: "600" }}>
+                {t("dashboard.imageSourceCamera")}
+              </Text>
+            </TouchableOpacity>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: isDark ? "#38383A" : "#E5E5EA", marginHorizontal: 16 }} />
+            <TouchableOpacity
+              onPress={_pickFromGallery}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 18 }}
+            >
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#6C63FF22", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="images-outline" size={20} color="#6C63FF" />
+              </View>
+              <Text style={{ color: isDark ? "#FFFFFF" : "#000000", fontSize: 16, fontWeight: "600" }}>
+                {t("dashboard.imageSourceGallery")}
+              </Text>
+            </TouchableOpacity>
+            <View style={{ height: 8, backgroundColor: isDark ? "#000000" : "#F2F2F7" }} />
+            <TouchableOpacity
+              onPress={() => setImageSourceOpen(false)}
+              style={{ padding: 18, alignItems: "center" }}
+            >
+              <Text style={{ color: "#FF3B30", fontSize: 16, fontWeight: "600" }}>
+                {t("common.cancel")}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

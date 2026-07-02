@@ -39,6 +39,7 @@
     "listFilterIn": "in",
     "photoPermissionTitle": "Permission needed",
     "photoPermissionBody": "Allow photo access to scan receipts.",
+    "cameraPermissionBody": "Allow camera access to capture receipts.",
     "receiptParseFailed": "Could not parse receipt.",
     "micPermissionTitle": "Microphone permission needed",
     "micPermissionBody": "Allow microphone access in settings to add expenses by voice.",
@@ -55,6 +56,9 @@
     "txHintExpenseOnly": "Expenses only · Tap category to filter · Long press for details",
     "txHintIncomeOnly": "Income only · Tap category to filter · Long press for details",
     "txHintAll": "Tap a category to filter transactions · Long press for category details",
+    "emptyFirstTimeTitle": "No expenses yet",
+    "emptyFirstTimeSubtitle": "Start tracking your spending by adding your first expense.",
+    "emptyFirstTimeCta": "Add Expense",
     "emptySearchNoMatch": "No transactions match your search.",
     "emptyNoExpensePeriod": "No spending this period.",
     "emptyNoIncomePeriod": "No income this period.",
@@ -74,7 +78,12 @@
     "uploadImageSubtitle": "Receipt or screenshot",
     "pendingBankTitle": "Pending bank transactions",
     "pendingBankMissingInfo": "Missing info",
-    "pendingBankDismissA11y": "Dismiss pending bank notification"
+    "pendingBankDismissA11y": "Dismiss pending bank notification",
+    "imageSourceTitle": "Choose image source",
+    "imageSourceCamera": "Camera",
+    "imageSourceGallery": "Gallery",
+    "trialDaysLeft": "Free trial: {{count}} days left",
+    "trialExpiredToday": "Your free trial ends today!"
   },
   "processing": {
     "title": "AI is parsing...",
@@ -384,6 +393,7 @@
     "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. Auto-renews until you cancel in the App Store.",
     "subscriptionSummaryTrial": "7 days free, then {{price}}/{{period}}. Auto-renews until you cancel in {{store}}.",
     "mandatoryPaywallHint": "A Centifi Pro subscription is required to use the app.",
+    "gracePeriodExpiredHint": "Your 7-day free trial has ended. Subscribe below to continue using Centifi.",
     "freeTrialTitle": "7-day free trial",
     "freeTrialBody": "Try Centifi Pro free for 7 days. After that, {{price}} per month. Billing is handled by {{store}}.",
     "freeTrialCancelHint": "Cancel in {{store}} anytime before the trial ends and you won’t be charged.",
@@ -397,7 +407,9 @@
     "yearlyPlanLabel": "Yearly",
     "annualSaveBadge": "BEST VALUE",
     "continueCta": "Start free trial",
-    "continueCtaHint": "The App Store opens next. You won't be charged during the 7-day trial if you cancel before it ends."
+    "continueCtaHint": "The App Store opens next. You won't be charged during the 7-day trial if you cancel before it ends.",
+    "subscribeNowCta": "Subscribe Now",
+    "subscriptionSummaryNoTrial": "{{price}}/{{period}}. Auto-renews until you cancel in {{store}}."
   },
   "budgets": {
     "title": "Budgets",
@@ -451,6 +463,8 @@
     "bankStep4Title": "Allow notifications",
     "bankStep4Desc": "Centifi reads payment notifications only",
     "bankPrivacy": "Centifi never accesses your bank account. It only reads notification text on your device.",
+    "gracePeriodNotice": "You get 7 days free — no payment needed now. After 7 days, a subscription is required to keep using Centifi.",
+    "startFreeTrial": "Start Free Trial 🎉",
     "newCategory": "New category",
     "categoryNamePlaceholder": "Category name",
     "emoji": "EMOJI"
@@ -482,5 +496,18 @@
     "entertainment": "Entertainment",
     "utilities": "Utilities",
     "other": "Other"
+  },
+  "regret": {
+    "question": "Happy with this expense?",
+    "optionHappy": "Yes",
+    "optionNeutral": "Neutral",
+    "optionRegret": "No",
+    "skip": "Skip",
+    "sectionTitle": "Regret Analysis",
+    "disclaimer": "Based on regret questions asked 24 hours after viewing each expense."
+  },
+  "coach": {
+    "sectionTitle": "Financial Coach",
+    "detailsCta": "View details →"
   }
 }

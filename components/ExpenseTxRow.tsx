@@ -1,25 +1,34 @@
-import React from "react";
-import { View, Text, Pressable } from "react-native";
+import React, { useRef } from "react";
+import { View, Text, Pressable, Animated } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "../store/useStore";
+import { useShallow } from "zustand/react/shallow";
 import { getCategoryMeta, type Expense } from "../constants/mockData";
 import CategoryGlyph from "./CategoryGlyph";
 import type { Language } from "../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../lib/formatMoney";
 
-export default function ExpenseTxRow({
+function ExpenseTxRow({
   expense,
   isDark,
   onPress,
+  onDelete,
 }: {
   expense: Expense;
   isDark: boolean;
   onPress?: () => void;
+  onDelete?: () => void;
 }) {
-  const customCategories = useStore((s) => s.customCategories);
-  const categoryDisplayOverrides = useStore((s) => s.categoryDisplayOverrides);
-  const language = useStore((s) => s.language);
-  const displayCurrency = useStore((s) => s.displayCurrency);
+  const swipeRef = useRef<Swipeable>(null);
+  const { customCategories, categoryDisplayOverrides, language, displayCurrency } = useStore(
+    useShallow((s) => ({
+      customCategories: s.customCategories,
+      categoryDisplayOverrides: s.categoryDisplayOverrides,
+      language: s.language,
+      displayCurrency: s.displayCurrency,
+    })),
+  );
   const lang = language as Language;
   const sym = currencySymbolFor(displayCurrency, lang);
   const meta = getCategoryMeta(expense.category, customCategories, categoryDisplayOverrides);
@@ -73,11 +82,57 @@ export default function ExpenseTxRow({
     </View>
   );
 
-  return onPress ? (
+  const renderRightActions = (
+    _progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+  ) => {
+    const scale = dragX.interpolate({ inputRange: [-80, 0], outputRange: [1, 0.7], extrapolate: "clamp" });
+    return (
+      <Pressable
+        onPress={async () => {
+          try {
+            const { impactAsync, ImpactFeedbackStyle } = await import("expo-haptics");
+            await impactAsync(ImpactFeedbackStyle.Medium);
+          } catch { /* noop */ }
+          swipeRef.current?.close();
+          onDelete?.();
+        }}
+        style={{
+          width: 76,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#FF3B30",
+          borderRadius: 0,
+        }}
+      >
+        <Animated.View style={{ transform: [{ scale }], alignItems: "center" }}>
+          <Ionicons name="trash-outline" size={22} color="#fff" />
+        </Animated.View>
+      </Pressable>
+    );
+  };
+
+  const row = onPress ? (
     <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.82 : 1 })}>
       {inner}
     </Pressable>
   ) : (
     inner
   );
+
+  if (!onDelete) return row;
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={2}
+      rightThreshold={40}
+    >
+      {row}
+    </Swipeable>
+  );
 }
+
+export default React.memo(ExpenseTxRow);

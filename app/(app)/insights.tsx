@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { displayExpenseListName } from "../../lib/listDisplayName";
 import { getApiErrorStatus, type ApiError } from "../../lib/api";
 import { userFacingApiMessage } from "../../lib/userFacingApiMessage";
 import { useAppDialog } from "../../context/AppDialogContext";
+import { getRegretEntriesMap, type RegretScore } from "../../hooks/useRegretPrompts";
+import { getCategoryMeta } from "../../constants/mockData";
 
 const PURPLE = "#6C63FF";
 const CTA_TEXT = "#ffffff";
@@ -116,6 +118,35 @@ export default function InsightsScreen() {
   const [expenseCount, setExpenseCount] = useState<number | null>(null);
   const [picker, setPicker] = useState<null | "start" | "end">(null);
   const [iosTemp, setIosTemp] = useState<Date | null>(null);
+
+  const expenses = useStore((s) => s.expenses);
+  const customCategories = useStore((s) => s.customCategories);
+  const categoryDisplayOverrides = useStore((s) => s.categoryDisplayOverrides);
+
+  interface RegretCatStat { total: number; regret: number; rate: number }
+  const [regretStats, setRegretStats] = useState<Record<string, RegretCatStat>>({});
+
+  useEffect(() => {
+    getRegretEntriesMap().then((map) => {
+      if (map.size === 0) return;
+      const stats: Record<string, RegretCatStat> = {};
+      for (const exp of expenses) {
+        if (exp.isIncome) continue;
+        const score = map.get(exp.id);
+        if (!score) continue;
+        const meta = getCategoryMeta(exp.category, customCategories, categoryDisplayOverrides);
+        const key = meta.name;
+        if (!stats[key]) stats[key] = { total: 0, regret: 0, rate: 0 };
+        stats[key].total++;
+        if (score === "regret") stats[key].regret++;
+      }
+      for (const key of Object.keys(stats)) {
+        stats[key].rate = Math.round((stats[key].regret / stats[key].total) * 100);
+      }
+      setRegretStats(stats);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expenses.length, customCategories, categoryDisplayOverrides]);
 
   useFocusEffect(
     useCallback(() => {
@@ -437,6 +468,81 @@ export default function InsightsScreen() {
           </View>
         </View>
 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 8, paddingBottom: 4 }}
+          style={{ flexGrow: 0, marginBottom: 14, marginHorizontal: -GUTTER }}
+        >
+          {([
+            {
+              label: language === "tr" ? "Bu ay" : "This month",
+              getRange: () => {
+                const n = todayNoon();
+                return { start: startOfMonth(n), end: n };
+              },
+            },
+            {
+              label: language === "tr" ? "Geçen ay" : "Last month",
+              getRange: () => {
+                const n = todayNoon();
+                const firstThisMonth = startOfMonth(n);
+                const lastMonth = new Date(firstThisMonth.getTime() - 86400000);
+                return { start: startOfMonth(lastMonth), end: lastMonth };
+              },
+            },
+            {
+              label: language === "tr" ? "Son 3 ay" : "Last 3 months",
+              getRange: () => {
+                const n = todayNoon();
+                const s = new Date(n.getFullYear(), n.getMonth() - 2, 1, 12, 0, 0, 0);
+                return { start: s, end: n };
+              },
+            },
+            {
+              label: language === "tr" ? "Son 6 ay" : "Last 6 months",
+              getRange: () => {
+                const n = todayNoon();
+                const s = new Date(n.getFullYear(), n.getMonth() - 5, 1, 12, 0, 0, 0);
+                return { start: s, end: n };
+              },
+            },
+          ] as { label: string; getRange: () => { start: Date; end: Date } }[]).map((preset) => {
+            const range = preset.getRange();
+            const isActive =
+              localYmd(startDate) === localYmd(range.start) &&
+              localYmd(endDate) === localYmd(range.end);
+            return (
+              <Pressable
+                key={preset.label}
+                onPress={() => {
+                  setStartDate(range.start);
+                  setEndDate(range.end);
+                }}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  backgroundColor: isActive ? PURPLE : tokens.card,
+                  borderWidth: 1,
+                  borderColor: isActive ? PURPLE : tokens.border,
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    color: isActive ? "#fff" : tokens.text,
+                    fontSize: 13,
+                    fontWeight: isActive ? "700" : "500",
+                  }}
+                >
+                  {preset.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         <Card title={t("report.cardPeriod")}>
           <DateRow label={t("report.startDate")} value={startDate} which="start" showDivider={false} />
           <DateRow label={t("report.endDate")} value={endDate} which="end" showDivider />
@@ -554,6 +660,75 @@ export default function InsightsScreen() {
         <Text style={{ color: tokens.muted, fontSize: 12, lineHeight: 18, marginTop: 20, opacity: 0.92 }}>
           {t("insights.retryHint")}
         </Text>
+
+        {Object.keys(regretStats).length > 0 ? (
+          <View
+            style={{
+              marginTop: 24,
+              backgroundColor: tokens.card,
+              borderRadius: 20,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: tokens.border,
+              overflow: "hidden",
+              marginBottom: 8,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: "rgba(255,107,107,0.15)", alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 18 }}>😞</Text>
+              </View>
+              <Text style={{ color: tokens.text, fontSize: 16, fontWeight: "800" }}>{t("regret.sectionTitle")}</Text>
+            </View>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: tokens.border }} />
+            {Object.entries(regretStats)
+              .sort((a, b) => b[1].rate - a[1].rate)
+              .slice(0, 5)
+              .map(([cat, stat], idx) => (
+                <View
+                  key={cat}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderTopWidth: idx > 0 ? StyleSheet.hairlineWidth : 0,
+                    borderTopColor: tokens.border,
+                    gap: 12,
+                  }}
+                >
+                  <Text style={{ color: tokens.text, fontSize: 14, flex: 1 }}>{cat}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View
+                      style={{
+                        height: 6,
+                        width: 80,
+                        borderRadius: 3,
+                        backgroundColor: tokens.border,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 6,
+                          width: `${stat.rate}%`,
+                          borderRadius: 3,
+                          backgroundColor: stat.rate >= 50 ? "#FF6B6B" : stat.rate >= 25 ? "#FDCB6E" : "#55efc4",
+                        }}
+                      />
+                    </View>
+                    <Text style={{ color: tokens.muted, fontSize: 13, fontWeight: "700", minWidth: 32, textAlign: "right" }}>
+                      %{stat.rate}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            <View style={{ paddingHorizontal: 16, paddingBottom: 14, paddingTop: 4 }}>
+              <Text style={{ color: tokens.muted, fontSize: 12, lineHeight: 17 }}>
+              {t("regret.disclaimer")}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       {Platform.OS === "android" && picker != null && (

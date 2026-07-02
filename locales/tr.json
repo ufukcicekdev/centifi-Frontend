@@ -39,6 +39,7 @@
     "listFilterIn": "içinde",
     "photoPermissionTitle": "İzin gerekli",
     "photoPermissionBody": "Fiş taramak için fotoğraf erişimine izin verin.",
+    "cameraPermissionBody": "Fiş çekmek için kamera iznine izin verin.",
     "receiptParseFailed": "Fiş işlenemedi.",
     "micPermissionTitle": "Mikrofon izni gerekli",
     "micPermissionBody": "Sesle harcama eklemek için ayarlardan mikrofon erişimine izin ver.",
@@ -55,6 +56,9 @@
     "txHintExpenseOnly": "Yalnızca harcamalar · Kategoriye dokun veya uzun bas",
     "txHintIncomeOnly": "Yalnızca gelirler · Kategoriye dokun veya uzun bas",
     "txHintAll": "Kategoriye dokun: işlem filtresi · Uzun bas: kategori detayı",
+    "emptyFirstTimeTitle": "Henüz harcama yok",
+    "emptyFirstTimeSubtitle": "İlk harcamanı ekleyerek takibe başla.",
+    "emptyFirstTimeCta": "Harcama Ekle",
     "emptySearchNoMatch": "Arama ile eşleşen işlem yok.",
     "emptyNoExpensePeriod": "Bu dönemde harcama yok.",
     "emptyNoIncomePeriod": "Bu dönemde gelir yok.",
@@ -74,7 +78,12 @@
     "uploadImageSubtitle": "Fiş veya ekran görüntüsü",
     "pendingBankTitle": "Bekleyen banka işlemleri",
     "pendingBankMissingInfo": "Eksik bilgi",
-    "pendingBankDismissA11y": "Bekleyen banka bildirimini kaldır"
+    "pendingBankDismissA11y": "Bekleyen banka bildirimini kaldır",
+    "imageSourceTitle": "Görsel kaynağı seç",
+    "imageSourceCamera": "Kamera",
+    "imageSourceGallery": "Galeri",
+    "trialDaysLeft": "Ücretsiz deneme: {{count}} gün kaldı",
+    "trialExpiredToday": "Ücretsiz denemen bugün bitiyor!"
   },
   "processing": {
     "title": "Yapay zeka analiz ediyor...",
@@ -381,6 +390,7 @@
     "subscriptionSummary": "{{plan}} — {{period}} — {{price}}. App Store’da iptal edene kadar otomatik yenilenir.",
     "subscriptionSummaryTrial": "7 gün ücretsiz, ardından {{price}}/{{period}}. {{store}}’da iptal edene kadar otomatik yenilenir.",
     "mandatoryPaywallHint": "Uygulamayı kullanmaya devam etmek için Centifi Pro aboneliği gerekir.",
+    "gracePeriodExpiredHint": "7 günlük ücretsiz deneme süren sona erdi. Centifi'yi kullanmaya devam etmek için abone ol.",
     "freeTrialTitle": "7 gün ücretsiz deneme",
     "freeTrialBody": "Centifi Pro’yu 7 gün ücretsiz dene. Sonrasında ayda {{price}}. Ödeme {{store}} üzerinden yapılır.",
     "freeTrialCancelHint": "Deneme bitmeden {{store}}’dan iptal edersen ücret alınmaz.",
@@ -394,6 +404,8 @@
     "yearlyPlanLabel": "Yıllık",
     "annualSaveBadge": "AVANTAJLI",
     "continueCta": "Ücretsiz dene",
+    "subscribeNowCta": "Abone Ol",
+    "subscriptionSummaryNoTrial": "{{price}}/{{period}}. {{store}} üzerinden iptal edene kadar otomatik yenilenir.",
     "continueCtaHint": "Sonraki adımda App Store açılır. Deneme süresinde iptal edersen 7 gün boyunca ücret alınmaz.",
     "subscriptionAlreadyOwnedTitle": "Zaten abonelik var",
     "subscriptionAlreadyOwnedBody": "Bu Apple hesabında bu abonelik zaten tanımlı. Centifi ile eşitlemek için Satın alımları geri yükle’ye basın.",
@@ -451,6 +463,8 @@
     "bankStep4Title": "Bildirimlere izin ver",
     "bankStep4Desc": "Centifi yalnızca ödeme bildirimlerini okur",
     "bankPrivacy": "Centifi banka hesabına asla erişmez. Yalnızca cihazındaki bildirim metnini okur.",
+    "gracePeriodNotice": "7 gün ücretsiz kullanıyorsun — şu an ödeme gerekmez. 7 günün sonunda Centifi'i kullanmaya devam etmek için abonelik gereklidir.",
+    "startFreeTrial": "Ücretsiz Dene 🎉",
     "newCategory": "Yeni kategori",
     "categoryNamePlaceholder": "Kategori adı",
     "emoji": "EMOJI"
@@ -482,5 +496,18 @@
     "entertainment": "Eğlence",
     "utilities": "Faturalar",
     "other": "Diğer"
+  },
+  "regret": {
+    "question": "Bu harcamadan memnun musun?",
+    "optionHappy": "Evet",
+    "optionNeutral": "Fena değil",
+    "optionRegret": "Hayır",
+    "skip": "Geç",
+    "sectionTitle": "Pişmanlık Analizi",
+    "disclaimer": "Harcama detayına girdiğinde 24 saat sonra sorulan pişmanlık sorularına verilen yanıtlara göre hesaplanır."
+  },
+  "coach": {
+    "sectionTitle": "Finansal Koç",
+    "detailsCta": "Detayları gör →"
   }
 }

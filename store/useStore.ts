@@ -106,6 +106,9 @@ interface AppState {
   /** RevenueCat ``pro`` — backend /subscription/sync + /me */
   isPro: boolean;
   proEntitlementExpiresAt: string | null;
+  /** ISO date string set once when onboarding completes — drives the in-app grace period. */
+  gracePeriodStartDate: string | null;
+  setGracePeriodStartDate: (date: string) => void;
   setUser: (user: AuthUser | null) => void;
   logout: () => void;
   hydrateFromBackend: () => Promise<"ok" | "no_token" | "session_invalid" | "unreachable">;
@@ -232,6 +235,8 @@ export const useStore = create<AppState>((set, get) => {
   onboardingCompleted: false,
   isPro: false,
   proEntitlementExpiresAt: null,
+  gracePeriodStartDate: null,
+  setGracePeriodStartDate: (date) => set({ gracePeriodStartDate: date }),
   setUser: (user) => set({ user, isAuthenticated: !!user, userName: user?.name.split(" ")[0] ?? "User" }),
   logout: () => {
     const uid = get().user?.uid;
@@ -328,6 +333,7 @@ export const useStore = create<AppState>((set, get) => {
         onboardingCompleted: !!me.onboarding_completed,
         isPro: !!me.is_pro,
         proEntitlementExpiresAt: me.pro_entitlement_expires_at ?? null,
+        ...(me.trial_started_at ? { gracePeriodStartDate: me.trial_started_at } : {}),
         enabledCategoryIds: savedCats,
         lists: listsMapped,
         activeListId,
@@ -569,7 +575,11 @@ export const useStore = create<AppState>((set, get) => {
   },
 
   isDark: true,
-  toggleTheme: () => set((state) => ({ isDark: !state.isDark })),
+  toggleTheme: () => {
+    const newIsDark = !get().isDark;
+    set({ isDark: newIsDark });
+    updateMe({ is_dark_mode: newIsDark }).catch(() => {});
+  },
 
   language: getDeviceAppLanguage() as Language,
   setLanguage: (lang) => {

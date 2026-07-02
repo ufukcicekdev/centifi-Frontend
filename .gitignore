@@ -696,3 +696,8 @@ MigrationBackup/
 
 expo-env.d.ts
 # @end expo-cli
+# Expo export output folders
+dist*/
+
+# Android bundled JS asset (generated at build time)
+android/app/src/main/assets/index.android.bundle

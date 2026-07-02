@@ -174,6 +174,7 @@ export default function Onboarding() {
       const uid = useStore.getState().user?.uid;
       useStore.getState().setEnabledCategoryIds(mappedSelected);
       if (uid) await saveEnabledCategoryIds(uid, mappedSelected);
+
       await useStore.getState().hydrateFromBackend();
     } finally {
       setSaving(false);
@@ -411,6 +412,14 @@ export default function Onboarding() {
                 {t("onboarding.bankPrivacy")}
               </Text>
             </View>
+
+            {/* Grace period notice */}
+            <View style={{ backgroundColor: "#00C89618", borderRadius: 12, padding: 14, flexDirection: "row", marginTop: 12 }}>
+              <Ionicons name="gift-outline" size={18} color="#00C896" style={{ marginRight: 10, marginTop: 1 }} />
+              <Text style={{ color: muted, fontSize: 13, lineHeight: 20, flex: 1 }}>
+                {t("onboarding.gracePeriodNotice")}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -492,7 +501,7 @@ export default function Onboarding() {
                       }}
                       numberOfLines={1}
                     >
-                      {step < STEPS - 1 ? t("onboarding.continue") : t("onboarding.getStarted")}
+                      {step < STEPS - 1 ? t("onboarding.continue") : t("onboarding.startFreeTrial")}
                     </Text>
                     {step < STEPS - 1 ? (
                       <Ionicons name="chevron-forward" size={20} color={primaryCtaText} style={{ marginLeft: 6 }} />

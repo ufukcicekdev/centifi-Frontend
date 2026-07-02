@@ -20,6 +20,8 @@ export type BackendUser = {
   /** ISO 8601 — RevenueCat ``pro`` entitlement bitişi */
   pro_entitlement_expires_at?: string | null;
   is_pro?: boolean;
+  /** ISO 8601 — in-app grace period başlangıcı (onboarding tamamlanınca set edilir) */
+  trial_started_at?: string | null;
   /** Per-category budgets (synced when logged in). */
   category_budgets?: Record<string, { amount: number | null; budgetColor: string }> | null;
   budget_alerts_enabled?: boolean;
@@ -608,6 +610,21 @@ export type SpendingInsightsResponse = {
   expense_count: number;
   summary?: unknown;
 };
+
+export type ProactiveCoachResponse = {
+  text: string;
+  type: "warning" | "info" | "positive";
+};
+
+/** Gemini: son 14 günlük harcamaları analiz edip proaktif koç mesajı üretir. */
+export async function fetchProactiveCoach(language: string): Promise<ProactiveCoachResponse> {
+  return apiFetch<ProactiveCoachResponse>("/api/ai/proactive-coach/", {
+    method: "POST",
+    auth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+}
 
 /** Gemini: dönem + isteğe bağlı liste için harcama özetinden kısa tavsiye metni. */
 export async function fetchSpendingInsights(body: {

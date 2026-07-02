@@ -39,6 +39,7 @@
     "listFilterIn": "dans",
     "photoPermissionTitle": "Autorisation requise",
     "photoPermissionBody": "Autorisez l’accès aux photos pour scanner les reçus.",
+    "cameraPermissionBody": "Autorisez l'accès à la caméra pour photographier les reçus.",
     "receiptParseFailed": "Impossible de lire le reçu.",
     "micPermissionTitle": "Autorisation microphone",
     "micPermissionBody": "Autorisez le microphone dans les réglages pour ajouter des dépenses à la voix.",
@@ -55,6 +56,9 @@
     "txHintExpenseOnly": "Dépenses uniquement · Touchez une catégorie pour filtrer · Appui long pour détails",
     "txHintIncomeOnly": "Revenus uniquement · Touchez une catégorie pour filtrer · Appui long pour détails",
     "txHintAll": "Touchez une catégorie pour filtrer · Appui long pour les détails",
+    "emptyFirstTimeTitle": "Aucune dépense pour linstant",
+    "emptyFirstTimeSubtitle": "Ajoutez votre première dépense pour commencer le suivi.",
+    "emptyFirstTimeCta": "Ajouter une dépense",
     "emptySearchNoMatch": "Aucune transaction ne correspond à la recherche.",
     "emptyNoExpensePeriod": "Aucune dépense sur cette période.",
     "emptyNoIncomePeriod": "Aucun revenu sur cette période.",
@@ -74,7 +78,12 @@
     "uploadImageSubtitle": "Reçu ou capture d’écran",
     "pendingBankTitle": "Opérations bancaires en attente",
     "pendingBankMissingInfo": "Infos manquantes",
-    "pendingBankDismissA11y": "Ignorer la notification bancaire en attente"
+    "pendingBankDismissA11y": "Ignorer la notification bancaire en attente",
+    "imageSourceTitle": "Choisir la source",
+    "imageSourceCamera": "Caméra",
+    "imageSourceGallery": "Galerie",
+    "trialDaysLeft": "Essai gratuit : {{count}} jours restants",
+    "trialExpiredToday": "Votre essai gratuit se termine aujourd'hui !"
   },
   "processing": {
     "title": "L'IA analyse...",
@@ -394,6 +403,8 @@
     "yearlyPlanLabel": "Annuel",
     "annualSaveBadge": "MEILLEUR PRIX",
     "continueCta": "Essai gratuit",
+    "subscribeNowCta": "S'abonner maintenant",
+    "subscriptionSummaryNoTrial": "{{price}}/{{period}}. Renouvellement automatique jusqu'à annulation dans {{store}}.",
     "continueCtaHint": "L’App Store s’ouvre ensuite. Aucun prélèvement pendant les 7 jours si vous annulez avant la fin de l’essai.",
     "subscriptionAlreadyOwnedTitle": "Déjà abonné",
     "subscriptionAlreadyOwnedBody": "Cet identifiant Apple a déjà cet abonnement. Touchez Restaurer les achats pour le synchroniser avec Centifi.",
@@ -482,5 +493,18 @@
     "entertainment": "Loisirs",
     "utilities": "Charges",
     "other": "Autres"
+  },
+  "regret": {
+    "question": "Es-tu satisfait de cette dépense ?",
+    "optionHappy": "Sí",
+    "optionNeutral": "Bof",
+    "optionRegret": "No",
+    "skip": "Ignorer",
+    "sectionTitle": "Analyse des regrets",
+    "disclaimer": "Basé sur les questions posées 24 heures après avoir consulté chaque dépense."
+  },
+  "coach": {
+    "sectionTitle": "Coach Financier",
+    "detailsCta": "Voir les détails →"
   }
 }

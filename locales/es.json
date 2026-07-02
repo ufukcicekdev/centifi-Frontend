@@ -39,6 +39,7 @@
     "listFilterIn": "en",
     "photoPermissionTitle": "Permiso necesario",
     "photoPermissionBody": "Permite acceso a fotos para escanear recibos.",
+    "cameraPermissionBody": "Permite el acceso a la cámara para fotografiar recibos.",
     "receiptParseFailed": "No se pudo leer el recibo.",
     "micPermissionTitle": "Permiso de micrófono",
     "micPermissionBody": "Permite el micrófono en ajustes para añadir gastos por voz.",
@@ -55,6 +56,9 @@
     "txHintExpenseOnly": "Solo gastos · Toca categoría para filtrar · Mantén pulsado para detalles",
     "txHintIncomeOnly": "Solo ingresos · Toca categoría para filtrar · Mantén pulsado para detalles",
     "txHintAll": "Toca una categoría para filtrar · Mantén pulsado para detalles",
+    "emptyFirstTimeTitle": "Sin gastos aún",
+    "emptyFirstTimeSubtitle": "Agrega tu primer gasto para empezar a hacer seguimiento.",
+    "emptyFirstTimeCta": "Agregar gasto",
     "emptySearchNoMatch": "Ninguna transacción coincide con la búsqueda.",
     "emptyNoExpensePeriod": "Sin gastos en este periodo.",
     "emptyNoIncomePeriod": "Sin ingresos en este periodo.",
@@ -74,7 +78,12 @@
     "uploadImageSubtitle": "Recibo o captura",
     "pendingBankTitle": "Operaciones bancarias pendientes",
     "pendingBankMissingInfo": "Faltan datos",
-    "pendingBankDismissA11y": "Descartar notificación bancaria pendiente"
+    "pendingBankDismissA11y": "Descartar notificación bancaria pendiente",
+    "imageSourceTitle": "Elegir fuente",
+    "imageSourceCamera": "Cámara",
+    "imageSourceGallery": "Galería",
+    "trialDaysLeft": "Prueba gratuita: {{count}} días restantes",
+    "trialExpiredToday": "¡Tu prueba gratuita termina hoy!"
   },
   "processing": {
     "title": "IA analizando...",
@@ -394,6 +403,8 @@
     "yearlyPlanLabel": "Anual",
     "annualSaveBadge": "MEJOR PRECIO",
     "continueCta": "Probar gratis",
+    "subscribeNowCta": "Suscribirse ahora",
+    "subscriptionSummaryNoTrial": "{{price}}/{{period}}. Renovación automática hasta cancelar en {{store}}.",
     "continueCtaHint": "A continuación se abrirá App Store. No se cobrará durante los 7 días si cancelas antes de que termine la prueba.",
     "subscriptionAlreadyOwnedTitle": "Ya estás suscrito",
     "subscriptionAlreadyOwnedBody": "Esta cuenta de Apple ya tiene esta suscripción. Toca Restaurar compras para sincronizarla con Centifi.",
@@ -482,5 +493,18 @@
     "entertainment": "Entretenimiento",
     "utilities": "Servicios",
     "other": "Otros"
+  },
+  "regret": {
+    "question": "¿Estás satisfecho con este gasto?",
+    "optionHappy": "Sí",
+    "optionNeutral": "Más o menos",
+    "optionRegret": "No",
+    "skip": "Omitir",
+    "sectionTitle": "Análisis de arrepentimiento",
+    "disclaimer": "Basado en preguntas de arrepentimiento realizadas 24 horas después de ver cada gasto."
+  },
+  "coach": {
+    "sectionTitle": "Coach Financiero",
+    "detailsCta": "Ver detalles →"
   }
 }

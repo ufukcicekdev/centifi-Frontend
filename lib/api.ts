@@ -108,6 +108,22 @@ export async function saveTokens(tokens: AuthTokens | null) {
   await SecureStore.setItemAsync(TOKEN_KEY, JSON.stringify(tokens));
 }
 
+const GRACE_PERIOD_KEY = "centifi_grace_period_start";
+
+export async function loadGracePeriodStartDate(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(GRACE_PERIOD_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveGracePeriodStartDate(isoDate: string): Promise<void> {
+  await SecureStore.setItemAsync(GRACE_PERIOD_KEY, isoDate);
+}
+
+export const GRACE_PERIOD_DAYS = 7;
+
 async function refreshAccessToken(tokens: AuthTokens): Promise<AuthTokens> {
   const res = await fetch(`${getBaseUrl()}/api/users/token/refresh/`, {
     method: "POST",

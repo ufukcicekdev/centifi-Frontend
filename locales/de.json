@@ -39,6 +39,7 @@
     "listFilterIn": "in",
     "photoPermissionTitle": "Berechtigung nötig",
     "photoPermissionBody": "Erlaube Fotos, um Belege zu scannen.",
+    "cameraPermissionBody": "Erlauben Sie den Kamerazugriff, um Belege zu fotografieren.",
     "receiptParseFailed": "Beleg konnte nicht gelesen werden.",
     "micPermissionTitle": "Mikrofonberechtigung nötig",
     "micPermissionBody": "Erlaube Mikrofonzugriff in den Einstellungen, um Ausgaben per Sprache hinzuzufügen.",
@@ -55,6 +56,9 @@
     "txHintExpenseOnly": "Nur Ausgaben · Kategorie antippen zum Filtern · Lang für Details",
     "txHintIncomeOnly": "Nur Einnahmen · Kategorie antippen zum Filtern · Lang für Details",
     "txHintAll": "Kategorie antippen zum Filtern · Lang für Kategoriedetails",
+    "emptyFirstTimeTitle": "Noch keine Ausgaben",
+    "emptyFirstTimeSubtitle": "Füge deine erste Ausgabe hinzu, um mit der Verfolgung zu beginnen.",
+    "emptyFirstTimeCta": "Ausgabe hinzufügen",
     "emptySearchNoMatch": "Keine Buchungen entsprechen der Suche.",
     "emptyNoExpensePeriod": "Keine Ausgaben in diesem Zeitraum.",
     "emptyNoIncomePeriod": "Keine Einnahmen in diesem Zeitraum.",
@@ -74,7 +78,12 @@
     "uploadImageSubtitle": "Beleg oder Screenshot",
     "pendingBankTitle": "Ausstehende Bankvorgänge",
     "pendingBankMissingInfo": "Angaben fehlen",
-    "pendingBankDismissA11y": "Ausstehende Bankbenachrichtigung verwerfen"
+    "pendingBankDismissA11y": "Ausstehende Bankbenachrichtigung verwerfen",
+    "imageSourceTitle": "Bildquelle wählen",
+    "imageSourceCamera": "Kamera",
+    "imageSourceGallery": "Galerie",
+    "trialDaysLeft": "Kostenloser Test: noch {{count}} Tage",
+    "trialExpiredToday": "Deine Testphase endet heute!"
   },
   "processing": {
     "title": "KI analysiert...",
@@ -394,6 +403,8 @@
     "yearlyPlanLabel": "Jährlich",
     "annualSaveBadge": "TOP‑PREIS",
     "continueCta": "Gratis testen",
+    "subscribeNowCta": "Jetzt abonnieren",
+    "subscriptionSummaryNoTrial": "{{price}}/{{period}}. Automatische Verlängerung bis zur Kündigung in {{store}}.",
     "continueCtaHint": "Als Nächstes öffnet sich der App Store. Bei Kündigung vor Ende der 7 Tage entstehen keine Kosten.",
     "subscriptionAlreadyOwnedTitle": "Bereits abonniert",
     "subscriptionAlreadyOwnedBody": "Diese Apple‑ID hat dieses Abo bereits. Tippe auf „Käufe wiederherstellen“, um es mit Centifi zu synchronisieren.",
@@ -482,5 +493,18 @@
     "entertainment": "Unterhaltung",
     "utilities": "Nebenkosten",
     "other": "Sonstiges"
+  },
+  "regret": {
+    "question": "Bist du mit dieser Ausgabe zufrieden?",
+    "optionHappy": "Ja",
+    "optionNeutral": "Geht so",
+    "optionRegret": "Nein",
+    "skip": "Überspringen",
+    "sectionTitle": "Reue-Analyse",
+    "disclaimer": "Basierend auf Fragen, die 24 Stunden nach dem Öffnen einer Ausgabe gestellt werden."
+  },
+  "coach": {
+    "sectionTitle": "Finanz-Coach",
+    "detailsCta": "Details anzeigen →"
   }
 }

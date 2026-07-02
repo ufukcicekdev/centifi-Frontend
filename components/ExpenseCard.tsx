@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Image, Modal } from "react-native";
 import { Expense, getCategoryMeta } from "../constants/mockData";
 import CategoryGlyph from "./CategoryGlyph";
+import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "../store/useStore";
 import type { Language } from "../i18n";
 import { currencySymbolFor, formatAmountDigits } from "../lib/formatMoney";
@@ -27,13 +28,17 @@ export default function ExpenseCard({
   const textColor = isDark ? "#ffffff" : "#0f0f0f";
   const mutedColor = isDark ? "#888888" : "#666666";
 
+  // ✅ FIX 1: Add receipt preview state
+  const [showReceiptModal, setShowReceiptModal] = React.useState(false);
+
   const formattedDate = new Date(expense.date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
   });
 
   return (
-    <Pressable
+    <>
+      <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: "row",

@@ -183,6 +183,7 @@ export default function SubscribeScreen() {
   const isDark = useStore((s) => s.isDark);
   const isPro = useStore((s) => s.isPro);
   const proExpires = useStore((s) => s.proEntitlementExpiresAt);
+  const gracePeriodStartDate = useStore((s) => s.gracePeriodStartDate);
 
   const [loading, setLoading] = useState(true);
   const [packages, setPackages] = useState<
@@ -218,7 +219,12 @@ export default function SubscribeScreen() {
   const billingStoreLabel =
     Platform.OS === "android" ? t("subscribe.storeGooglePlay") : t("subscribe.storeAppStore");
 
-  const showTrialBanner = !isPro && isRevenueCatConfigured() && !loading && packages.length > 0;
+  const showTrialBanner =
+    !isPro &&
+    isRevenueCatConfigured() &&
+    !loading &&
+    packages.length > 0 &&
+    !!monthlyBillingPkg?.product?.introPrice;
 
   useFocusEffect(
     useCallback(() => {
@@ -478,7 +484,23 @@ export default function SubscribeScreen() {
           </View>
         ) : null}
 
-        {mandatory ? (
+        {mandatory && gracePeriodStartDate ? (
+          <View style={{
+            backgroundColor: "#FF3B3018",
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 14,
+            flexDirection: "row",
+            alignItems: "flex-start",
+            borderWidth: 1,
+            borderColor: "#FF3B3040",
+          }}>
+            <Ionicons name="time-outline" size={18} color="#FF3B30" style={{ marginRight: 10, marginTop: 1 }} />
+            <Text style={{ color: textColor, fontSize: 14, lineHeight: 21, flex: 1 }}>
+              {t("subscribe.gracePeriodExpiredHint")}
+            </Text>
+          </View>
+        ) : mandatory ? (
           <Text style={{ color: textColor, fontSize: 14, lineHeight: 21, marginBottom: 12, fontWeight: "600" }}>
             {t("subscribe.mandatoryPaywallHint")}
           </Text>
@@ -781,7 +803,9 @@ export default function SubscribeScreen() {
                       }}
                       numberOfLines={1}
                     >
-                  {t("subscribe.continueCta")}
+                  {showTrialBanner
+                    ? t("subscribe.continueCta")
+                    : t("subscribe.subscribeNowCta")}
                 </Text>
               </>
             )}
@@ -797,11 +821,17 @@ export default function SubscribeScreen() {
                     paddingHorizontal: 4,
                   }}
                 >
-                  {t("subscribe.subscriptionSummaryTrial", {
-                    price: monthlyBillingPkg.product.priceString,
-                    period: t("subscribe.periodMonthly"),
-                    store: billingStoreLabel,
-                  })}
+                  {showTrialBanner
+                    ? t("subscribe.subscriptionSummaryTrial", {
+                        price: monthlyBillingPkg.product.priceString,
+                        period: t("subscribe.periodMonthly"),
+                        store: billingStoreLabel,
+                      })
+                    : t("subscribe.subscriptionSummaryNoTrial", {
+                        price: monthlyBillingPkg.product.priceString,
+                        period: t("subscribe.periodMonthly"),
+                        store: billingStoreLabel,
+                      })}
                 </Text>
               ) : null}
               <Text

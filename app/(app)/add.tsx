@@ -263,12 +263,12 @@ export default function AddExpense() {
   const lang = language as Language;
   const recLabels = REC_LABELS[lang];
 
+  const PURPLE = "#6C63FF";
   const bg = isDark ? "#000000" : "#f5f5f5";
   const textColor = isDark ? "#fff" : "#111";
   const mutedColor = isDark ? "#6b6b70" : "#888";
   const pillBg = isDark ? "#1c1c1e" : "#efefef";
   const bottomBarBg = isDark ? "#0a0a0a" : "#fff";
-  const saveBtnBg = isDark ? "#2c2c2e" : "#e2e2e6";
 
   const handleSave = async () => {
     const num = parseFloat(amount.replace(",", "."));
@@ -382,11 +382,20 @@ export default function AddExpense() {
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={mutedColor} />
                 </Pressable>
-                <Pressable onPress={() => setRecurrenceOpen(true)} style={pillStyle}>
-                  <Text style={{ color: textColor, fontSize: 14, fontWeight: "600" }}>
+                <Pressable
+                  onPress={() => setRecurrenceOpen(true)}
+                  style={[
+                    pillStyle,
+                    recurrence !== "once" && { backgroundColor: `${PURPLE}22`, borderWidth: 1.5, borderColor: PURPLE },
+                  ]}
+                >
+                  {recurrence !== "once" && (
+                    <Ionicons name="repeat" size={14} color={PURPLE} />
+                  )}
+                  <Text style={{ color: recurrence !== "once" ? PURPLE : textColor, fontSize: 14, fontWeight: "600" }}>
                     {recLabels[recurrence]}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={mutedColor} />
+                  <Ionicons name="chevron-down" size={14} color={recurrence !== "once" ? PURPLE : mutedColor} />
                 </Pressable>
                 <Text style={{ color: mutedColor, fontSize: 13 }}>{t("dashboard.listFilterIn")}</Text>
                 <Pressable onPress={() => setListsModalOpen(true)} style={pillStyle}>
@@ -473,7 +482,13 @@ export default function AddExpense() {
                 return (
                   <Pressable
                     key={cat.id}
-                    onPress={() => setSelectedCategory(cat.id)}
+                    onPress={async () => {
+                      setSelectedCategory(cat.id);
+                      try {
+                        const { selectionAsync } = await import("expo-haptics");
+                        await selectionAsync();
+                      } catch { /* noop */ }
+                    }}
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
@@ -524,7 +539,7 @@ export default function AddExpense() {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 10,
-                  backgroundColor: saveBtnBg,
+                  backgroundColor: isDark ? "#2c2c2e" : "#e2e2e6",
                   borderRadius: 16,
                   paddingVertical: 16,
                   opacity: saving ? 0.65 : 1,
